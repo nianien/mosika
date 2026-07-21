@@ -6,36 +6,39 @@ parse
 
 expr
  : '(' expr ')' #PAREN
- | '!'<assoc=right> expr #NOT
+ | <assoc=right> '!' expr #NOT
  | expr '&&' expr #AND
  | expr '||' expr #OR
  | expr '?'  expr (':' expr)? #IF
  | expr '->' expr #SER
  | expr '=>' expr #PAR
- | LIMIT LP CONST ',' CONST ',' arguments RP #LIMIT
- | ID #ID
+ | HITS LP bound ',' bound ',' arguments RP #HITS
+ | (ID | NUMBER) #ID
  ;
 
 arguments
  : expr (',' expr )*
  ;
 
+bound
+ : NUMBER
+ | UNBOUNDED
+ ;
+
 LP:'(';
 RP:')';
-LIMIT: 'limit';
+HITS: 'hits';
 STRING:'"'(ESC|.)*?':';
 fragment ESC:'\\'[btnr"\\];
 
-CONST: '\'' [-]?DIGIT+ '\'';
+UNBOUNDED: '_';
+NUMBER: DIGIT+;
 
 ID: '∅'|(ID_LETTER|DIGIT)+;
 fragment ID_LETTER:'a'..'z'|'A'..'Z'|'_';
 fragment DIGIT:'0'..'9';
 
 WS: [ \t\r\n]+ -> skip;
-
-
-
 
 
 

@@ -31,7 +31,7 @@ public class ByteBuddyTest {
                 .visit(Advice.to(Decorator.class).on(ElementMatchers.isGetter()))
                 .make()
                 .load(Thread.currentThread().getContextClassLoader())
-                .getLoaded().newInstance();
+                .getLoaded().getDeclaredConstructor().newInstance();
 
         System.out.println(Reflections.invoke("getReplace", instance, new Object[0]));
     }

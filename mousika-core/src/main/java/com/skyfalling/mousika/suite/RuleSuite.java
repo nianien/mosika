@@ -35,11 +35,7 @@ public class RuleSuite {
     private final RuleContext ruleContext = null;
 
 
-    private static RuleSuite current;
-
-    {
-        current = this;
-    }
+    private static volatile RuleSuite current;
 
     /**
      * 获取当前规则套件
@@ -61,6 +57,7 @@ public class RuleSuite {
         this.ruleEvaluator = create(ruleDefinitions, udfDefinitions);
         this.scenes = sceneDefinitions.stream().map(SceneDefinition::build)
                 .collect(Collectors.toMap(RuleScene::getId, Function.identity(), (v1, v2) -> v2));
+        current = this;
     }
 
     /**

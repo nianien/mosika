@@ -14,18 +14,22 @@ import org.antlr.v4.runtime.*;
 public class Antlr4Parser {
 
     public static RuleNode parse(String expression, NodeGenerator generator) {
-        RuleLexer lexer = new RuleLexer(new ANTLRInputStream(expression));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(new BaseErrorListener() {
+        BaseErrorListener errorListener = new BaseErrorListener() {
             @Override
             public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                     int line, int charPositionInLine, String msg,
                                     RecognitionException e) {
-                throw new IllegalStateException(msg, e);
+                throw new IllegalStateException("line " + line + ":" + charPositionInLine + " " + msg, e);
             }
-        });
+        };
+        RuleLexer lexer = new RuleLexer(CharStreams.fromString(expression));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
         RuleParser parser = new RuleParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
         RuleVisitor visitor = new DefaultRuleVisitor(generator);
-        return (RuleNode) visitor.visit(parser.expr());
+        RuleParser.ParseContext context = parser.parse();
+        return (RuleNode) visitor.visit(context.expr());
     }
 }

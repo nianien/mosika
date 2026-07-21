@@ -1,16 +1,21 @@
 package com.skyfalling.mousika;
 
 import com.cudrania.core.utils.TimeCounter;
+import com.skyfalling.mousika.engine.RuleDefinition;
 import com.skyfalling.mousika.engine.RuleEngine;
 import com.skyfalling.mousika.engine.UdfDefinition;
+import com.skyfalling.mousika.utils.JsRuntime;
 import lombok.SneakyThrows;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 
-import javax.script.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,28 +30,18 @@ public class RuleEngineTest {
     @SneakyThrows
     @Test
     public void ruleRuleEngine2() {
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName("graal.js");
-        Bindings bindings = engine.getBindings(ScriptContext.ENGINE_SCOPE);
-        bindings.put("polyglot.js.nashorn-compat", true);
-        CompiledScript compiledScript = ((Compilable) engine).compile("add1(1,1)");
-        List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            Thread thread = new Thread(() -> {
-                try {
-                    ScriptEngine se = new ScriptEngineManager().getEngineByName("graal.js");
-                    se.eval("function add(a,b){return a+b};");
-                    Bindings bindings1 = engine.createBindings();
-                    bindings1.put("add1", se.getBindings(ScriptContext.ENGINE_SCOPE).get("add"));
-                    System.out.println(compiledScript.eval(bindings1));
-                } catch (ScriptException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            thread.start();
-            threads.add(thread);
-        }
-        for (Thread thread : threads) {
-            thread.join();
+        Source source = JsRuntime.createSource("$.value + 1", "concurrent-source");
+        List<CompletableFuture<Integer>> futures = IntStream.range(0, 10)
+                .mapToObj(value -> CompletableFuture.supplyAsync(() -> {
+                    try (Context context = JsRuntime.createContext()) {
+                        context.getBindings(JsRuntime.LANGUAGE_ID)
+                                .putMember("$", Map.of("value", value));
+                        return context.eval(source).asInt();
+                    }
+                }))
+                .toList();
+        for (int i = 0; i < futures.size(); i++) {
+            assertEquals(i + 1, futures.get(i).join());
         }
     }
 
@@ -114,6 +109,21 @@ public class RuleEngineTest {
         map.put("customerId", "b");
         System.out.println(ruleEngine.evalExpr(desc, map, null));
         assertEquals("代理商【a】不允许【b】跨开{}", ruleEngine.evalExpr(desc, map, null));
+    }
+
+    @Test
+    public void testDescriptionEscaping() {
+        String desc = "用户“{$.name}”状态：\"{$$.status}\"\n路径 C:\\temp";
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("escapedDesc", "true", desc))
+                .build();
+
+        String result = ruleEngine.evalRuleDesc(
+                "escapedDesc",
+                Map.of("name", "jack"),
+                Map.of("status", "通过"));
+
+        assertEquals("用户“jack”状态：\"通过\"\n路径 C:\\temp", result);
     }
 
     @Test

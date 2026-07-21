@@ -1,7 +1,7 @@
-package com.skyfalling.mousika.ui.tree2.node.flow;
+package com.skyfalling.mousika.ui.tree.node.flow;
 
 
-import com.skyfalling.mousika.ui.tree2.node.rule.RNode;
+import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import lombok.Getter;
 import lombok.Setter;
 

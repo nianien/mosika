@@ -1,12 +1,13 @@
-package com.skyfalling.mousika.ui.tree2;
+package com.skyfalling.mousika.ui.tree;
 
 import com.google.common.base.Preconditions;
 import com.skyfalling.mousika.eval.node.*;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
-import com.skyfalling.mousika.ui.tree2.node.define.FlowNode;
-import com.skyfalling.mousika.ui.tree2.node.flow.*;
-import com.skyfalling.mousika.ui.tree2.node.rule.LNode;
-import com.skyfalling.mousika.ui.tree2.node.rule.RNode;
+import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
+import com.skyfalling.mousika.ui.tree.node.flow.*;
+import com.skyfalling.mousika.ui.tree.node.rule.HNode;
+import com.skyfalling.mousika.ui.tree.node.rule.LNode;
+import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import com.skyfalling.mousika.utils.Constants;
 
 import java.util.ArrayList;
@@ -69,15 +70,11 @@ public class UINodeAdapter {
         if (ruleNode instanceof ParNode) {
             return parNode2FlowNode((ParNode) ruleNode);
         }
-        if (ruleNode instanceof NotNode) {
-            CNode cn = new CNode(ruleNode.not().expr());
-            cn.setNegative(true);
-            return cn;
-        }
-        if (ruleNode instanceof AndNode || ruleNode instanceof OrNode) {
-            JNode jn = new JNode();
-            jn.setRule(ruleNode2RNode(ruleNode));
-            return jn;
+        if (ruleNode instanceof NotNode
+                || ruleNode instanceof AndNode
+                || ruleNode instanceof OrNode
+                || ruleNode instanceof HitsNode) {
+            return ruleNode2CNode(ruleNode);
         }
         if (ruleNode instanceof ExprNode) {
             return new ANode(ruleNode.expr());
@@ -118,7 +115,7 @@ public class UINodeAdapter {
      */
     private RuleNode cNode2Rule(CNode cn) {
         if (cn.getAction() == null) {
-            throw new IllegalArgumentException("CNode's action is required!");
+            return NodeBuilder.build(cn.ruleExpr());
         }
         return new CaseNode(NodeBuilder.build(cn.ruleExpr()), toRule(cn.getAction()));
     }
@@ -131,17 +128,20 @@ public class UINodeAdapter {
      * @return
      */
     private RuleNode dNode2Rule(DNode dn) {
-        if (dn.getAction() == null) {
-            throw new IllegalArgumentException("DNode's action is required!");
+        if (dn.getBranches().isEmpty()
+                || dn.getBranches().size() == 1 && dn.getAction() == null) {
+            throw new IllegalArgumentException("DNode requires at least two outcomes!");
         }
         List<CNode> branches = new ArrayList<>(dn.getBranches());
         CaseNode root = new CaseNode(new ExprNode(""), new ExprNode(""));
         CaseNode current = root;
-        for (int i = 0; i < branches.size(); i++) {
-            CNode fn = branches.get(i);
-            CaseNode caseNode = current;
-            caseNode.setFalseCase(toRule(fn));
-            current = (CaseNode) caseNode.getFalseCase();
+        for (CNode branch : branches) {
+            if (branch.getAction() == null) {
+                throw new IllegalArgumentException("DNode branch action is required!");
+            }
+            CaseNode caseNode = new CaseNode(NodeBuilder.build(branch.ruleExpr()), toRule(branch.getAction()));
+            current.setFalseCase(caseNode);
+            current = caseNode;
         }
         if (dn.getAction() != null) {
             current.setFalseCase(toRule(dn.getAction()));
@@ -177,19 +177,26 @@ public class UINodeAdapter {
      * @return
      */
     private CNode caseNode2CNode(CaseNode caseNode) {
-        RuleNode condition = caseNode.getCondition();
-        RNode rn = ruleNode2RNode(condition);
+        CNode node = ruleNode2CNode(caseNode.getCondition());
+        if (caseNode.getTrueCase() != null) {
+            node.setAction(fromRule(caseNode.getTrueCase()));
+        }
+        return node;
+    }
+
+    /**
+     * 条件规则转条件节点。
+     */
+    private CNode ruleNode2CNode(RuleNode ruleNode) {
+        RNode rn = ruleNode2RNode(ruleNode);
         if (rn instanceof LNode) {
             JNode jn = new JNode();
             jn.setRule(rn);
-            jn.setAction(fromRule(caseNode.getTrueCase()));
             return jn;
-        } else {
-            CNode cn = new CNode(rn.getExpr());
-            cn.setNegative(rn.isNegative());
-            cn.setAction(fromRule(caseNode.getTrueCase()));
-            return cn;
         }
+        CNode cn = new CNode(rn.getExpr());
+        cn.setNegative(rn.isNegative());
+        return cn;
     }
 
     /**
@@ -224,7 +231,12 @@ public class UINodeAdapter {
             negative = true;
         }
         LNode node;
-        if (ruleNode instanceof AndNode) {
+        if (ruleNode instanceof HitsNode) {
+            HitsNode hitsNode = (HitsNode) ruleNode;
+            node = new HNode(hitsNode.getMinHits(), hitsNode.getMaxHits());
+            node.setNegative(negative);
+            hitsNode.getNodes().forEach(r -> node.addRule(ruleNode2RNode(r)));
+        } else if (ruleNode instanceof AndNode) {
             node = LNode.and();
             node.setNegative(negative);
             ((AndNode) ruleNode).getNodes().forEach(r -> node.addRule(ruleNode2RNode(r)));
@@ -255,17 +267,30 @@ public class UINodeAdapter {
             SNode sn = new SNode();
             nodes.forEach(n -> sn.addBranch(fromRule(n)));
             return sn;
-        } else {//ANode
-            ANode root = (ANode) fromRule(first);
-            FlowNode current = root;
-            for (RuleNode node : nodes) {
-                ANode an = ((ANode) current);
-                an.setNext(fromRule(node));
-                current = an.getNext();
-            }
-            return root;
         }
-
+        List<FlowNode> flows = new ArrayList<>();
+        flows.add(fromRule(first));
+        nodes.forEach(node -> flows.add(fromRule(node)));
+        if (flows.size() == 1) {
+            return flows.get(0);
+        }
+        boolean actionChain = flows.subList(0, flows.size() - 1).stream()
+                .allMatch(ANode.class::isInstance);
+        if (!actionChain) {
+            SNode sn = new SNode();
+            flows.forEach(sn::addBranch);
+            return sn;
+        }
+        ANode root = (ANode) flows.get(0);
+        ANode current = root;
+        for (int i = 1; i < flows.size(); i++) {
+            FlowNode flow = flows.get(i);
+            current.setNext(flow);
+            if (flow instanceof ANode) {
+                current = (ANode) flow;
+            }
+        }
+        return root;
     }
 
 

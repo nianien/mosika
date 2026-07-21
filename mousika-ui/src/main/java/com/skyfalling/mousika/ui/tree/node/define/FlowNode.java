@@ -1,4 +1,4 @@
-package com.skyfalling.mousika.ui.tree2.node.define;
+package com.skyfalling.mousika.ui.tree.node.define;
 
 /**
  * Flow流式节点

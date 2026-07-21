@@ -133,17 +133,17 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     @Override
-    public Object getProperty(Object name) {
+    public synchronized Object getProperty(Object name) {
         return super.get(name);
     }
 
     @Override
-    public void setProperty(String name, Object value) {
+    public synchronized void setProperty(String name, Object value) {
         super.put(name, value);
     }
 
     @Override
-    public void removeProperty(String name) {
+    public synchronized void removeProperty(String name) {
         super.remove(name);
     }
 
@@ -207,10 +207,6 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         evalCache.put(expr, result);
     }
 }
-
-
-
-
 
 
 

@@ -2,14 +2,17 @@ package com.skyfalling.mousika.utils;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.JsonParser.Feature;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.hubspot.jackson.datatype.protobuf.ProtobufModule;
@@ -32,24 +35,25 @@ public class JsonUtils {
     private static ObjectMapper objectMapper;
 
     static {
-        objectMapper = new ObjectMapper()
-                //空字段不序列化
-                .setSerializationInclusion(Include.NON_NULL)
+        objectMapper = JsonMapper.builder()
                 // 允许字段名不用引号
-                .configure(Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+                .enable(JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES)
                 // 允许使用单引号
-                .configure(Feature.ALLOW_SINGLE_QUOTES, true)
+                .enable(JsonReadFeature.ALLOW_SINGLE_QUOTES)
                 // 允许数字含有前导0
-                .configure(Feature.ALLOW_NUMERIC_LEADING_ZEROS, true)
-                .configure(Feature.STRICT_DUPLICATE_DETECTION, true)
+                .enable(JsonReadFeature.ALLOW_LEADING_ZEROS_FOR_NUMBERS)
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 // 允许未知的属性
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-                .setVisibility(PropertyAccessor.FIELD, Visibility.ANY)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                //空字段不序列化
+                .defaultPropertyInclusion(JsonInclude.Value.construct(Include.NON_NULL, Include.NON_NULL))
+                .visibility(PropertyAccessor.FIELD, Visibility.ANY)
                 //无需默认构造方法
-                .registerModule(new ParameterNamesModule(JsonCreator.Mode.PROPERTIES))
-                .registerModule(new KotlinModule())
-                .registerModule(new ProtobufModule());
+                .addModule(new ParameterNamesModule(JsonCreator.Mode.PROPERTIES))
+                .addModule(new KotlinModule.Builder().build())
+                .addModule(new ProtobufModule())
+                .build();
     }
 
 

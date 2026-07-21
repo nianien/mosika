@@ -1,10 +1,9 @@
 package com.skyfalling.mousika.udf;
 
-import lombok.SneakyThrows;
+import com.skyfalling.mousika.utils.JsRuntime;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Value;
 
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import java.util.function.Function;
 
 /**
@@ -22,11 +21,11 @@ public class JsUdf implements Function<Object[], Object> {
     /**
      * 类级线程副本
      */
-    private static ThreadLocal<ScriptEngine> engineFactory = ThreadLocal.withInitial(() -> new ScriptEngineManager().getEngineByName("js"));
+    private static final ThreadLocal<Context> CONTEXT_FACTORY = ThreadLocal.withInitial(JsRuntime::createContext);
     /**
      * 实例级线程副本
      */
-    private ThreadLocal<Object> funcFactory = ThreadLocal.withInitial(this::createFuncObject);
+    private final ThreadLocal<Value> funcFactory = ThreadLocal.withInitial(this::createFuncObject);
 
 
     /**
@@ -35,7 +34,6 @@ public class JsUdf implements Function<Object[], Object> {
      * @param funcName 函数名称
      * @param funcBody 函数定义
      */
-    @SneakyThrows
     public JsUdf(String funcName, String funcBody) {
         this.funcName = funcName;
         this.funcBody = funcBody;
@@ -43,15 +41,17 @@ public class JsUdf implements Function<Object[], Object> {
 
     @Override
     public Object apply(Object... objects) {
-        Function<Object[], Object> func = (Function<Object[], Object>) funcFactory.get();
-        return func.apply(objects);
+        return JsRuntime.toJava(funcFactory.get().execute(objects));
     }
 
-    @SneakyThrows
-    private Object createFuncObject() {
-        ScriptEngine engine = engineFactory.get();
-        engine.eval(funcBody);
-        return engine.getBindings(ScriptContext.ENGINE_SCOPE).get(funcName);
+    private Value createFuncObject() {
+        Context context = CONTEXT_FACTORY.get();
+        context.eval(JsRuntime.createSource(funcBody, "udf-" + funcName));
+        Value function = context.getBindings(JsRuntime.LANGUAGE_ID).getMember(funcName);
+        if (function == null || !function.canExecute()) {
+            throw new IllegalArgumentException("JavaScript UDF is not executable: " + funcName);
+        }
+        return function;
     }
 
 }

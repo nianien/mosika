@@ -1,338 +1,353 @@
 package com.skyfalling.mousika.ui.tree;
 
-import com.skyfalling.mousika.engine.RuleDefinition;
-import com.skyfalling.mousika.engine.UdfDefinition;
 import com.skyfalling.mousika.eval.node.RuleNode;
-import com.skyfalling.mousika.eval.result.NodeResult;
-import com.skyfalling.mousika.suite.RuleSuite;
-import com.skyfalling.mousika.ui.tree.mock.SimpleRuleLoader;
-import com.skyfalling.mousika.ui.tree.node.*;
-import com.skyfalling.mousika.ui.tree.udf.ActionUdf;
-import lombok.SneakyThrows;
+import com.skyfalling.mousika.eval.parser.NodeBuilder;
+import com.skyfalling.mousika.ui.tree.node.TreeNode;
+import com.skyfalling.mousika.ui.tree.node.flow.*;
+import com.skyfalling.mousika.ui.tree.node.rule.HNode;
+import com.skyfalling.mousika.ui.tree.node.rule.LNode;
+import com.skyfalling.mousika.ui.tree.node.rule.RNode;
+import com.skyfalling.mousika.utils.JsonUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Created on 2022/6/27
+ * Created on 2023/4/24
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class TreeNodeTest {
 
     @Test
-    @SneakyThrows
-    public void testTreeNode1() {
-        TreeNode tree = TreeNode.create();
-        ZNode zNode = new ZNode();
-        PNode l1 = PNode.of("201");
-        PNode l1_1 = PNode.of("202");
-        l1_1.setAction(ANode.of("104"));
-        l1.addBranch(l1_1);
-        l1.setAction(ANode.of("105"));
-        zNode.addBranch(l1);
-        PNode l2 = PNode.of("203");
-        l2.setAction(ANode.of("107"));
-        zNode.addBranch(l2);
-        zNode.setAction(ANode.of("106"));
-        tree.addFlow(zNode);
-        System.out.println(TreeAdapter.toRule(tree).expr());
+    public void testHitsRoundTrip() {
+        String expression = "hits(_,2,101,102,103)?104:105";
+        TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(expression));
+        String json = JsonUtils.toJson(tree);
+        assertTrue(json.contains("\"type\":\"H\""));
+        assertFalse(json.contains("\"minHits\""));
+        assertTrue(json.contains("\"maxHits\":2"));
+
+        TreeNode restored = JsonUtils.toBean(json, TreeNode.class);
+        assertEquals(expression, restored.toRule().expr());
+        assertEquals(json, JsonUtils.toJson(restored));
     }
 
     @Test
-    @SneakyThrows
-    public void testTreeNode2() {
-        TreeNode tree = TreeNode.create();
-        ZNode zNode = new ZNode();
-        PNode l1 = PNode.of("207");
-        l1.setAction(ANode.of("117"));
-        PNode l1_1 = PNode.of("208");
-        l1.addBranch(l1_1);
-        l1_1.setAction(ANode.of("105"));
-        PNode l1_1_1 = PNode.of("202");
-        ANode a1_1_1 = ANode.of("104");
-        l1_1_1.setAction(a1_1_1);
-        a1_1_1.addFlow(FNode.of("106"));
-        a1_1_1.addFlow(FNode.of("107"));
-        l1_1.addBranch(l1_1_1);
-        zNode.addBranch(l1);
-        tree.addFlow(zNode);
-        System.out.println(tree.toJson());
-        System.out.println(TreeAdapter.toRule(tree).expr());
+    public void testTopLevelHits() {
+        String expression = "hits(2,_,101,102,103)";
+        TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(expression));
+        JNode judge = assertInstanceOf(JNode.class, tree.getNext());
+        assertInstanceOf(HNode.class, judge.getRule());
+        assertEquals(expression, judge.ruleExpr());
+        assertEquals(expression, tree.toRule().expr());
+
+        TreeNode restored = JsonUtils.toBean(JsonUtils.toJson(tree), TreeNode.class);
+        JNode restoredJudge = assertInstanceOf(JNode.class, restored.getNext());
+        assertInstanceOf(HNode.class, restoredJudge.getRule());
+        assertEquals(expression, restoredJudge.ruleExpr());
+        assertEquals(expression, restored.toRule().expr());
     }
 
     @Test
-    @SneakyThrows
-    public void testTreeNode3() {
-        TreeNode tree = TreeNode.create();
-        tree.addFlow(FNode.of("102"));
-        tree.addFlow(FNode.of("103"));
-        {
-            ZNode zNode = new ZNode();
-            PNode l1 = PNode.of("201");
-            PNode l1_1 = PNode.of("202");
-            l1_1.setAction(ANode.of("104"));
-            l1.addBranch(l1_1);
-            l1.setAction(ANode.of("105"));
-            zNode.addBranch(l1);
-            zNode.setAction(ANode.of("106"));
-            tree.addFlow(zNode);
-        }
+    public void testTopLevelLogicRoundTrip() {
+        for (String expression : new String[]{
+                "c1&&!c2",
+                "!c1",
+                "!(c1&&c2)",
+                "!hits(1,2,c1,c2,c3)"
+        }) {
+            TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(expression));
+            assertEquals(expression, tree.toRule().expr());
 
-        {
-            ZNode zNode = new ZNode();
-            PNode l1 = PNode.of("203");
-            l1.setAction(ANode.of("108"));
-            zNode.addBranch(l1);
-            zNode.setAction(ANode.of("109"));
-            tree.addFlow(zNode);
+            TreeNode restored = TreeNode.fromJson(tree.toJson());
+            assertEquals(expression, restored.toRule().expr());
         }
+    }
 
-        tree.addFlow(FNode.of("111"));
-        tree.addFlow(FNode.of("112"));
-        tree.addFlow(FNode.of("113"));
-        {
-            ZNode zNode = new ZNode();
-            PNode l1 = PNode.of("204");
-            l1.setAction(ANode.of("114"));
-            zNode.addBranch(l1);
-            zNode.setAction(ANode.of("115"));
-            tree.addFlow(zNode);
-        }
+    @Test
+    public void testSerialWithNonActionNodes() {
+        String expression = "a0->(c1?a1)->a2";
+        TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(expression));
+        assertInstanceOf(SNode.class, tree.getNext());
 
-        {
-            ZNode zNode = new ZNode();
-            PNode l1 = PNode.of("205");
-            l1.setAction(ANode.of("117"));
-            PNode l2 = PNode.of("206");
-            l2.setAction(ANode.of("118"));
-            zNode.addBranch(l1);
-            zNode.addBranch(l2);
-            tree.addFlow(zNode);
-        }
+        RuleNode restoredRule = tree.toRule();
+        assertEquals("∅->a0->(c1?a1)->a2", restoredRule.expr());
+        assertEquals(tree.toJson(), new TreeNode().fromRule(NodeBuilder.build(restoredRule.expr())).toJson());
+    }
 
-        {
-            ZNode zNode = new ZNode();
-            PNode l1 = PNode.of("207");
-            l1.setAction(ANode.of("117"));
-            PNode l1_1 = PNode.of("208");
-            l1.addBranch(l1_1);
-            l1_1.setAction(ANode.of("105"));
-            PNode l1_1_1 = PNode.of("202");
-            l1_1_1.setAction(ANode.of("104"));
-            l1_1.addBranch(l1_1_1);
-            zNode.addBranch(l1);
-            tree.addFlow(zNode);
-        }
-        String json = tree.toJson();
-        System.out.println(json);
-        assertEquals(TreeNode.fromJson(json).toJson(), json);
-        String expr = TreeAdapter.toRule(tree).expr();
-        System.out.println(expr);
-        assertEquals(json, TreeAdapter.fromRule(expr).toJson());
+    @Test
+    public void testCollectAndValidate() {
+        TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(
+                "a0->(c1?hits(1,2,r1,r_2)?a1:a2)->a3"));
+        tree.validate();
+        assertEquals(Set.of("a0", "c1", "r1", "r_2", "a1", "a2", "a3"), tree.collect());
+
+        HNode invalidHits = new HNode(3, 3);
+        invalidHits.addRule(r("r1")).addRule(r("r2"));
+        JNode judge = new JNode();
+        judge.setRule(invalidHits);
+        TreeNode invalidTree = new TreeNode();
+        invalidTree.setNext(judge);
+        assertThrows(IllegalStateException.class, invalidTree::validate);
+
+        DNode redundantDecision = new DNode();
+        redundantDecision.addBranch(c("c1", "a1"));
+        TreeNode redundantTree = new TreeNode();
+        redundantTree.setNext(redundantDecision);
+        assertThrows(IllegalStateException.class, redundantTree::validate);
+        assertThrows(IllegalArgumentException.class, redundantTree::toRule);
+    }
+
+    @Test
+    public void testFlow() {
+        TreeNode tree = new TreeNode();
+        ANode a1 = a("a1");
+        ANode a2 = a("a2");
+        CNode c3 = c("c3");
+        ANode a3 = a("a3");
+        ANode a4 = a("a4");
+        tree.setNext(a1);
+        a1.setNext(a2);
+        a2.setNext(c3);
+        c3.setAction(a3);
+        a3.setNext(a4);
+        RuleNode rule = tree.toRule();
+        System.out.println(rule);
+        TreeNode t2 = new TreeNode().fromRule(rule);
+        System.out.println(JsonUtils.toJson(t2));
+        assertEquals("{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\"a1\",\"next\":{\"type\":\"A\",\"expr\":\"a2\",\"next\":{\"type\":\"C\",\"expr\":\"c3\",\"negative\":false,\"action\":{\"type\":\"A\",\"expr\":\"a3\",\"next\":{\"type\":\"A\",\"expr\":\"a4\"}}}}}}",
+                JsonUtils.toJson(t2));
     }
 
 
     @Test
-    @SneakyThrows
-    public void testFromRuleNode() {
-        //1&&2
-        GNode l1 = GNode.and().addRule(RNode.of("1")).addRule(RNode.of("2"));
-        PNode l2_1 = PNode.of("3");
-        l2_1.setAction(ANode.of("a"));
-        l1.addBranch(l2_1);
+    public void testDecision() {
+        TreeNode tree = new TreeNode();
+        ANode a0 = new ANode("a0");
+        tree.setNext(a0);
+        DNode d1 = new DNode();
+        a0.setNext(d1);
+        d1.addBranch(c("c1", "a1"));
+        d1.addBranch(c("c2", "a2"));
+        d1.setAction(new ANode("a3"));
+        RuleNode rule = tree.toRule();
+        RuleNode ruleNode3 = NodeBuilder.build(rule.expr());
+        System.out.println(JsonUtils.toJson(rule));
+        System.out.println(JsonUtils.toJson(ruleNode3));
+        TreeNode t2 = new TreeNode().fromRule(rule);
 
-        PNode l2_2 = PNode.of("4");
-        l2_2.setAction(ANode.of("b"));
-        l1.addBranch(l2_2);
-        l1.setAction(ANode.of("c"));
-
-        ZNode zNode = new ZNode();
-        zNode.addBranch(l1);
-        zNode.setAction(ANode.of("c"));
-        TreeNode ruleTree = TreeNode.create();
-        ruleTree.addFlow(zNode);
-        String originJson = ruleTree.toJson();
-        System.out.println(originJson);
-        RuleNode ruleNode = TreeAdapter.toRule(ruleTree);
-        TreeNode ruleTree2 = TreeAdapter.fromRule(ruleNode);
-        String convertJson = ruleTree2.toJson();
-        System.out.println(convertJson);
-        assertEquals(originJson, convertJson);
-    }
-
-    @SneakyThrows
-    @ParameterizedTest
-    @CsvSource(
-            value = {
-                    "(1&&2)?3?4?(!5&&(6||7))?!(8&&9)?a:b:(10||11)?c:12?d:e#b"
-            }, delimiter = '#'
-    )
-    public void testTreeEval(String expr, String result) {
-        //1&&2
-        GNode l1 = GNode.and().addRule(RNode.of("1")).addRule(RNode.of("2"));
-        PNode l2_1 = PNode.of("3");
-        PNode l3_1 = PNode.of("4");
-
-        //5&&(6||7)
-        GNode l4_1 = GNode.and().addRule(RNode.of("5").negative())
-                .addRule(LNode.or().addRule(RNode.of("6")).addRule(RNode.of("7")));
-
-        //8&&9
-        GNode l5_1 = GNode.and().addRule(RNode.of("8")).addRule(RNode.of("9")).negative();
-        l5_1.setAction(ANode.of("a"));
-        l4_1.addBranch(l5_1);
-        l4_1.setAction(ANode.of("b"));
-        l3_1.addBranch(l4_1);
-        l2_1.addBranch(l3_1);
-
-        //10||11
-        GNode l3_2 = GNode.or().addRule(RNode.of("10")).addRule(RNode.of("11"));
-        l3_2.setAction(ANode.of("c"));
-        l2_1.addBranch(l3_2);
-
-        PNode l2_2 = PNode.of("12");
-        l2_2.setAction(ANode.of("d"));
-        l1.addBranch(l2_1).addBranch(l2_2);
-
-        TreeNode ruleTree = TreeNode.create();
-        ZNode zNode = new ZNode();
-        zNode.addBranch(l1);
-        zNode.setAction(ANode.of("e"));
-        ruleTree.addFlow(zNode);
-        String json = ruleTree.toJson();
-        System.out.println(json);
-        ruleTree = TreeNode.fromJson(json);
-        json = ruleTree.toJson();
-        System.out.println(json);
-        String realExpr = TreeAdapter.toRule(ruleTree).expr();
-        System.out.println("规则表达式:" + realExpr);
-        SimpleRuleLoader simpleRuleLoader = new SimpleRuleLoader(
-                Arrays.asList(
-                        new RuleDefinition("1", "true", "规则1"),
-                        new RuleDefinition("2", "true", "规则2"),
-                        new RuleDefinition("3", "true", "规则3"),
-                        new RuleDefinition("4", "true", "规则4"),
-                        new RuleDefinition("5", "false", "规则5"),
-                        new RuleDefinition("6", "true", "规则6"),
-                        new RuleDefinition("7", "true", "规则7"),
-                        new RuleDefinition("8", "true", "规则8"),
-                        new RuleDefinition("9", "true", "规则9"),
-                        new RuleDefinition("10", "true", "规则10"),
-                        new RuleDefinition("11", "true", "规则11"),
-                        new RuleDefinition("12", "true", "规则12"),
-                        new RuleDefinition("a", "act('a')", "操作a"),
-                        new RuleDefinition("b", "act('b')", "操作b"),
-                        new RuleDefinition("c", "act('c')", "操作c"),
-                        new RuleDefinition("d", "act('d')", "操作d"),
-                        new RuleDefinition("e", "act('e')", "操作e")
-                ),
-                Arrays.asList(
-                        new UdfDefinition("act", new ActionUdf())
-                ));
-
-        RuleSuite ruleSuite = simpleRuleLoader.loadSuite();
-        NodeResult actualResult = ruleSuite.evalExpr(expr, null);
-        System.out.println(actualResult);
-        assertEquals(result, actualResult.getResult());
-    }
-
-
-    @ParameterizedTest
-    @CsvSource(
-            value = {
-                    "(r1||r2)&&(r3||!(r4||(r5&&r6)))?action1:expr2?expr3?action3:expr4?action4:action2:action0#4"
-            }, delimiter = '#'
-    )
-    public void testTreeEval2(String expr, String res) {
-        TreeNode treeNode = TreeAdapter.fromRule(expr);
-        String jsonTree = treeNode.toJson();
-        System.out.println(jsonTree);
-        SimpleRuleLoader simpleRuleLoader = new SimpleRuleLoader(
-                Arrays.asList(
-                        new RuleDefinition("r1", "true", "规则1"),
-                        new RuleDefinition("r2", "true", "规则2"),
-                        new RuleDefinition("r3", "false", "规则3"),
-                        new RuleDefinition("r4", "true", "规则4"),
-                        new RuleDefinition("r5", "true", "规则5"),
-                        new RuleDefinition("r6", "true", "规则6"),
-                        new RuleDefinition("expr2", "true", "分支2"),
-                        new RuleDefinition("expr3", "false", "分支3"),
-                        new RuleDefinition("expr4", "true", "分支4"),
-                        new RuleDefinition("action0", "act('0')", "操作0"),
-                        new RuleDefinition("action1", "act('1')", "操作1"),
-                        new RuleDefinition("action2", "act('2')", "操作2"),
-                        new RuleDefinition("action3", "act('3')", "操作3"),
-                        new RuleDefinition("action4", "act('4')", "操作4")
-                ),
-                Arrays.asList(
-                        new UdfDefinition("act", new ActionUdf())
-                ));
-
-        RuleSuite ruleSuite = simpleRuleLoader.loadSuite();
-        NodeResult result = ruleSuite.evalExpr(expr, null);
-        System.out.println(result);
-        assertEquals(res, result.getResult());
-    }
-
-
-    @ParameterizedTest
-    @CsvSource(
-            value = {
-                    "(!(1&&2)?3:4)#{\"type\":\"T\",\"expr\":\"\",\"flows\":[{\"type\":\"Z\",\"branches\":[{\"type\":\"G\",\"expr\":\"&&\",\"branches\":[],\"action\":{\"type\":\"A\",\"expr\":\"3\",\"flows\":[]},\"negative\":true,\"rules\":[{\"type\":\"R\",\"expr\":\"1\",\"negative\":false},{\"type\":\"R\",\"expr\":\"2\",\"negative\":false}]}],\"action\":{\"type\":\"A\",\"expr\":\"4\",\"flows\":[]}}]}"
-                    , "((1&&!2)?3:4)#{\"type\":\"T\",\"expr\":\"\",\"flows\":[{\"type\":\"Z\",\"branches\":[{\"type\":\"G\",\"expr\":\"&&\",\"branches\":[],\"action\":{\"type\":\"A\",\"expr\":\"3\",\"flows\":[]},\"negative\":false,\"rules\":[{\"type\":\"R\",\"expr\":\"1\",\"negative\":false},{\"type\":\"R\",\"expr\":\"2\",\"negative\":true}]}],\"action\":{\"type\":\"A\",\"expr\":\"4\",\"flows\":[]}}]}"
-                    , "a#{\"type\":\"T\",\"expr\":\"\",\"flows\":[{\"type\":\"F\",\"expr\":\"a\"}]}"
-
-            }, delimiter = '#'
-    )
-    public void testTreeAdapter(String expr, String jsonTree) {
-        TreeNode from = TreeAdapter.fromRule(expr);
-        String json = from.toJson();
-        System.out.println(json);
-        RuleNode ruleNode = TreeAdapter.toRule(from);
-        String ruleExpr = ruleNode.expr();
-        System.out.println(ruleExpr);
-        assertEquals(ruleExpr, expr);
-        assertEquals(jsonTree, json);
+        RuleNode rule2 = t2.toRule();
+        System.out.println(rule);
+        System.out.println(rule2);
+        System.out.println(JsonUtils.toJson(tree));
+        System.out.println(JsonUtils.toJson(t2));
+        assertEquals(rule.expr(), rule2.expr());
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
     }
 
 
     @Test
-    public void testTreeValidate() {
-        TreeNode tree = TreeNode.create();
-        ZNode zNode = new ZNode();
-        PNode l1 = PNode.of("201");
-        PNode l1_1 = PNode.of("202");
-        l1_1.setAction(ANode.of("104"));
-        l1.addBranch(l1_1);
-        l1.setAction(ANode.of(""));
-        zNode.addBranch(l1);
-        PNode l2 = PNode.of("203");
-        l2.setAction(ANode.of("107"));
-        zNode.addBranch(l2);
-        zNode.setAction(ANode.of("106"));
-        tree.addFlow(zNode);
-        String expr = TreeAdapter.toRule(tree).expr();
-        System.out.println(expr);
-        assertEquals(expr, "(201?(202?104):(203?107:106))");
-        assertThrows(IllegalStateException.class, () -> tree.validate());
+    public void testSerial() {
+        TreeNode tree = new TreeNode();
+        SNode s1 = new SNode();
+        tree.setNext(s1);
+        CNode c1 = new CNode("c1");
+        c1.setAction(new ANode("a1"));
+        s1.addBranch(c1);
+        CNode c2 = new CNode("c2");
+        c2.setAction(new ANode("a2"));
+        s1.addBranch(c2);
+        CNode c3 = new CNode("c3");
+        c3.setAction(new ANode("a3"));
+        s1.addBranch(c3);
+
+        TreeNode t2 = JsonUtils.toBean(JsonUtils.toJson(tree), TreeNode.class);
+        RuleNode rule = tree.toRule();
+        RuleNode rule2 = t2.toRule();
+        TreeNode t3 = new TreeNode().fromRule(rule2);
+        System.out.println(rule2);
+        System.out.println(JsonUtils.toJson(tree));
+        System.out.println(JsonUtils.toJson(t2));
+        System.out.println(JsonUtils.toJson(t3));
+        assertEquals(rule.expr(), rule2.expr());
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t3));
     }
 
     @Test
-    @SneakyThrows
-    public void testVisit() {
-        TreeNode ruleTree = TreeAdapter.fromRule("(207?(208?(202?104:105):117))");
-        Set<String> idSet = ruleTree.collect();
-        Set<String> expectedSet = new HashSet<>(Arrays.asList("207", "208", "202", "104", "105", "117"));
-        assertEquals(expectedSet, idSet);
+    public void testSerial2() {
+        TreeNode tree = new TreeNode();
+        SNode s1 = new SNode();
+        tree.setNext(s1);
+        ANode a1 = new ANode("a1");
+        ANode a2 = new ANode("a2");
+        a1.setNext(a2);
+        s1.addBranch(a1);
+        ANode a3 = new ANode("a3");
+        ANode a4 = new ANode("a4");
+        a3.setNext(a4);
+        s1.addBranch(a3);
+        RuleNode rule = tree.toRule();
+        System.out.println(rule);
+        assertEquals("∅->(a1->a2)->(a3->a4)", rule.expr());
+        TreeNode t2 = new TreeNode().fromRule(rule);
+        System.out.println(JsonUtils.toJson(t2));
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+    }
+
+    @Test
+    public void testParallel() {
+        TreeNode tree = new TreeNode();
+        PNode p1 = new PNode();
+        ANode a0 = a("a0");
+        tree.setNext(a0);
+        a0.setNext(p1);
+        p1.addBranch(a("a1"));
+        p1.addBranch(a("a2"));
+        p1.addBranch(a("a3"));
+        RuleNode rule = tree.toRule();
+        RuleNode reparsed = NodeBuilder.build(rule.expr());
+        TreeNode restored = new TreeNode().fromRule(reparsed);
+        assertEquals(rule.expr(), reparsed.expr());
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(restored));
+    }
+
+    @Test
+    public void testJudge() {
+        TreeNode tree = new TreeNode();
+        ANode a0 = new ANode("a0");
+        tree.setNext(a0);
+        DNode d1 = new DNode();
+        a0.setNext(d1);
+        JNode j1 = new JNode();
+        j1.setRule(LNode.and()
+                .addRule(LNode.or().addRule(r("r1")).addRule(r("r2")))
+                .addRule(LNode.or().addRule(r("r3")).addRule(r("r4"))));
+        j1.setAction(new ANode("a1"));
+        d1.addBranch(j1);
+
+        d1.addBranch(c("c2","a2"));
+        d1.setAction(a("a3"));
+        RuleNode rule = JsonUtils.toBean(JsonUtils.toJson(tree), TreeNode.class).toRule();
+        TreeNode t2 = new TreeNode().fromRule(rule);
+        System.out.println(JsonUtils.toJson(t2));
+        System.out.println(rule);
+        System.out.println(t2.toRule());
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+        assertEquals(rule.expr(), t2.toRule().expr());
+    }
+
+    @Test
+    public void testFromCaseNode() {
+        RuleNode caseNode = NodeBuilder.build("c1?a1:c2&&!c3?a2:a3");
+        System.out.println(JsonUtils.toJson(new TreeNode().fromRule(caseNode)));
+    }
+
+    @Test
+    public void testFromLogicNode() {
+        RuleNode caseNode = NodeBuilder.build("c1&&!c2");
+        System.out.println(JsonUtils.toJson(new TreeNode().fromRule(caseNode)));
+    }
+
+    @Test
+    public void testFromSerNode() {
+        RuleNode caseNode = NodeBuilder.build("c1->c2->c3");
+        System.out.println(JsonUtils.toJson(new TreeNode().fromRule(caseNode)));
     }
 
 
+    @Test
+    public void testFromExprNode() {
+        RuleNode rule = NodeBuilder.build("c1");
+        TreeNode t1 = new TreeNode().fromRule(rule);
+        System.out.println(JsonUtils.toJson(t1));
+        RuleNode rule2 = NodeBuilder.build("c1?nop");
+        TreeNode t2 = new TreeNode().fromRule(rule2);
+        System.out.println(JsonUtils.toJson(t2));
+    }
+
+
+    @Test
+    public void testTree() {
+        TreeNode tree = new TreeNode();
+        SNode s0 = new SNode();
+        tree.setNext(s0);
+        PNode pn = new PNode();
+        s0.addBranch(pn);
+        //build pn
+        pn.addBranch(a("a1"));
+        pn.addBranch(a("a2"));
+        pn.addBranch(a("a3"));
+
+
+        //build d1
+        DNode d1 = new DNode();
+        s0.addBranch(d1);
+
+        // add branch d1_j
+        JNode d1_j = new JNode();
+        //add d1_j
+        d1_j.setRule(LNode.or().addRule(r("c1")).addRule(LNode.and().addRule(r("c2")).addRule(r("c3"))));
+
+        //add d1_j_s
+        SNode d1_j_s = new SNode();
+
+
+        DNode d1_j_s_d = new DNode();
+        d1_j_s_d.addBranch(c("c1", "a1"));
+        JNode d1_j_s_d_j = new JNode();
+        d1_j_s_d_j.setRule(LNode.and().addRule(r("c2")).addRule(r("c3")));
+        d1_j_s_d_j.setAction(a("a3"));
+        d1_j_s_d.addBranch(d1_j_s_d_j);
+
+        d1_j_s.addBranch(d1_j_s_d);
+        d1_j_s.addBranch(c("c4", "a4"));
+
+        d1_j.setAction(d1_j_s);
+
+        d1.addBranch(d1_j);
+
+        //add d1_c5 for d1
+        CNode d1_c5 = new CNode("c5");
+        DNode c5_d = new DNode();
+        c5_d.addBranch(c("c6", "a6"));
+        c5_d.addBranch(c("c7", "a7"));
+        c5_d.setAction(a("a5"));
+        d1_c5.setAction(c5_d);
+        d1.addBranch(d1_c5);
+
+        SNode d1_s = new SNode();
+        d1_s.addBranch(c("c8", "a8"));
+        d1_s.addBranch(c("c9", "a9"));
+        d1.setAction(d1_s);
+        System.out.println(JsonUtils.toJson(tree));
+        System.out.println(tree.toRule());
+        TreeNode t2 = new TreeNode().fromRule(tree.toRule());
+        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+    }
+
+
+    private CNode c(String c, String a) {
+        CNode cn = new CNode(c);
+        cn.setAction(new ANode(a));
+        return cn;
+    }
+
+    private CNode c(String c) {
+        return new CNode(c);
+    }
+
+    private ANode a(String a) {
+        return new ANode(a);
+    }
+
+    private RNode r(String r) {
+        return new RNode(r);
+    }
 }

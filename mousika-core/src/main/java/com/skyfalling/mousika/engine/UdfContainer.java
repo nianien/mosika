@@ -129,7 +129,7 @@ public class UdfContainer {
         Object instance = subclass
                 .make()
                 .load(Thread.currentThread().getContextClassLoader())
-                .getLoaded().newInstance();
+                .getLoaded().getDeclaredConstructor().newInstance();
         for (Entry<String, Object> entry : udfMap.entrySet()) {
             //udf的名称,不含命名空间
             String key = entry.getKey();

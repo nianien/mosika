@@ -1,8 +1,8 @@
-package com.skyfalling.mousika.ui.tree2.node.flow;
+package com.skyfalling.mousika.ui.tree.node.flow;
 
 
-import com.skyfalling.mousika.ui.tree2.node.define.BranchNode;
-import com.skyfalling.mousika.ui.tree2.node.define.FlowNode;
+import com.skyfalling.mousika.ui.tree.node.define.BranchNode;
+import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import lombok.Getter;
 
 /**

@@ -17,16 +17,6 @@ public interface TypeNode {
     /**
      * 原始表达式
      */
-    default String originExpr() {
-        return "";
-    }
-
-    /**
-     * 规则表达式,默认为原始表达式
-     */
-    default String ruleExpr() {
-        return originExpr();
-    }
-
+    String getExpr();
 
 }

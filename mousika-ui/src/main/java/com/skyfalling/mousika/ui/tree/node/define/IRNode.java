@@ -1,12 +1,12 @@
 package com.skyfalling.mousika.ui.tree.node.define;
 
 /**
- * 简单规则节点, 用于条件判断
+ * 规则节点接口定义
+ * Created on 2023/5/2
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
- * Created on 2022-07-19
  */
-public interface IRNode<T extends IRNode> extends TypeNode {
+public interface IRNode {
 
     /**
      * 设置是否取反
@@ -23,21 +23,9 @@ public interface IRNode<T extends IRNode> extends TypeNode {
     boolean isNegative();
 
     /**
-     * 取反
+     * 规则表达式
      *
      * @return
      */
-    default T negative() {
-        this.setNegative(!isNegative());
-        return (T) this;
-    }
-
-    /**
-     * 生成规则表达式
-     *
-     * @return
-     */
-    default String ruleExpr() {
-        return (isNegative() ? "!" : "") + originExpr();
-    }
+    String ruleExpr();
 }

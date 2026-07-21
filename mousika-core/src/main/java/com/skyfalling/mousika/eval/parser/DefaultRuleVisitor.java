@@ -3,7 +3,8 @@ package com.skyfalling.mousika.eval.parser;
 import com.nianien.antlr4.RuleBaseVisitor;
 import com.nianien.antlr4.RuleParser;
 import com.skyfalling.mousika.eval.node.CaseNode;
-import com.skyfalling.mousika.eval.node.LimitNode;
+import com.skyfalling.mousika.eval.node.HitsNode;
+import com.skyfalling.mousika.eval.node.ParNode;
 import com.skyfalling.mousika.eval.node.RuleNode;
 import lombok.AllArgsConstructor;
 
@@ -24,7 +25,10 @@ public class DefaultRuleVisitor extends RuleBaseVisitor {
     public Object visitPAR(RuleParser.PARContext ctx) {
         RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
         RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
-        return r1.next(r2);
+        if (r1 instanceof ParNode) {
+            return r1.next(r2);
+        }
+        return new ParNode(r1, r2);
     }
 
     @Override
@@ -67,11 +71,15 @@ public class DefaultRuleVisitor extends RuleBaseVisitor {
 
 
     @Override
-    public Object visitLIMIT(RuleParser.LIMITContext ctx) {
+    public Object visitHITS(RuleParser.HITSContext ctx) {
         List<RuleNode> nodes = (List<RuleNode>) ctx.arguments().accept(this);
-        int from = Integer.parseInt(ctx.CONST(0).getText().replaceAll("'", ""));
-        int to = Integer.parseInt(ctx.CONST(1).getText().replaceAll("'", ""));
-        return new LimitNode(from, to, nodes);
+        Integer minHits = parseBound(ctx.bound(0));
+        Integer maxHits = parseBound(ctx.bound(1));
+        return new HitsNode(minHits, maxHits, nodes);
+    }
+
+    private Integer parseBound(RuleParser.BoundContext ctx) {
+        return ctx.UNBOUNDED() == null ? Integer.parseInt(ctx.NUMBER().getText()) : null;
     }
 
     @Override

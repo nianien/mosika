@@ -1,10 +1,10 @@
-package com.skyfalling.mousika.ui.tree2.node.flow;
+package com.skyfalling.mousika.ui.tree.node.flow;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonCreator.Mode;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.skyfalling.mousika.ui.tree2.node.define.FlowNode;
-import com.skyfalling.mousika.ui.tree2.node.define.IRNode;
+import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
+import com.skyfalling.mousika.ui.tree.node.define.IRNode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,7 +16,7 @@ import lombok.Setter;
  *      |
  *     fN
  * </pre>
- * 条件约束: {@link CNode#action}不可为空
+ * action为空时表示纯条件规则，非空时表示条件执行。
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
@@ -31,9 +31,9 @@ public class CNode extends FlowNode implements IRNode {
     private boolean negative;
 
     /**
-     * 注意: 这里设置默认值是为了在反序列化时区分{@link ANode}和{@link CNode}
+     * 条件命中后执行的节点；为空时当前节点仅表示条件本身。
      */
-    private FlowNode action = ANode.NOP;
+    private FlowNode action;
 
     @JsonCreator(mode = Mode.PROPERTIES)
     public CNode(@JsonProperty("expr") String expr) {

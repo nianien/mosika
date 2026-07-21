@@ -17,9 +17,9 @@ public class RuleResult extends EvalResult {
      * @param desc
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
-     */
+    */
     public RuleResult(EvalResult result, String desc) {
-        super(result.getExpr(), result.getResult());
+        super(result.getExpr(), result.getResult(), result.isMatched());
         this.desc = desc;
     }
 

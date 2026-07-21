@@ -2,15 +2,22 @@ package com.skyfalling.mousika.engine;
 
 import com.skyfalling.mousika.eval.result.NaResult;
 import com.skyfalling.mousika.utils.Constants;
+import com.skyfalling.mousika.utils.JsRuntime;
+import com.skyfalling.mousika.utils.JsonUtils;
 import lombok.Builder;
 import lombok.Singular;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
 
-import javax.script.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 /**
@@ -21,29 +28,21 @@ import java.util.Map;
 @Slf4j
 public class RuleEngine {
 
+    private static final Pattern DESC_PARAMETER = Pattern.compile("\\{(\\$+\\..+?)\\}");
 
-    /**
-     * 脚本引擎
-     */
-    private ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
-
-    {
-        Bindings bindings = engine.getBindings(ScriptContext.ENGINE_SCOPE);
-        bindings.put("polyglot.js.nashorn-compat", true);
-    }
 
     /**
      * 规则定义
      */
     private Map<String, RuleDefinition> ruleDefinitions = new HashMap<>();
     /**
-     * 编译规则, key=expression, value=CompiledScript
+     * 编译规则, key=expression, value=Source
      */
-    private Map<String, CompiledScript> compiledScripts = new HashMap<>();
+    private final ConcurrentMap<String, Source> compiledScripts = new ConcurrentHashMap<>();
     /**
-     * 编译描述, key=desc, value=CompiledScript
+     * 编译描述, key=desc, value=Source
      */
-    private Map<String, CompiledScript> compiledDesc = new HashMap<>();
+    private final ConcurrentMap<String, Source> compiledDesc = new ConcurrentHashMap<>();
     /**
      * 编译后的UDF
      */
@@ -57,7 +56,6 @@ public class RuleEngine {
         this.register(new RuleDefinition(Constants.NULL, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NULL"));
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
-        ThreadLocal<ScriptEngine> engineFactory = ThreadLocal.withInitial(() -> new ScriptEngineManager().getEngineByName("graal.js"));
         this.compiledUdfs = new UdfContainer(udfDefinitions).compile();
     }
 
@@ -96,13 +94,14 @@ public class RuleEngine {
     /**
      * 执行编译脚本
      */
-    @SneakyThrows
-    private Object doEval(CompiledScript script, Object root, Object context) {
-        Bindings bindings = engine.createBindings();
-        bindings.put("$", root);
-        bindings.put("$$", context);
-        bindings.putAll(compiledUdfs);
-        return script.eval(bindings);
+    private Object doEval(Source script, Object root, Object ruleContext) {
+        try (Context context = JsRuntime.createContext()) {
+            Value bindings = context.getBindings(JsRuntime.LANGUAGE_ID);
+            bindings.putMember("$", root);
+            bindings.putMember("$$", ruleContext);
+            compiledUdfs.forEach(bindings::putMember);
+            return JsRuntime.toJava(context.eval(script));
+        }
     }
 
     /**
@@ -120,12 +119,8 @@ public class RuleEngine {
         compileDesc(definition.getDesc());
     }
 
-    private CompiledScript compile(String expression) {
-        CompiledScript compiledScript = compiledScripts.get(expression);
-        if (compiledScript == null) {
-            compiledScript = doCompile(expression);
-        }
-        return compiledScript;
+    private Source compile(String expression) {
+        return compiledScripts.computeIfAbsent(expression, this::doCompile);
     }
 
 
@@ -135,16 +130,19 @@ public class RuleEngine {
      * @param originDesc
      * @return
      */
-    private CompiledScript compileDesc(String originDesc) {
-        // 正则表达式转换成字符串计算
-        // "代理商：{$.agentId} 不允许 客户：{$.customerId}】跨开，这里{不需要转义}"
-        // ==> "代理商："+$.agentId+" 不允许 "+$.customerId+"：跨开，这里{不需要转义}"
-        String expression = "\"" + originDesc.replaceAll("\\{(\\$+\\..+?)\\}", "\\\"+$1+\\\"") + "\"";
-        CompiledScript compiledScript = compiledDesc.get(expression);
-        if (compiledScript == null) {
-            compiledScript = doCompile(expression);
+    private Source compileDesc(String originDesc) {
+        Matcher matcher = DESC_PARAMETER.matcher(originDesc);
+        StringBuilder expression = new StringBuilder();
+        int start = 0;
+        while (matcher.find()) {
+            expression.append(JsonUtils.toJson(originDesc.substring(start, matcher.start())))
+                    .append('+')
+                    .append(matcher.group(1))
+                    .append('+');
+            start = matcher.end();
         }
-        return compiledScript;
+        expression.append(JsonUtils.toJson(originDesc.substring(start)));
+        return compiledDesc.computeIfAbsent(expression.toString(), this::doCompile);
     }
 
 
@@ -154,9 +152,12 @@ public class RuleEngine {
      * @param expression
      * @return
      */
-    @SneakyThrows
-    private synchronized CompiledScript doCompile(String expression) {
-        return ((Compilable) engine).compile(expression);
+    private Source doCompile(String expression) {
+        Source source = JsRuntime.createSource(expression, "rule-" + Integer.toHexString(expression.hashCode()));
+        try (Context context = JsRuntime.createContext()) {
+            context.parse(source);
+        }
+        return source;
     }
 
 

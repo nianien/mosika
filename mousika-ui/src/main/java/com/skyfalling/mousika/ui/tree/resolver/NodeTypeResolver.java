@@ -5,7 +5,11 @@ import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import com.fasterxml.jackson.databind.type.SimpleType;
-import com.skyfalling.mousika.ui.tree.node.*;
+import com.skyfalling.mousika.ui.tree.node.TreeNode;
+import com.skyfalling.mousika.ui.tree.node.flow.*;
+import com.skyfalling.mousika.ui.tree.node.rule.HNode;
+import com.skyfalling.mousika.ui.tree.node.rule.LNode;
+import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,20 +43,24 @@ public class NodeTypeResolver extends TypeIdResolverBase {
         switch (id) {
             case "A":
                 return SimpleType.constructUnsafe(ANode.class);
-            case "F":
-                return SimpleType.constructUnsafe(FNode.class);
-            case "G":
-                return SimpleType.constructUnsafe(GNode.class);
-            case "L":
-                return SimpleType.constructUnsafe(LNode.class);
+            case "C":
+                return SimpleType.constructUnsafe(CNode.class);
+            case "D":
+                return SimpleType.constructUnsafe(DNode.class);
+            case "J":
+                return SimpleType.constructUnsafe(JNode.class);
             case "P":
                 return SimpleType.constructUnsafe(PNode.class);
+            case "S":
+                return SimpleType.constructUnsafe(SNode.class);
+            case "L":
+                return SimpleType.constructUnsafe(LNode.class);
+            case "H":
+                return SimpleType.constructUnsafe(HNode.class);
             case "R":
                 return SimpleType.constructUnsafe(RNode.class);
             case "T":
                 return SimpleType.constructUnsafe(TreeNode.class);
-            case "Z":
-                return SimpleType.constructUnsafe(ZNode.class);
             default:
                 return super.typeFromId(context, id);
         }

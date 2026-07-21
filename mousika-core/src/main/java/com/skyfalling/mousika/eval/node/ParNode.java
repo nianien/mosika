@@ -35,8 +35,9 @@ public class ParNode implements RuleNode {
 
 
     /**
-     * 顺序执行
+     * 添加下一个并行节点
      */
+    @Override
     public ParNode next(RuleNode node) {
         this.nodes.add(node);
         return this;

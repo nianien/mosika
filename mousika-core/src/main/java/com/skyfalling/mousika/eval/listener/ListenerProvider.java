@@ -1,7 +1,7 @@
 package com.skyfalling.mousika.eval.listener;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 监听器驱动
@@ -19,7 +19,7 @@ public class ListenerProvider implements RuleListener {
     /**
      * 注册的监听器列表
      */
-    private List<RuleListener> listeners = new ArrayList<>();
+    private List<RuleListener> listeners = new CopyOnWriteArrayList<>();
 
 
     @Override

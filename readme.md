@@ -1,3 +1,13 @@
+# Mousika
+
+Mousika 要求 JDK 21，使用 Maven 构建：
+
+```shell
+mvn clean test
+```
+
+规则中的 JavaScript 由 GraalJS Polyglot 执行。普通 JDK 21 可以正常运行；高频 JavaScript 场景建议使用支持 GraalJS 优化运行时的 GraalVM。
+
 ## 1. 串行执行
 
 ![img.png](mousika-ui/src/main/resources/img/serial.png)
@@ -6,7 +16,7 @@
  a->b->c->d
 ```
 
-## 2. 串行执行
+## 2. 并行执行
 ![img.png](mousika-ui/src/main/resources/img/parallel.png)
 ```text
  a->(b=>c)->d
@@ -72,7 +82,15 @@
     fi
  fi
 ```
-注：nop不参与规则计算，仅用于反序列化UI树时区分同义表达式，存在同义表达式的情况如下：
-+ CNode无action时，与ANode的规则表达式相同
-+ SNode、PNode单分支时，规则表达式相同，且与ANode相同
-+ DNode单分支且无action时，与CNode的规则表达式相同
+注：`∅` 不参与规则计算，仅作为 `SNode`、`PNode` 的结构标记，确保单分支结构也能稳定反序列化。
+
+## 7. 命中数量
+
+`hits(min, max, rules...)` 用于判断子规则的命中数是否位于指定区间，`_` 表示该边界不限制。
+
+```text
+hits(2, _, a, b, c)  // 至少命中 2 个
+hits(_, 2, a, b, c)  // 至多命中 2 个
+hits(2, 2, a, b, c)  // 恰好命中 2 个
+hits(1, 2, a, b, c)  // 命中 1～2 个
+```

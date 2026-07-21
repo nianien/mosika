@@ -1,9 +1,9 @@
-package com.skyfalling.mousika.ui.tree2.node.rule;
+package com.skyfalling.mousika.ui.tree.node.rule;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonCreator.Mode;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.skyfalling.mousika.ui.tree2.node.define.IRNode;
+import com.skyfalling.mousika.ui.tree.node.define.IRNode;
 import lombok.Getter;
 
 import java.util.ArrayList;

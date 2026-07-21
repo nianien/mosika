@@ -1,10 +1,9 @@
-package com.skyfalling.mousika.ui.tree2.node.flow;
+package com.skyfalling.mousika.ui.tree.node.flow;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonCreator.Mode;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.skyfalling.mousika.ui.tree2.node.define.FlowNode;
-import com.skyfalling.mousika.utils.Constants;
+import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,7 +21,6 @@ import lombok.Setter;
  */
 public class ANode extends FlowNode {
 
-    public final static ANode NOP = new ANode(Constants.NOP);
     @Getter
     @Setter
     private FlowNode next;

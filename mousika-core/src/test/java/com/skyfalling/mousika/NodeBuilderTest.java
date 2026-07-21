@@ -1,13 +1,19 @@
 package com.skyfalling.mousika;
 
+import com.skyfalling.mousika.eval.node.HitsNode;
 import com.skyfalling.mousika.eval.node.RuleNode;
+import com.skyfalling.mousika.eval.node.ParNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
+import com.skyfalling.mousika.exception.RuleParseException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import static com.skyfalling.mousika.eval.parser.NodeBuilder.build;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -56,6 +62,40 @@ public class NodeBuilderTest {
     public void testSer() {
         System.out.println(NodeBuilder.build("∅->(1001?1002)->1004").expr());
         System.out.println(NodeBuilder.build("f3?t1:f4?t2:t3").expr());
+    }
+
+    @Test
+    public void testParallel() {
+        RuleNode node = build("a=>b=>c");
+        ParNode parNode = assertInstanceOf(ParNode.class, node);
+        assertEquals(3, parNode.getNodes().size());
+        assertEquals("a=>b=>c", parNode.expr());
+
+        ParNode nested = assertInstanceOf(ParNode.class, build("a=>(b=>c)"));
+        assertEquals(2, nested.getNodes().size());
+        assertInstanceOf(ParNode.class, nested.getNodes().get(1));
+        assertEquals("a=>(b=>c)", nested.expr());
+    }
+
+    @Test
+    public void testInvalidExpression() {
+        assertThrows(RuleParseException.class, () -> build(""));
+        assertThrows(RuleParseException.class, () -> build("a&&"));
+        assertThrows(RuleParseException.class, () -> build("a b"));
+        assertThrows(RuleParseException.class, () -> build("hits(_,_,a,b)"));
+        assertThrows(RuleParseException.class, () -> build("hits(3,2,a,b,c)"));
+        assertThrows(RuleParseException.class, () -> build("hits(0,4,a,b,c)"));
+        assertThrows(RuleParseException.class, () -> build("limit('2','2',a,b)"));
+    }
+
+    @Test
+    public void testHits() {
+        HitsNode node = assertInstanceOf(HitsNode.class, build("hits(2,_,1,a,3)"));
+        assertEquals(2, node.getMinHits());
+        assertNull(node.getMaxHits());
+        assertEquals(3, node.getNodes().size());
+        assertEquals("hits(2,_,1,a,3)", node.expr());
+        assertEquals(node.expr(), build(node.expr()).expr());
     }
 
 

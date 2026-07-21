@@ -17,19 +17,19 @@
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>17</java.version>
-        <lombok.version>1.18.26</lombok.version>
-        <logback.version>1.2.10</logback.version>
-        <jackson.version>2.14.2</jackson.version>
+        <java.version>21</java.version>
+        <lombok.version>1.18.46</lombok.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <logback.version>1.5.38</logback.version>
+        <jackson.version>2.21.3</jackson.version>
         <cudrania.version>1.2.5</cudrania.version>
-        <janino.version>3.1.6</janino.version>
-        <spring.version>5.1.6.RELEASE</spring.version>
+        <spring.version>6.2.19</spring.version>
         <junit-jupiter.version>5.8.2</junit-jupiter.version>
-        <jackson-datatype-protobuf.version>0.9.13</jackson-datatype-protobuf.version>
+        <jackson-datatype-protobuf.version>0.9.18</jackson-datatype-protobuf.version>
         <revision>1.0.0</revision>
-        <antlr4.version>4.13.1</antlr4.version>
-        <graalvm.version>22.3.4</graalvm.version>
-        <byte-buddy.version>1.14.9</byte-buddy.version>
+        <antlr4.version>4.13.2</antlr4.version>
+        <graalvm.version>25.0.2</graalvm.version>
+        <byte-buddy.version>1.18.7</byte-buddy.version>
     </properties>
     <licenses>
         <license>
@@ -57,13 +57,20 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.antlr</groupId>
-                <artifactId>antlr4</artifactId>
+                <artifactId>antlr4-runtime</artifactId>
                 <version>${antlr4.version}</version>
             </dependency>
             <dependency>
@@ -72,36 +79,26 @@
                 <version>${byte-buddy.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.ibm.icu</groupId>
-                <artifactId>icu4j</artifactId>
-                <version>73.2</version>
-            </dependency>
-            <dependency>
-                <groupId>org.graalvm.sdk</groupId>
-                <artifactId>graal-sdk</artifactId>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>polyglot</artifactId>
                 <version>${graalvm.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.graalvm.js</groupId>
-                <artifactId>js</artifactId>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>js-community</artifactId>
                 <version>${graalvm.version}</version>
+                <type>pom</type>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
-                <groupId>org.graalvm.js</groupId>
-                <artifactId>js-scriptengine</artifactId>
-                <version>${graalvm.version}</version>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
                 <version>${logback.version}</version>
-                <optional>true</optional>
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.janino</groupId>
-                <artifactId>janino</artifactId>
-                <version>${janino.version}</version>
                 <optional>true</optional>
             </dependency>
             <dependency>
@@ -121,17 +118,6 @@
                 <artifactId>cudrania</artifactId>
                 <version>${cudrania.version}</version>
             </dependency>
-            <!-- jackson-->
-            <dependency>
-                <groupId>com.fasterxml.jackson.module</groupId>
-                <artifactId>jackson-module-parameter-names</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.module</groupId>
-                <artifactId>jackson-module-kotlin</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
             <dependency>
                 <groupId>com.hubspot.jackson</groupId>
                 <artifactId>jackson-datatype-protobuf</artifactId>
@@ -147,19 +133,18 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <optional>true</optional>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.codehaus.janino</groupId>
-            <artifactId>janino</artifactId>
-            <optional>true</optional>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <optional>true</optional>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>
@@ -207,8 +192,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.11.0</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <release>${java.version}</release>
                     </configuration>
                 </plugin>
                 <plugin>
