@@ -8,26 +8,35 @@ import com.skyfalling.mousika.utils.Constants;
 import lombok.Getter;
 import lombok.SneakyThrows;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * 并行执行节点<br>
- * 最后执行的节点结果作为并行结果; 如果存在节点结果为真，则并行结果作为判断条件为真,否则为假
- * Created on 2023/3/31
+ * 并行执行结构节点。
+ * <p>并发执行所有非 {@link Constants#NOP} 占位子节点并等待全部完成，不解释子节点的匹配结果。
+ * 正常完成时不产生业务结果，统一返回 {@code result=null, matched=true}；
+ * 子节点抛出的异常继续向上传播。</p>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
 public class ParNode implements RuleNode {
 
+    /**
+     * 待并发执行的分支节点。
+     */
     private List<RuleNode> nodes = new ArrayList<>();
 
     /**
-     * @param nodes 子节点
+     * 创建并行执行结构。
+     *
+     * @param nodes 并行分支节点
      */
     public ParNode(RuleNode... nodes) {
         this.nodes.addAll(Arrays.asList(nodes));
@@ -35,7 +44,10 @@ public class ParNode implements RuleNode {
 
 
     /**
-     * 添加下一个并行节点
+     * 向当前并行结构追加一个分支。
+     *
+     * @param node 待追加的并行分支
+     * @return 当前并行节点
      */
     @Override
     public ParNode next(RuleNode node) {
@@ -43,29 +55,40 @@ public class ParNode implements RuleNode {
         return this;
     }
 
+    /**
+     * 在公共线程池中执行所有非 {@link Constants#NOP} 分支，并等待全部分支完成。
+     *
+     * @param context 规则执行上下文
+     * @return 无业务结果的结构执行结果
+     */
     @Override
     @SneakyThrows
     public EvalResult eval(RuleContext context) {
         EvalNode parentNode = context.getCurrentEval();
-        Vector<EvalResult> results = new Vector<>();
-        CompletableFuture<EvalResult>[] futures = nodes.stream()
-                .filter(e -> !e.expr().equals(Constants.NOP))
-                .map(node -> CompletableFuture.supplyAsync(() -> {
-                            //子线程设置当前evalNode
-                            context.setCurrentEval(parentNode);
-                            return context.visit(node);
-                        }, ForkJoinPool.commonPool()).thenAcceptAsync(r -> results.add(r))
-                )
+        CompletableFuture<?>[] futures = nodes.stream()
+                .filter(node -> !Constants.NOP.equals(node.expr()))
+                .map(node -> CompletableFuture.runAsync(() -> {
+                    // 子线程设置当前评估节点
+                    context.setCurrentEval(parentNode);
+                    context.visit(node);
+                }, ForkJoinPool.commonPool()))
                 .toArray(n -> new CompletableFuture[n]);
 
-        CompletableFuture.allOf(futures).get(1, TimeUnit.MINUTES);
-        //线程策略会使用当前线程,所以需要恢复父评估节点
-        context.setCurrentEval(parentNode);
-        EvalResult result = results.stream().filter(EvalResult::isMatched).findAny().orElse(new EvalResult(null, null));
-        return new EvalResult(expr(), result.getResult(), result.isMatched());
+        try {
+            CompletableFuture.allOf(futures).get(1, TimeUnit.MINUTES);
+        } finally {
+            // 线程策略可能使用当前线程，需要恢复父评估节点
+            context.setCurrentEval(parentNode);
+        }
+        return new EvalResult(expr(), null, true);
     }
 
 
+    /**
+     * 使用 {@code =>} 连接所有分支表达式。
+     *
+     * @return 并行 DSL 表达式
+     */
     @Override
     public String expr() {
         return String.join("=>", nodes.stream()
@@ -73,6 +96,11 @@ public class ParNode implements RuleNode {
                 .collect(Collectors.toList()));
     }
 
+    /**
+     * 多分支时返回带括号的并行 DSL 表达式。
+     *
+     * @return 并行 DSL 表达式
+     */
     @Override
     public String toString() {
         return nodes.size() > 1 ? "(" + expr() + ")" : expr();

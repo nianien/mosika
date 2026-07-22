@@ -9,11 +9,13 @@ import com.skyfalling.mousika.eval.context.RuleContext;
 import com.skyfalling.mousika.eval.node.ExprNode;
 import com.skyfalling.mousika.eval.node.ParNode;
 import com.skyfalling.mousika.eval.node.RuleNode;
+import com.skyfalling.mousika.eval.node.SerNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.eval.result.EvalResult;
 import com.skyfalling.mousika.eval.result.NodeResult;
 import com.skyfalling.mousika.suite.RuleEvaluator;
 import com.skyfalling.mousika.udf.SayHelloUdf;
+import com.skyfalling.mousika.utils.Constants;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -97,12 +99,41 @@ public class RuleNodeFlowTest {
 
 
     @Test
-    public void tesSerNode() {
+    public void testSerNodeExecutesAllNodesWithoutBusinessResult() {
         User root = new User("jack", 19);
         RuleNode node = NodeBuilder.build("a1->a2->a3->a4");
-        System.out.println(node.toString());
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
-        System.out.println(nodeResult);
+        RuleVisitor context = new RuleVisitor(ruleEngine, root);
+
+        EvalResult result = context.visit(node);
+
+        assertTrue(result.isMatched());
+        assertNull(result.getResult());
+        assertEquals(4, context.getRuleResults().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testSerNodeContinuesAfterUnmatchedNode() {
+        User root = new User("jack", 19);
+        RuleNode node = NodeBuilder.build("a1->f1->a2");
+        RuleVisitor context = new RuleVisitor(ruleEngine, root);
+
+        EvalResult result = context.visit(node);
+
+        assertTrue(result.isMatched());
+        assertNull(result.getResult());
+        assertEquals(3, context.getRuleResults().get(0).getSubRules().size());
+        assertEquals("f1", context.getRuleResults().get(0).getSubRules().get(1).getExpr());
+        assertEquals("a2", context.getRuleResults().get(0).getSubRules().get(2).getExpr());
+    }
+
+    @Test
+    public void testSerNodeWithOnlyNopIsMatched() {
+        RuleVisitor context = new RuleVisitor(ruleEngine, null);
+
+        EvalResult result = context.visit(new SerNode(new ExprNode(Constants.NOP)));
+
+        assertTrue(result.isMatched());
+        assertNull(result.getResult());
     }
 
     @SneakyThrows
@@ -111,10 +142,21 @@ public class RuleNodeFlowTest {
         User root = new User("jack", 19);
         RuleNode node = NodeBuilder.build("f1=>a1=>a2");
         assertInstanceOf(ParNode.class, node);
-        System.out.println(node.toString());
         NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
-        System.out.println(nodeResult);
+        assertNull(nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testParNodeIgnoresBranchMatchResults() {
+        RuleVisitor context = new RuleVisitor(ruleEngine, null);
+        RuleNode node = NodeBuilder.build("f1=>f2");
+
+        EvalResult result = context.visit(node);
+
+        assertTrue(result.isMatched());
+        assertNull(result.getResult());
+        assertEquals(2, context.getRuleResults().get(0).getSubRules().size());
     }
 
     @Test
