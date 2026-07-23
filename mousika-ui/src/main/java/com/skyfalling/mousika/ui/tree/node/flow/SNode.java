@@ -6,7 +6,10 @@ import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import lombok.Getter;
 
 /**
- * Serial串行节点
+ * 串行流程结构节点。
+ * <p>
+ * {@code branches}中的每个元素都是可替换的完整流程子树，并严格按照列表顺序执行。
+ * 显式串行结构保存子树作用域，不能用节点纵向位置或隐含连线替代。
  * <pre>
  *      sN
  *     / | \
@@ -20,7 +23,10 @@ import lombok.Getter;
 @Getter
 public class SNode extends BranchNode<FlowNode> {
 
+    /**
+     * 创建串行节点，使用{@code S}作为稳定结构标识。
+     */
     public SNode() {
-        super("+");
+        super("S");
     }
 }

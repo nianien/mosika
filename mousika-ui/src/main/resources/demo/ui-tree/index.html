@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mousika 规则树编辑器</title>
+    <link rel="stylesheet" href="styles.css?v=20260723-28">
+</head>
+<body>
+<main class="app-shell">
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">M</span>
+            <div>
+                <strong>规则树编辑器</strong>
+                <span>递归 DSL 布局原型</span>
+            </div>
+        </div>
+        <div class="toolbar" aria-label="画布工具栏">
+            <button class="primary" id="addChildButton" type="button">＋ 子节点</button>
+            <button id="addSiblingButton" type="button">＋ 同级节点</button>
+            <span class="toolbar-divider"></span>
+            <button id="zoomOutButton" type="button" aria-label="缩小">−</button>
+            <output id="zoomValue">100%</output>
+            <button id="zoomInButton" type="button" aria-label="放大">＋</button>
+            <button id="fitButton" type="button">适应画布</button>
+            <button id="resetButton" type="button">重置示例</button>
+        </div>
+    </header>
+
+    <section class="workspace">
+        <aside class="legend" aria-label="节点图例">
+            <h2>节点</h2>
+            <div class="legend-item"><span class="legend-shape structure">串</span><span>串行</span></div>
+            <div class="legend-item"><span class="legend-shape structure">并</span><span>并行</span></div>
+            <div class="legend-item"><span class="legend-shape structure">分</span><span>有序互斥</span></div>
+            <div class="legend-item"><span class="legend-shape condition">规则</span><span>判断规则</span></div>
+            <div class="legend-item"><span class="legend-shape action">A</span><span>业务操作</span></div>
+            <p>拖动画布移动<br>滚轮平移<br>⌘/Ctrl + 滚轮缩放</p>
+        </aside>
+
+        <section class="canvas-panel">
+            <div class="canvas-titlebar">
+                <div>
+                    <strong>UI 树示例</strong>
+                    <span id="nodeCount"></span>
+                </div>
+                <span class="status"><i></i> 本地草稿</span>
+            </div>
+            <div class="tree-viewport" id="treeViewport" tabindex="0" aria-label="可缩放规则树画布">
+                <div class="grid"></div>
+                <div class="tree-stage" id="treeStage">
+                    <div id="treeRoot"></div>
+                </div>
+                <div class="canvas-hint" id="canvasHint">单击选中节点 · 业务节点双击或按 Enter 编辑 · 命中流程在主画布向下展开</div>
+            </div>
+        </section>
+
+        <aside class="inspector" id="inspector">
+            <div class="inspector-empty" id="inspectorEmpty">
+                <span>↖</span>
+                <strong>选择一个节点</strong>
+                <p>选择节点后查看结构摘要和可用操作。</p>
+            </div>
+            <form id="inspectorForm" hidden>
+                <div class="inspector-heading">
+                    <div>
+                        <span>节点属性</span>
+                        <strong id="inspectorTitle"></strong>
+                    </div>
+                </div>
+                <label>
+                    节点类型
+                    <input id="nodeType" readonly>
+                </label>
+                <label id="nodeLabelField">
+                    <span id="nodeLabelCaption">节点名称</span>
+                    <input id="nodeLabel" maxlength="28" autocomplete="off" readonly>
+                </label>
+                <label id="nodeExpressionField">
+                    <span id="nodeExpressionCaption">配置摘要</span>
+                    <input id="nodeExpression" maxlength="64" autocomplete="off" readonly>
+                </label>
+                <div class="inspector-actions">
+                    <button class="primary" id="editNodeButton" type="button">编辑节点</button>
+                    <button id="collapseButton" type="button">折叠分支</button>
+                    <button class="danger" id="deleteButton" type="button">删除节点</button>
+                </div>
+            </form>
+        </aside>
+    </section>
+</main>
+
+<dialog id="nodeDialog">
+    <form method="dialog" id="nodeDialogForm">
+        <div class="dialog-heading">
+            <div>
+                <span>编辑结构</span>
+                <h2 id="dialogTitle">添加子节点</h2>
+            </div>
+            <button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button>
+        </div>
+        <label>
+            节点类型
+            <select id="newNodeType"></select>
+        </label>
+        <label id="relationField">
+            插入位置
+            <select id="newNodeRelation"></select>
+        </label>
+        <label id="newNodeLabelField">
+            <span id="newNodeLabelCaption">动作名称</span>
+            <input id="newNodeLabel" maxlength="28" required autocomplete="off">
+        </label>
+        <label id="newNodeExpressionField">
+            <span id="newNodeExpressionCaption">方法标识</span>
+            <input id="newNodeExpression" maxlength="64" autocomplete="off">
+        </label>
+        <div class="type-help" id="typeHelp"></div>
+        <div class="dialog-actions">
+            <button value="cancel" type="submit">取消</button>
+            <button class="primary" id="confirmAddButton" value="default" type="submit">添加</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="nodeEditDialog">
+    <form method="dialog" id="nodeEditDialogForm">
+        <div class="dialog-heading">
+            <div>
+                <span id="nodeEditDialogEyebrow">节点配置</span>
+                <h2 id="nodeEditDialogTitle">编辑节点</h2>
+            </div>
+            <button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button>
+        </div>
+        <label>
+            节点类型
+            <input id="editNodeType" readonly>
+        </label>
+        <label id="editNodeLabelField">
+            <span id="editNodeLabelCaption">显示名称</span>
+            <input id="editNodeLabel" maxlength="28" autocomplete="off">
+        </label>
+        <label id="editNodeExpressionField">
+            <span id="editNodeExpressionCaption">配置标识</span>
+            <input id="editNodeExpression" maxlength="64" autocomplete="off">
+        </label>
+        <div class="dialog-actions">
+            <button value="cancel" type="submit">取消</button>
+            <button class="primary" value="default" type="submit">保存</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="ruleDialog" class="rule-dialog">
+    <div class="rule-dialog-shell">
+        <header class="rule-dialog-header">
+            <div>
+                <span>嵌入式规则编辑器</span>
+                <h2 id="ruleDialogTitle">判断条件</h2>
+                <p id="ruleDialogSummary"></p>
+            </div>
+            <button class="icon-button" id="ruleDialogCloseButton" aria-label="关闭" type="button">×</button>
+        </header>
+        <div class="rule-dialog-body">
+            <section class="rule-tree-panel" id="ruleTreePanel" aria-label="规则树">
+                <div class="rule-tree-caption">
+                    <strong>条件组合</strong>
+                    <span id="ruleNodeCount"></span>
+                </div>
+                <div class="rule-tree-viewport">
+                    <div id="ruleTreeRoot"></div>
+                </div>
+                <section class="rule-context-popover" id="ruleContextPopover" hidden>
+                    <section class="rule-context-section" id="ruleActionPanel" hidden>
+                        <div class="rule-action-menu">
+                            <button id="ruleActionBefore" type="button" data-rule-menu-action="before">前插</button>
+                            <button id="ruleActionAfter" type="button" data-rule-menu-action="after">后插</button>
+                            <button type="button" data-rule-menu-action="edit">编辑</button>
+                            <button id="ruleActionExtend" type="button" data-rule-menu-action="extend">添加规则</button>
+                            <button class="danger" id="ruleActionDelete" type="button" data-rule-menu-action="delete">删除</button>
+                        </div>
+                    </section>
+                    <section class="rule-context-section rule-extend-panel" id="ruleExtendPanel" hidden>
+                        <div class="rule-add-heading">
+                            <strong>添加规则</strong>
+                            <button class="icon-button" id="ruleExtendCloseButton" type="button" aria-label="关闭添加规则">×</button>
+                        </div>
+                        <div class="rule-current-reference">
+                            <span>当前规则</span>
+                            <strong id="ruleExtendCurrent"></strong>
+                        </div>
+                        <div class="rule-add-rows" id="ruleExtendRows"></div>
+                        <button class="rule-add-row-button" id="ruleExtendRowButton" type="button">＋ 添加规则</button>
+                        <fieldset class="rule-logic-field">
+                            <legend>组合方式</legend>
+                            <div class="rule-radio-group">
+                                <label>
+                                    <input type="radio" name="ruleExtendLogic" value="&amp;&amp;" checked>
+                                    <span>与</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="ruleExtendLogic" value="||">
+                                    <span>或</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <div class="rule-extend-actions">
+                            <button id="ruleExtendCancelButton" type="button">取消</button>
+                            <button class="primary" id="ruleExtendSaveButton" type="button">保存</button>
+                        </div>
+                    </section>
+                    <section class="rule-context-section" id="ruleAddPanel" hidden>
+                        <div class="rule-add-heading">
+                            <strong id="ruleAddTitle">添加规则</strong>
+                            <button class="icon-button" id="ruleAddCancelButton" type="button" aria-label="取消添加">×</button>
+                        </div>
+                        <div class="rule-add-rows" id="ruleAddRows">
+                        </div>
+                        <button class="rule-add-row-button" id="ruleAddRowButton" type="button">＋ 添加规则</button>
+                        <fieldset class="rule-logic-field" id="ruleAddLogicField" hidden>
+                            <legend>组合方式</legend>
+                            <div class="rule-radio-group">
+                                <label>
+                                <input type="radio" name="ruleAddLogic" value="&amp;&amp;" checked>
+                                    <span>与</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="ruleAddLogic" value="||">
+                                    <span>或</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <button class="primary" id="ruleAddConfirmButton" type="button">确认添加</button>
+                    </section>
+                </section>
+            </section>
+            <aside class="rule-editor">
+                <div class="rule-editor-empty" id="ruleEditorEmpty">
+                    <span>◇</span>
+                    <strong id="ruleEditorEmptyTitle">尚未配置条件</strong>
+                    <p id="ruleEditorEmptyHint">规则子树只在当前弹窗内递归，不会进入流程画布。</p>
+                </div>
+                <div class="rule-editor-panel" id="ruleEditorPanel" hidden>
+                    <div class="inspector-heading">
+                        <div>
+                            <span>规则节点</span>
+                            <strong id="ruleEditorTitle"></strong>
+                        </div>
+                    </div>
+                    <label>
+                        节点类型
+                        <input id="ruleNodeType" readonly>
+                    </label>
+                    <label id="ruleDefinitionField">
+                        引用规则
+                        <select id="ruleDefinitionSelect" disabled></select>
+                    </label>
+                    <label id="ruleLogicField" hidden>
+                        逻辑类型
+                        <select id="ruleLogicSelect" disabled>
+                            <option value="&amp;&amp;">与</option>
+                            <option value="||">或</option>
+                        </select>
+                    </label>
+                    <label>
+                        节点别名
+                        <input id="ruleNodeLabel" maxlength="28" autocomplete="off" readonly>
+                    </label>
+                    <label id="ruleReferenceField">
+                        <span id="ruleReferenceLabel">命中表达式</span>
+                        <input id="ruleNodeExpression" readonly>
+                    </label>
+                    <div class="rule-editor-actions">
+                        <button class="primary rule-editor-edit" id="ruleEditorEditButton" type="button">编辑</button>
+                        <button id="ruleEditorCancelButton" type="button" hidden>取消</button>
+                        <button class="primary" id="ruleEditorSaveButton" type="button" hidden disabled>保存</button>
+                    </div>
+                    <p class="form-note">点击编辑后修改节点配置；保存后生效，取消则放弃修改。右键节点可前插、后插、编辑或删除。</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+</dialog>
+
+<script src="app.js?v=20260723-28"></script>
+</body>
+</html>

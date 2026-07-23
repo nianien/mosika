@@ -74,7 +74,7 @@ public class UINodeAdapter {
                 || ruleNode instanceof AndNode
                 || ruleNode instanceof OrNode
                 || ruleNode instanceof HitsNode) {
-            return ruleNode2CNode(ruleNode);
+            return ruleNode2JNode(ruleNode);
         }
         if (ruleNode instanceof ExprNode) {
             return new ANode(ruleNode.expr());
@@ -177,7 +177,7 @@ public class UINodeAdapter {
      * @return
      */
     private CNode caseNode2CNode(CaseNode caseNode) {
-        CNode node = ruleNode2CNode(caseNode.getCondition());
+        CNode node = ruleNode2JNode(caseNode.getCondition());
         if (caseNode.getTrueCase() != null) {
             node.setAction(fromRule(caseNode.getTrueCase()));
         }
@@ -187,16 +187,11 @@ public class UINodeAdapter {
     /**
      * 条件规则转条件节点。
      */
-    private CNode ruleNode2CNode(RuleNode ruleNode) {
+    private JNode ruleNode2JNode(RuleNode ruleNode) {
         RNode rn = ruleNode2RNode(ruleNode);
-        if (rn instanceof LNode) {
-            JNode jn = new JNode();
-            jn.setRule(rn);
-            return jn;
-        }
-        CNode cn = new CNode(rn.getExpr());
-        cn.setNegative(rn.isNegative());
-        return cn;
+        JNode jn = new JNode();
+        jn.setRule(rn);
+        return jn;
     }
 
     /**

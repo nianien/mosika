@@ -72,6 +72,37 @@ public class TreeNodeTest {
     }
 
     @Test
+    public void testRuleNodeNameJsonRoundTrip() {
+        TreeNode tree = new TreeNode();
+        SNode serial = new SNode();
+        tree.setNext(serial);
+
+        RNode atomicRule = new RNode("c1");
+        atomicRule.setName("单一规则名称");
+        JNode atomicJudge = new JNode();
+        atomicJudge.setRule(atomicRule);
+        serial.addBranch(atomicJudge);
+
+        LNode compositeRule = LNode.and();
+        compositeRule.setName("复合规则名称");
+        compositeRule.addRule(new RNode("c2")).addRule(new RNode("c3"));
+        JNode compositeJudge = new JNode();
+        compositeJudge.setRule(compositeRule);
+        serial.addBranch(compositeJudge);
+
+        String json = tree.toJson();
+        TreeNode restored = TreeNode.fromJson(json);
+        SNode restoredSerial = assertInstanceOf(SNode.class, restored.getNext());
+        JNode restoredAtomic = assertInstanceOf(JNode.class, restoredSerial.getBranches().get(0));
+        JNode restoredComposite = assertInstanceOf(JNode.class, restoredSerial.getBranches().get(1));
+
+        assertEquals("单一规则名称", restoredAtomic.getRule().getName());
+        assertEquals("复合规则名称", restoredComposite.getRule().getName());
+        assertEquals(json, restored.toJson());
+        assertEquals(tree.toRule().expr(), restored.toRule().expr());
+    }
+
+    @Test
     public void testSerialWithNonActionNodes() {
         String expression = "a0->(c1?a1)->a2";
         TreeNode tree = new TreeNode().fromRule(NodeBuilder.build(expression));
@@ -122,7 +153,7 @@ public class TreeNodeTest {
         System.out.println(rule);
         TreeNode t2 = new TreeNode().fromRule(rule);
         System.out.println(JsonUtils.toJson(t2));
-        assertEquals("{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\"a1\",\"next\":{\"type\":\"A\",\"expr\":\"a2\",\"next\":{\"type\":\"C\",\"expr\":\"c3\",\"negative\":false,\"action\":{\"type\":\"A\",\"expr\":\"a3\",\"next\":{\"type\":\"A\",\"expr\":\"a4\"}}}}}}",
+        assertEquals("{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\"a1\",\"next\":{\"type\":\"A\",\"expr\":\"a2\",\"next\":{\"type\":\"J\",\"expr\":\"J\",\"negative\":false,\"action\":{\"type\":\"A\",\"expr\":\"a3\",\"next\":{\"type\":\"A\",\"expr\":\"a4\"}},\"rule\":{\"type\":\"R\",\"expr\":\"c3\",\"negative\":false}}}}}",
                 JsonUtils.toJson(t2));
     }
 
@@ -149,7 +180,10 @@ public class TreeNodeTest {
         System.out.println(JsonUtils.toJson(tree));
         System.out.println(JsonUtils.toJson(t2));
         assertEquals(rule.expr(), rule2.expr());
-        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+        DNode restoredDecision = assertInstanceOf(DNode.class,
+                assertInstanceOf(ANode.class, t2.getNext()).getNext());
+        restoredDecision.getBranches().forEach(branch -> assertInstanceOf(JNode.class, branch));
+        assertEquals(JsonUtils.toJson(t2), JsonUtils.toJson(new TreeNode().fromRule(rule2)));
     }
 
 
@@ -177,7 +211,9 @@ public class TreeNodeTest {
         System.out.println(JsonUtils.toJson(t2));
         System.out.println(JsonUtils.toJson(t3));
         assertEquals(rule.expr(), rule2.expr());
-        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t3));
+        assertInstanceOf(SNode.class, t3.getNext()).getBranches()
+                .forEach(branch -> assertInstanceOf(JNode.class, branch));
+        assertEquals(JsonUtils.toJson(t3), JsonUtils.toJson(new TreeNode().fromRule(t3.toRule())));
     }
 
     @Test
@@ -239,7 +275,10 @@ public class TreeNodeTest {
         System.out.println(JsonUtils.toJson(t2));
         System.out.println(rule);
         System.out.println(t2.toRule());
-        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+        DNode restoredDecision = assertInstanceOf(DNode.class,
+                assertInstanceOf(ANode.class, t2.getNext()).getNext());
+        restoredDecision.getBranches().forEach(branch -> assertInstanceOf(JNode.class, branch));
+        assertEquals(JsonUtils.toJson(t2), JsonUtils.toJson(new TreeNode().fromRule(t2.toRule())));
         assertEquals(rule.expr(), t2.toRule().expr());
     }
 
@@ -329,7 +368,8 @@ public class TreeNodeTest {
         System.out.println(JsonUtils.toJson(tree));
         System.out.println(tree.toRule());
         TreeNode t2 = new TreeNode().fromRule(tree.toRule());
-        assertEquals(JsonUtils.toJson(tree), JsonUtils.toJson(t2));
+        assertEquals(tree.toRule().expr(), t2.toRule().expr());
+        assertEquals(JsonUtils.toJson(t2), JsonUtils.toJson(new TreeNode().fromRule(t2.toRule())));
     }
 
 

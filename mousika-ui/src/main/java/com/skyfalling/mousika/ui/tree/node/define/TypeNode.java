@@ -6,7 +6,10 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.skyfalling.mousika.ui.tree.resolver.NodeTypeResolver;
 
 /**
- * 节点类型定义
+ * UI树节点的多态类型契约。
+ * <p>
+ * JSON中的{@code type}字段由{@link NodeTypeResolver}根据具体节点类型生成并解析，
+ * {@code expr}则保留节点自身的表达式或结构标识。
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -15,7 +18,11 @@ import com.skyfalling.mousika.ui.tree.resolver.NodeTypeResolver;
 public interface TypeNode {
 
     /**
-     * 原始表达式
+     * 返回节点表达式。
+     * <p>
+     * 原子节点返回规则或动作表达式，结构节点返回稳定的结构标识。
+     *
+     * @return 节点表达式或结构标识
      */
     String getExpr();
 
