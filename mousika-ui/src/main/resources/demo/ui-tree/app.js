@@ -250,7 +250,7 @@
         return `${low}…${high}`;
     }
 
-    function renderBranch(node, parent = null) {
+    function renderBranch(node) {
         const type = TYPES[node.type] || TYPES.A;
         const expression = node.expression && type.kind !== "structure" && type.kind !== "root"
             ? `<span class="node-expression">${escapeText(node.expression)}</span>` : "";
@@ -258,25 +258,20 @@
         const collapsed = Boolean(node.type !== "J" && node.collapsed && node.children.length);
         const visibleChildren = node.type === "J" ? flows : (collapsed ? [] : node.children);
         const children = visibleChildren.length
-            ? `<div class="tree-children">${visibleChildren.map((child) => renderBranch(child, node)).join("")}</div>` : "";
+            ? `<div class="tree-children">${visibleChildren.map((child) => renderBranch(child)).join("")}</div>` : "";
         const collapsedBadge = collapsed ? `<span class="collapsed-count">+${countFlowNodes(node) - 1}</span>` : "";
         const title = node.type === "J"
             ? ruleDisplayName(node)
             : (type.kind === "structure" || type.kind === "root" ? compactStructureLabel(node, type) : node.label);
         const cardKind = `${node.type === "J" ? "condition judge-summary" : type.kind} node-type-${node.type.toLowerCase()}`;
         const cardTitle = node.type === "J"
-            ? `规则 · ${ruleDisplayName(node)} · 双击编辑`
+            ? `规则 · ${ruleDisplayName(node)}`
             : (["A", "C"].includes(node.type)
-                ? `${type.name} · ${node.label} · 双击编辑`
+                ? `${type.name} · ${node.label}`
                 : type.name);
         const canCollapse = node.type !== "J" && Boolean(node.children.length);
         const nodeShell = `
             <div class="node-shell" data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
-                    <div class="node-tools" aria-label="节点快捷操作">
-                        ${availableRelations(node).length ? `<button type="button" data-action="add" title="添加子节点">＋</button>` : ""}
-                        ${canAddSibling(node, parent) ? `<button type="button" data-action="sibling" title="添加同级节点">↔</button>` : ""}
-                        ${node.type === "ROOT" ? "" : `<button type="button" data-action="delete" title="删除">×</button>`}
-                    </div>
                     <div class="node-card ${cardKind}" title="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
@@ -1068,25 +1063,13 @@
         if (!shell) return;
         selectNode(shell.dataset.nodeId);
         const action = event.target.closest("[data-action]")?.dataset.action;
-        if (action === "add") openAddDialog("child");
-        else if (action === "sibling") openAddDialog("sibling");
-        else if (action === "collapse") toggleCollapse();
-        else if (action === "delete") deleteSelected();
-    });
-
-    treeRoot.addEventListener("dblclick", (event) => {
-        if (event.target.closest("[data-action]")) return;
-        const shell = event.target.closest(".node-shell");
-        if (!shell) return;
-        selectNode(shell.dataset.nodeId);
-        openSelectedNodeEditor();
+        if (action === "collapse") toggleCollapse();
     });
 
     treeRoot.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && event.target.matches(".node-shell")) {
             event.preventDefault();
             selectNode(event.target.dataset.nodeId);
-            if (event.key === "Enter") openSelectedNodeEditor();
         }
     });
 
@@ -1281,10 +1264,8 @@
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && dialog.open) dialog.close();
         const editing = event.target.matches("input, select, textarea");
-        if (!editing && (event.key === "Delete" || event.key === "Backspace")) {
-            if (ruleDialog.open) deleteSelectedRule();
-            else if (nodeEditDialog.open) return;
-            else deleteSelected();
+        if (!editing && ruleDialog.open && (event.key === "Delete" || event.key === "Backspace")) {
+            deleteSelectedRule();
         }
         if (!editing && event.key === "0") fitTree();
     });

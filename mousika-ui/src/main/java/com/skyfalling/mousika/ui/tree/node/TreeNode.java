@@ -39,23 +39,12 @@ public class TreeNode extends ANode {
     private static final UINodeAdapter ADAPTER = new UINodeAdapter();
 
     /**
-     * 将当前UI流程树还原为内核规则节点。
+     * 将当前UI流程树单向编译为内核规则节点。
      *
      * @return 内核规则树
      */
     public RuleNode toRule() {
         return ADAPTER.toRule(getNext());
-    }
-
-    /**
-     * 使用内核规则树替换当前流程入口。
-     *
-     * @param ruleNode 内核规则树
-     * @return 当前UI树
-     */
-    public TreeNode fromRule(RuleNode ruleNode) {
-        this.setNext(ADAPTER.fromRule(ruleNode));
-        return this;
     }
 
     /**

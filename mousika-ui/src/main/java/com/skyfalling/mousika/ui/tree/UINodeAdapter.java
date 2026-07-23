@@ -5,9 +5,6 @@ import com.skyfalling.mousika.eval.node.*;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import com.skyfalling.mousika.ui.tree.node.flow.*;
-import com.skyfalling.mousika.ui.tree.node.rule.HNode;
-import com.skyfalling.mousika.ui.tree.node.rule.LNode;
-import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import com.skyfalling.mousika.utils.Constants;
 
 import java.util.ArrayList;
@@ -15,6 +12,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
+ * 将UI树单向转换为内核执行树。
+ * <p>
+ * UI树及其JSON是编辑和持久化的唯一事实来源；转换过程只保留执行语义，
+ * 不传递{@code label}、规则{@code name}等UI元数据，也不提供逆向转换。
+ *
  * Created on 2023/5/2
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -23,10 +25,10 @@ public class UINodeAdapter {
 
 
     /**
-     * UI节点转规则
+     * 将流程节点编译为内核规则节点。
      *
-     * @param un
-     * @return
+     * @param un UI流程节点
+     * @return 仅包含执行语义的内核规则树
      */
     public RuleNode toRule(FlowNode un) {
         Preconditions.checkNotNull(un, "ui node cannot be null!");
@@ -48,40 +50,6 @@ public class UINodeAdapter {
         }
         throw new UnsupportedOperationException("not support node type:" + un.getClass().getSimpleName());
     }
-
-    /**
-     * 规则转UI节点
-     *
-     * @param ruleNode
-     * @return
-     */
-    public FlowNode fromRule(RuleNode ruleNode) {
-        Preconditions.checkNotNull(ruleNode, "rule node cannot be null!");
-        if (ruleNode instanceof CaseNode) {
-            CaseNode caseNode = (CaseNode) ruleNode;
-            if (caseNode.getFalseCase() == null) {
-                return caseNode2CNode(caseNode);
-            }
-            return caseNode2DNode(caseNode, new DNode());
-        }
-        if (ruleNode instanceof SerNode) {
-            return serNode2FlowNode((SerNode) ruleNode);
-        }
-        if (ruleNode instanceof ParNode) {
-            return parNode2FlowNode((ParNode) ruleNode);
-        }
-        if (ruleNode instanceof NotNode
-                || ruleNode instanceof AndNode
-                || ruleNode instanceof OrNode
-                || ruleNode instanceof HitsNode) {
-            return ruleNode2JNode(ruleNode);
-        }
-        if (ruleNode instanceof ExprNode) {
-            return new ANode(ruleNode.expr());
-        }
-        throw new UnsupportedOperationException("not support rule type:" + ruleNode.getClass().getSimpleName());
-    }
-
 
     /**
      * PNode转Rule
@@ -169,144 +137,5 @@ public class UINodeAdapter {
         return nodes.size() == 1 ? nodes.get(0) : new SerNode(nodes.toArray(new RuleNode[0]));
     }
 
-
-    /**
-     * CaseNode转CNode
-     *
-     * @param caseNode
-     * @return
-     */
-    private CNode caseNode2CNode(CaseNode caseNode) {
-        CNode node = ruleNode2JNode(caseNode.getCondition());
-        if (caseNode.getTrueCase() != null) {
-            node.setAction(fromRule(caseNode.getTrueCase()));
-        }
-        return node;
-    }
-
-    /**
-     * 条件规则转条件节点。
-     */
-    private JNode ruleNode2JNode(RuleNode ruleNode) {
-        RNode rn = ruleNode2RNode(ruleNode);
-        JNode jn = new JNode();
-        jn.setRule(rn);
-        return jn;
-    }
-
-    /**
-     * CaseNode转DNode
-     *
-     * @param caseNode
-     * @param dNode
-     * @return
-     */
-    private DNode caseNode2DNode(CaseNode caseNode, DNode dNode) {
-        dNode.addBranch(caseNode2CNode(caseNode));
-        RuleNode falseCase = caseNode.getFalseCase();
-        if (falseCase instanceof CaseNode) {
-            caseNode2DNode((CaseNode) falseCase, dNode);
-        } else if (falseCase != null) {
-            dNode.setAction(fromRule(falseCase));
-        }
-        return dNode;
-    }
-
-
-    /**
-     * RuleNode转RNode
-     *
-     * @param ruleNode 规则节点
-     */
-    private RNode ruleNode2RNode(RuleNode ruleNode) {
-        Preconditions.checkNotNull(ruleNode, "rule node cannot be null!");
-        boolean negative = false;
-        if (ruleNode instanceof NotNode) {
-            ruleNode = ruleNode.not();
-            negative = true;
-        }
-        LNode node;
-        if (ruleNode instanceof HitsNode) {
-            HitsNode hitsNode = (HitsNode) ruleNode;
-            node = new HNode(hitsNode.getMinHits(), hitsNode.getMaxHits());
-            node.setNegative(negative);
-            hitsNode.getNodes().forEach(r -> node.addRule(ruleNode2RNode(r)));
-        } else if (ruleNode instanceof AndNode) {
-            node = LNode.and();
-            node.setNegative(negative);
-            ((AndNode) ruleNode).getNodes().forEach(r -> node.addRule(ruleNode2RNode(r)));
-        } else if (ruleNode instanceof OrNode) {
-            node = LNode.or();
-            node.setNegative(negative);
-            ((OrNode) ruleNode).getNodes().forEach(r -> node.addRule(ruleNode2RNode(r)));
-        } else {
-            return new RNode(ruleNode.expr(), negative);
-        }
-        return node;
-    }
-
-    /**
-     * SerNode转UINode
-     *
-     * @param serNode
-     * @return
-     */
-    private FlowNode serNode2FlowNode(SerNode serNode) {
-        List<RuleNode> nodes = serNode.getNodes();
-        if(nodes.isEmpty()){
-            return null;
-        }
-        RuleNode first = nodes.get(0);
-        nodes = nodes.subList(1, nodes.size());
-        if (first.expr().equals(Constants.NOP)) {// SNode
-            SNode sn = new SNode();
-            nodes.forEach(n -> sn.addBranch(fromRule(n)));
-            return sn;
-        }
-        List<FlowNode> flows = new ArrayList<>();
-        flows.add(fromRule(first));
-        nodes.forEach(node -> flows.add(fromRule(node)));
-        if (flows.size() == 1) {
-            return flows.get(0);
-        }
-        boolean actionChain = flows.subList(0, flows.size() - 1).stream()
-                .allMatch(ANode.class::isInstance);
-        if (!actionChain) {
-            SNode sn = new SNode();
-            flows.forEach(sn::addBranch);
-            return sn;
-        }
-        ANode root = (ANode) flows.get(0);
-        ANode current = root;
-        for (int i = 1; i < flows.size(); i++) {
-            FlowNode flow = flows.get(i);
-            current.setNext(flow);
-            if (flow instanceof ANode) {
-                current = (ANode) flow;
-            }
-        }
-        return root;
-    }
-
-
-    /**
-     * SerNode转UINode
-     *
-     * @param parNode
-     * @return
-     */
-    private FlowNode parNode2FlowNode(ParNode parNode) {
-        List<RuleNode> nodes = parNode.getNodes();
-        if(nodes.isEmpty()){
-            return null;
-        }
-        RuleNode first = nodes.get(0);
-        if (first.expr().equals(Constants.NOP)) {
-            nodes = nodes.subList(1, nodes.size());
-        }
-        PNode pn = new PNode();
-        nodes.forEach(n -> pn.addBranch(fromRule(n)));
-        return pn;
-    }
 
 }
