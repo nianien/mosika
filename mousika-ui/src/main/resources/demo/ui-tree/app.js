@@ -96,6 +96,7 @@
 
     let tree = sampleTree();
     let selectedId = null;
+    let inspectorEditingField = null;
     let nextId = 44;
     let addRelation = null;
     let scale = 1;
@@ -109,13 +110,12 @@
     let ruleAddParentId = null;
     let ruleAddAnchorId = null;
     let ruleAddRuleIds = [];
-    let ruleExtendRuleIds = [];
     let rulePopoverAnchorId = null;
     let rulePopoverPoint = null;
     let ruleEditorEditing = false;
     let ruleEditorDraftNodeId = null;
+    let ruleEditorDraftState = null;
     let closeRuleDialogAfterEdit = false;
-    let deleteNodeId = null;
 
     const FLOW_TYPES = ["A", "S", "P", "D", "J"];
     const RELATIONS = {
@@ -131,9 +131,7 @@
     const treeRoot = $("#treeRoot");
     const viewport = $("#treeViewport");
     const stage = $("#treeStage");
-    const dialog = $("#nodeDialog");
-    const nodeEditDialog = $("#nodeEditDialog");
-    const deleteNodeDialog = $("#deleteNodeDialog");
+    const confirmDialog = $("#confirmDialog");
     const ruleDialog = $("#ruleDialog");
     const ruleTreeRoot = $("#ruleTreeRoot");
 
@@ -143,6 +141,20 @@
             if (walk(child, visitor, node) === false) return false;
         }
         return true;
+    }
+
+    function openConfirm(message, { title = "确认操作", confirmLabel = "确定" } = {}) {
+        $("#confirmDialogTitle").textContent = title;
+        $("#confirmDialogMessage").textContent = message;
+        $("#confirmDialogConfirm").textContent = confirmLabel;
+        return new Promise((resolve) => {
+            const onClose = () => {
+                confirmDialog.removeEventListener("close", onClose);
+                resolve(confirmDialog.returnValue === "default");
+            };
+            confirmDialog.addEventListener("close", onClose);
+            confirmDialog.showModal();
+        });
     }
 
     function findNode(id) {
@@ -259,7 +271,7 @@
         } else if (node.type === "A") {
             add("next", "添加下一步", "添加下一步");
         } else if (["C", "J"].includes(node.type)) {
-            add("action", "添加后续", "添加后续");
+            add("action", "添加后续流程", "添加后续流程");
         } else if (node.type === "S") {
             add("branch", "添加分支", "添加分支");
         } else if (node.type === "P") {
@@ -329,7 +341,7 @@
             ? `条件节点 · ${ruleDisplayName(node)}`
             : (["A", "C"].includes(node.type)
                 ? `${type.name} · ${flowNodeDisplayName(node)}`
-                : type.name);
+                : (flowNodeName(node) ? `${type.name} · ${flowNodeName(node)}` : type.name));
         const canCollapse = node.type !== "J" && Boolean(node.children.length);
         const nodeShell = `
             <div class="node-shell${canCollapse ? " has-fold-toggle" : ""}" data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
@@ -381,6 +393,101 @@
         return `复合规则 · ${countNodes(rule)} 个规则节点`;
     }
 
+    function inspectorEditableType(type) {
+        return ["A", "C", "S", "P", "D", "J"].includes(type);
+    }
+
+    function editKey(nodeId, field) {
+        return `${nodeId}:${field}`;
+    }
+
+    function renderInspectorHeading(node) {
+        const container = $("#inspectorHeading");
+        if (!container) return;
+        const editable = inspectorEditableType(node.type);
+        const active = editable && inspectorEditingField === editKey(node.id, "alias");
+        const typeChip = `<span class="inspector-type">${escapeText(TYPES[node.type].name)}</span>`;
+        container.innerHTML = `<div class="rule-heading-view">
+            <strong id="inspectorTitle">节点属性</strong>
+            ${editable && !active ? `<button class="field-edit" type="button" data-field-edit="alias" aria-label="设置节点名称" title="设置节点名称"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg></button>` : ""}
+        </div>
+        ${typeChip}`;
+    }
+
+    function renderInspectorFields(node) {
+        const nodeName = flowNodeName(node);
+        const parts = [];
+        const pencil = (field) => `<button class="field-edit" type="button" data-field-edit="${field}" aria-label="编辑" title="编辑">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
+        </button>`;
+        const confirmCancel = () => `<div class="field-edit-actions">
+            <button class="field-confirm" type="button" data-field-confirm aria-label="确认" title="确认"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></button>
+            <button class="field-cancel" type="button" data-field-cancel aria-label="取消" title="取消"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>`;
+        const ruleField = (definitions, selectedId, fallbackLabel) => {
+            const active = inspectorEditingField === editKey(node.id, "expression");
+            const options = [...(selectedId && !definitions.some((d) => d.ruleId === selectedId)
+                ? [{ ruleId: selectedId, desc: fallbackLabel || selectedId }] : []), ...definitions];
+            parts.push(`<div class="detail-field editable${active ? " field-editing" : ""}" data-field="expression">
+                <span class="detail-label">引用规则</span>
+                <div class="field-row">
+                    <span class="detail-value">${escapeText(definitionReference(definitions, selectedId, fallbackLabel))}</span>
+                    ${active ? "" : pencil("expression")}
+                    <select class="field-control" id="inspectorDefinitionSelect">
+                        ${options.map((d) => `<option value="${escapeText(d.ruleId)}" ${d.ruleId === selectedId ? "selected" : ""}>${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("")}
+                    </select>
+                    ${active ? confirmCancel() : ""}
+                </div>
+            </div>`);
+        };
+        const readonlyField = (label, value) => {
+            parts.push(`<div class="detail-field">
+                <span class="detail-label">${escapeText(label)}</span>
+                <span class="detail-value">${escapeText(value)}</span>
+            </div>`);
+        };
+        const aliasActive = inspectorEditingField === editKey(node.id, "alias");
+        if (nodeName || aliasActive) {
+            parts.push(`<div class="detail-field editable${aliasActive ? " field-editing" : ""}" data-field="alias">
+                <span class="detail-label">节点名称</span>
+                <div class="field-row">
+                    <span class="detail-value">${escapeText(nodeName)}</span>
+                    ${aliasActive ? "" : pencil("alias")}
+                    <input class="field-control" id="inspectorAliasInput" maxlength="28" autocomplete="off"
+                           value="${escapeText(nodeName)}" placeholder="未设置">
+                    ${aliasActive ? confirmCancel() : ""}
+                </div>
+            </div>`);
+        }
+
+        if (node.type === "A") {
+            ruleField(ACTION_DEFINITIONS, node.expression, node.label);
+            const next = relationChild(node, "next");
+            if (next) readonlyField("下一步", flowNodeDisplayName(next));
+        } else if (node.type === "C") {
+            ruleField(RULE_DEFINITIONS, node.expression, node.label);
+        } else if (node.type === "J") {
+            readonlyField("引用规则", judgeRuleReference(node));
+        } else if (["S", "P"].includes(node.type)) {
+            readonlyField("分支数", `${node.children.length} 个`);
+        } else if (node.type === "D") {
+            const branches = node.children.filter((child) => child.relation === "decision").length;
+            readonlyField("分支数", `${branches} 个`);
+            readonlyField("默认分支", relationChild(node, "default") ? "已设置" : "未设置");
+        } else {
+            const root = relationChild(node, "root");
+            readonlyField("流程入口", root ? flowNodeDisplayName(root) : "未设置");
+        }
+        $("#nodeDetailFields").innerHTML = parts.join("");
+        if (inspectorEditingField && inspectorEditingField.startsWith(`${node.id}:`)) {
+            requestAnimationFrame(() => {
+                const control = $("#nodeDetailFields .field-editing .field-control");
+                control?.focus();
+                if (control?.tagName === "INPUT") control.select();
+            });
+        }
+    }
+
     function updateInspector() {
         const found = findNode(selectedId);
         const empty = $("#inspectorEmpty");
@@ -393,70 +500,65 @@
         const { node } = found;
         empty.hidden = true;
         form.hidden = false;
-        $("#inspectorTitle").textContent = "节点属性";
-        $("#nodeType").textContent = TYPES[node.type].name;
-        const nodeName = flowNodeName(node);
-        const fields = nodeName ? [{ label: "节点名称", value: nodeName }] : [];
-        if (node.type === "J") {
-            fields.push({ label: "引用规则", value: judgeRuleReference(node) });
-        } else if (node.type === "A") {
-            const next = relationChild(node, "next");
-            fields.push({
-                label: "引用规则",
-                value: definitionReference(ACTION_DEFINITIONS, node.expression, node.label)
-            });
-            if (next) {
-                fields.push({ label: "下一步", value: flowNodeDisplayName(next) });
-            }
-        } else if (node.type === "C") {
-            fields.push({
-                label: "引用规则",
-                value: definitionReference(RULE_DEFINITIONS, node.expression, node.label)
-            });
-        } else if (["S", "P"].includes(node.type)) {
-            fields.push({ label: "分支数", value: `${node.children.length} 个` });
-        } else if (node.type === "D") {
-            const branches = node.children.filter((child) => child.relation === "decision").length;
-            fields.push({ label: "分支数", value: `${branches} 个` });
-            fields.push({
-                label: "默认分支",
-                value: relationChild(node, "default") ? "已设置" : "未设置"
-            });
-        } else {
-            const root = relationChild(node, "root");
-            fields.push({
-                label: "流程入口",
-                value: root ? flowNodeDisplayName(root) : "未设置"
-            });
-        }
-        $("#nodeDetailFields").innerHTML = fields.map((field) => `
-            <label>
-                ${escapeText(field.label)}
-                <input value="${escapeText(field.value)}" readonly>
-            </label>
-        `).join("");
+        renderInspectorHeading(node);
+        renderInspectorFields(node);
+        $("#inspectorAddPanel").hidden = true;
         const operations = flowNodeOperations(node);
-        const primaryOperation = ["ROOT", "S", "P", "D"].includes(node.type);
+        const convertButton = ["S", "P"].includes(node.type)
+            ? `<button class="flow-operation wide" type="button" data-convert="${node.type === "S" ? "P" : "S"}">${node.type === "S" ? "转为并行" : "转为串行"}</button>`
+            : "";
         $("#flowNodeActions").innerHTML = operations.map((operation, index) => `
-            <button class="${primaryOperation && index === 0 ? "primary " : ""}flow-operation${operations.length === 1 ? " wide" : ""}"
+            <button class="${index === 0 ? "primary " : ""}flow-operation${operations.length === 1 && !convertButton ? " wide" : ""}"
                     type="button" data-flow-relation="${operation.relation}">
                 ${escapeText(operation.label)}
             </button>
-        `).join("");
+        `).join("") + convertButton;
         const editButton = $("#editNodeButton");
-        editButton.textContent = node.type === "J" ? "查看规则" : "编辑";
-        editButton.hidden = node.type === "ROOT";
-        editButton.classList.toggle("primary", ["A", "C", "J"].includes(node.type));
-        editButton.style.order = ["A", "C", "J"].includes(node.type) ? "-1" : "0";
-        $(".inspector-actions").hidden = operations.length === 0 && editButton.hidden;
-        $("#deleteButton").hidden = node.type === "ROOT";
+        editButton.hidden = node.type !== "J";
+        $("#inspectorViewActions").hidden = operations.length === 0 && editButton.hidden;
+        $("#inspectorFooter").hidden = node.type === "ROOT";
         $("#deleteButton").disabled = !canDeleteFlowNode(node, found.parent);
         $("#deleteButton").title = $("#deleteButton").disabled
             ? "当前节点是所属结构的唯一必需分支，不能直接删除"
             : "";
     }
 
+    function beginFieldEdit(field) {
+        const found = findNode(selectedId);
+        if (!found || !inspectorEditableType(found.node.type)) return;
+        inspectorEditingField = editKey(found.node.id, field);
+        renderInspectorHeading(found.node);
+        renderInspectorFields(found.node);
+    }
+
+    function confirmFieldEdit() {
+        const found = findNode(selectedId);
+        if (!found || !inspectorEditingField) return;
+        const node = found.node;
+        const [, field] = inspectorEditingField.split(":");
+        if (field === "alias") {
+            const nameTarget = node.type === "J" ? judgeParts(node).rule : node;
+            if (nameTarget) nameTarget.name = $("#inspectorAliasInput").value.trim();
+        } else if (field === "expression" && ["A", "C"].includes(node.type)) {
+            const definitions = node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS;
+            const definition = definitions.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
+            if (definition) {
+                node.label = definition.desc;
+                node.expression = definition.ruleId;
+            }
+        }
+        inspectorEditingField = null;
+        render({ preserveView: true });
+    }
+
+    function cancelFieldEdit() {
+        inspectorEditingField = null;
+        const found = findNode(selectedId);
+        if (found) { renderInspectorHeading(found.node); renderInspectorFields(found.node); }
+    }
+
     function selectNode(id) {
+        if (id !== selectedId) inspectorEditingField = null;
         selectedId = id;
         treeRoot.querySelectorAll(".node-shell").forEach((shell) => {
             shell.setAttribute("aria-selected", String(shell.dataset.nodeId === id));
@@ -464,51 +566,9 @@
         updateInspector();
     }
 
-    function openSelectedNodeEditor() {
-        const found = findNode(selectedId);
-        if (!found) return;
-        const { node } = found;
-        if (node.type === "ROOT") return;
-        if (node.type === "J") {
-            openRuleDialog(node.id);
-            return;
-        }
-        const ruleBacked = ["A", "C"].includes(node.type);
-        $("#nodeEditDialogTitle").textContent = "编辑节点";
-        $("#editNodeDefinitionField").hidden = !ruleBacked;
-        $("#editNodeDefinition").disabled = !ruleBacked;
-        if (ruleBacked) {
-            populateFlowDefinitionSelect(
-                $("#editNodeDefinition"),
-                node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS,
-                node.expression,
-                node.label
-            );
-        }
-        $("#editNodeAlias").value = flowNodeName(node);
-        $("#editNodeAlias").placeholder = ruleBacked ? flowNodeDisplayName(node) : "";
-        nodeEditDialog.showModal();
-        requestAnimationFrame(() => {
-            (ruleBacked ? $("#editNodeDefinition") : $("#editNodeAlias")).focus();
-        });
-    }
-
-    function saveSelectedNodeEditor() {
-        const found = findNode(selectedId);
-        if (!found || !["A", "C", "S", "P", "D"].includes(found.node.type)) return;
-        if (["A", "C"].includes(found.node.type)) {
-            const definitions = found.node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS;
-            const selectedRuleId = $("#editNodeDefinition").value;
-            const definition = definitions.find((candidate) =>
-                candidate.ruleId === selectedRuleId);
-            if (!definition && selectedRuleId !== found.node.expression) return;
-            if (definition) {
-                found.node.label = definition.desc;
-                found.node.expression = definition.ruleId;
-            }
-        }
-        found.node.name = $("#editNodeAlias").value.trim();
-        render({ preserveView: true });
+    function confirmDiscardInspectorEdit() {
+        inspectorEditingField = null;
+        return true;
     }
 
     function currentRuleJudge() {
@@ -572,6 +632,76 @@
         $("#ruleNodeCount").textContent = rule ? `${countNodes(rule)} 个规则节点` : "0 个规则节点";
     }
 
+    function ruleNodeSubrules(node) {
+        // 统一视角：原子规则视为只有一条子规则的列表，复合规则展开其直接子规则。
+        if (node.type === "R") return [node];
+        if (["L", "H"].includes(node.type)) return node.children.slice();
+        return [];
+    }
+
+    function subruleRowLabel(child) {
+        if (child.type === "R") {
+            const definition = ruleDefinitionById(child.expression);
+            return definition ? `${definition.desc} · ${definition.ruleId}` : (child.expression || "未设置");
+        }
+        return `${ruleNodeDisplayName(child)} · ${countNodes(child)} 个规则节点`;
+    }
+
+    function renderRuleEditorHeading(node) {
+        const container = $("#ruleEditorHeading");
+        if (!container) return;
+        const active = ruleEditorEditing && ruleEditorDraftState;
+        const name = active ? ruleEditorDraftState.name : (node.name?.trim() || "");
+        const fallback = ruleNodeDisplayName(node);
+        const typeChip = `<span class="inspector-type">${escapeText(node.type === "R" ? "规则" : TYPES[node.type].name)}</span>`;
+        if (active) {
+            container.innerHTML = `<div class="rule-heading-edit">
+                <input id="ruleAliasInput" maxlength="28" autocomplete="off" value="${escapeText(name)}" placeholder="${escapeText(fallback)}">
+            </div>
+            ${typeChip}`;
+        } else {
+            container.innerHTML = `<div class="rule-heading-view">
+                <strong id="ruleEditorTitle">${escapeText(name || fallback)}</strong>
+            </div>
+            ${typeChip}`;
+        }
+    }
+
+    function renderRuleEditorSubrules() {
+        const draft = ruleEditorDraftState;
+        const editing = ruleEditorEditing && draft;
+        const container = $("#ruleEditorSubrules");
+        if (editing) {
+            container.innerHTML = draft.refs.map((ref, index) => {
+                if (ref.type !== "R") {
+                    return `<div class="rule-add-row rule-subrule-static">
+                        <span class="detail-value">${escapeText(subruleRowLabel(ref.node))}</span>
+                        <button type="button" data-subrule-remove="${index}" aria-label="删除规则 ${index + 1}" ${draft.refs.length <= 1 ? "disabled" : ""}>×</button>
+                    </div>`;
+                }
+                return `<div class="rule-add-row">
+                    <select data-subrule-select="${index}">
+                        ${RULE_DEFINITIONS.map((definition) => `<option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ref.ruleId ? "selected" : ""}>${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`).join("")}
+                    </select>
+                    <button type="button" data-subrule-remove="${index}" aria-label="删除规则 ${index + 1}" ${draft.refs.length <= 1 ? "disabled" : ""}>×</button>
+                </div>`;
+            }).join("");
+        } else {
+            const node = findRuleNode(ruleSelectedId)?.node;
+            const subrules = node ? ruleNodeSubrules(node) : [];
+            container.innerHTML = subrules.map((child) => `
+                <div class="rule-subrule-view"><span class="detail-value">${escapeText(subruleRowLabel(child))}</span></div>
+            `).join("");
+        }
+        const count = editing ? draft.refs.length : (findRuleNode(ruleSelectedId)?.node ? ruleNodeSubrules(findRuleNode(ruleSelectedId).node).length : 0);
+        const selectedNode = editing
+            ? findRuleNode(ruleEditorDraftNodeId)?.node
+            : findRuleNode(ruleSelectedId)?.node;
+        const showsLogic = count >= 2 && selectedNode?.type !== "H";
+        $("#ruleEditorAddRuleButton").hidden = !editing;
+        $("#ruleEditorLogicField").hidden = !showsLogic;
+    }
+
     function updateRuleEditor() {
         const found = findRuleNode(ruleSelectedId);
         const empty = $("#ruleEditorEmpty");
@@ -589,102 +719,163 @@
         const { node } = found;
         empty.hidden = true;
         panel.hidden = false;
-        $("#ruleEditorTitle").textContent = ruleNodeDisplayName(node);
-        $("#ruleNodeType").value = TYPES[node.type].name;
-        const aliasInput = $("#ruleNodeLabel");
-        const fallbackName = ruleNodeDisplayName(node);
-        aliasInput.value = node.name?.trim() || "";
-        aliasInput.placeholder = fallbackName;
-        aliasInput.dataset.initialAlias = node.name || "";
-        aliasInput.dataset.fallbackName = fallbackName;
-        $("#ruleNodeNameField").hidden = !node.name?.trim();
-        $("#ruleNodeExpression").value = node.expression || "";
-        const atomic = node.type === "R";
-        const logic = node.type === "L";
-        $("#ruleDefinitionField").hidden = !atomic;
-        $("#ruleLogicField").hidden = !logic;
-        $("#ruleReferenceField").hidden = atomic || logic;
-        $("#ruleReferenceLabel").textContent = "命中表达式";
-        $("#ruleNodeExpression").readOnly = true;
-        if (atomic) populateRuleDefinitionSelect($("#ruleDefinitionSelect"), node.expression);
-        if (logic) {
-            $("#ruleLogicSelect").value = node.expression === "||" ? "||" : "&&";
-        }
-        $("#ruleNodeLabel").readOnly = true;
-        $("#ruleDefinitionSelect").disabled = true;
-        $("#ruleLogicSelect").disabled = true;
-        $("#ruleNodeExpression").readOnly = true;
         ruleEditorEditing = false;
         ruleEditorDraftNodeId = null;
-        $("#ruleEditorEditButton").hidden = false;
-        $("#ruleEditorCancelButton").hidden = true;
-        $("#ruleEditorSaveButton").hidden = true;
+        ruleEditorDraftState = null;
+        renderRuleEditorHeading(node);
+        const isHits = node.type === "H";
+        $("#ruleReferenceField").hidden = !isHits;
+        $("#ruleNodeExpression").value = isHits ? (node.expression || "") : "";
+        $("#ruleNodeExpression").readOnly = true;
+        if (["&&", "||"].includes(node.expression)) {
+            document.querySelector(`input[name="ruleEditorLogic"][value="${node.expression === "||" ? "||" : "&&"}"]`).checked = true;
+        }
+        renderRuleEditorSubrules();
+        $("#ruleEditorEditActions").hidden = true;
         $("#ruleEditorSaveButton").disabled = true;
+        $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = true; });
     }
 
     function enterRuleEditorEditMode() {
         const found = findRuleNode(ruleSelectedId);
         if (!found) return;
+        const { node } = found;
         ruleEditorEditing = true;
-        ruleEditorDraftNodeId = found.node.id;
-        $("#ruleNodeNameField").hidden = false;
-        $("#ruleNodeLabel").readOnly = false;
-        $("#ruleDefinitionSelect").disabled = found.node.type !== "R";
-        $("#ruleLogicSelect").disabled = found.node.type !== "L";
-        $("#ruleNodeExpression").readOnly = found.node.type !== "H";
-        $("#ruleEditorEditButton").hidden = true;
-        $("#ruleEditorCancelButton").hidden = false;
-        $("#ruleEditorSaveButton").hidden = false;
+        ruleEditorDraftNodeId = node.id;
+        ruleEditorDraftState = {
+            name: node.name || "",
+            refs: ruleNodeSubrules(node).map((child) => child.type === "R"
+                ? { type: "R", ruleId: child.expression, node: child }
+                : { type: child.type, node: child }),
+            logic: node.type === "L" ? (node.expression === "||" ? "||" : "&&") : "&&",
+            hitsExpr: node.type === "H" ? (node.expression || "") : ""
+        };
+        renderRuleEditorHeading(node);
+        $("#ruleNodeExpression").readOnly = node.type !== "H";
+        document.querySelector(`input[name="ruleEditorLogic"][value="${ruleEditorDraftState.logic === "||" ? "||" : "&&"}"]`).checked = true;
+        $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = false; });
+        renderRuleEditorSubrules();
+        $("#ruleEditorEditActions").hidden = false;
         updateRuleEditorDirtyState();
-        $("#ruleNodeLabel").focus();
-        $("#ruleNodeLabel").select();
     }
 
-    function ruleEditorDraft() {
-        const found = findRuleNode(ruleSelectedId);
-        if (!found || found.node.id !== ruleEditorDraftNodeId) return null;
-        const aliasInput = $("#ruleNodeLabel");
-        const value = aliasInput.value.trim();
-        const initialAlias = aliasInput.dataset.initialAlias || "";
-        const fallbackName = aliasInput.dataset.fallbackName || "";
-        const name = !initialAlias.trim() && value === fallbackName ? "" : value;
-        let expression = found.node.expression || "";
-        if (found.node.type === "R") expression = $("#ruleDefinitionSelect").value;
-        if (found.node.type === "L") expression = $("#ruleLogicSelect").value;
-        if (found.node.type === "H") expression = $("#ruleNodeExpression").value.trim();
-        return { found, name, expression };
+    function readRuleEditorDraft() {
+        const draft = ruleEditorDraftState;
+        if (!draft) return;
+        $("#ruleEditorSubrules").querySelectorAll("[data-subrule-select]").forEach((select) => {
+            const index = Number(select.dataset.subruleSelect);
+            if (draft.refs[index]?.type === "R") draft.refs[index].ruleId = select.value;
+        });
+        const checkedLogic = document.querySelector('input[name="ruleEditorLogic"]:checked');
+        draft.logic = checkedLogic ? checkedLogic.value : "&&";
+        draft.name = $("#ruleAliasInput")?.value.trim() || "";
+        if ($("#ruleNodeExpression").readOnly === false) draft.hitsExpr = $("#ruleNodeExpression").value.trim();
     }
 
     function ruleEditorHasUnsavedChanges() {
-        if (!ruleEditorEditing) return false;
-        const draft = ruleEditorDraft();
-        return Boolean(draft && (
-            draft.name !== (draft.found.node.name || "").trim()
-            || draft.expression !== (draft.found.node.expression || "")
-        ));
+        if (!ruleEditorEditing || !ruleEditorDraftState) return false;
+        readRuleEditorDraft();
+        const found = findRuleNode(ruleEditorDraftNodeId);
+        if (!found) return false;
+        const node = found.node;
+        const draft = ruleEditorDraftState;
+        const originalRefs = ruleNodeSubrules(node).map((child) => child.type === "R" ? `R:${child.expression}` : `N:${child.id}`);
+        const draftRefs = draft.refs.map((ref) => ref.type === "R" ? `R:${ref.ruleId}` : `N:${ref.node.id}`);
+        if (draft.name !== (node.name || "")) return true;
+        if (originalRefs.join("|") !== draftRefs.join("|")) return true;
+        if (draft.refs.length >= 2 && node.type === "L" && draft.logic !== (node.expression === "||" ? "||" : "&&")) return true;
+        if (node.type === "H" && draft.hitsExpr !== (node.expression || "")) return true;
+        return false;
     }
 
     function updateRuleEditorDirtyState() {
         $("#ruleEditorSaveButton").disabled = !ruleEditorHasUnsavedChanges();
     }
 
-    function updateRuleDefinitionDraft() {
-        const aliasInput = $("#ruleNodeLabel");
-        const initialAlias = aliasInput.dataset.initialAlias || "";
-        const definition = ruleDefinitionById($("#ruleDefinitionSelect").value);
-        if (!initialAlias.trim() && !aliasInput.value.trim() && definition) {
-            aliasInput.placeholder = definition.desc;
-            aliasInput.dataset.fallbackName = definition.desc;
-        }
+    function addRuleEditorSubrule() {
+        if (!ruleEditorDraftState) return;
+        readRuleEditorDraft();
+        ruleEditorDraftState.refs.push({ type: "R", ruleId: RULE_DEFINITIONS[0]?.ruleId || "", node: null });
+        renderRuleEditorSubrules();
+        updateRuleEditorDirtyState();
+    }
+
+    function removeRuleEditorSubrule(index) {
+        const draft = ruleEditorDraftState;
+        if (!draft || draft.refs.length <= 1 || index < 0 || index >= draft.refs.length) return;
+        readRuleEditorDraft();
+        draft.refs.splice(index, 1);
+        renderRuleEditorSubrules();
         updateRuleEditorDirtyState();
     }
 
     function saveRuleEditorChanges({ refresh = true } = {}) {
-        const draft = ruleEditorDraft();
-        if (!draft || !ruleEditorHasUnsavedChanges()) return false;
-        draft.found.node.name = draft.name;
-        draft.found.node.expression = draft.expression;
-        if (refresh) refreshRuleAfterEdit(draft.found);
+        if (!ruleEditorHasUnsavedChanges()) return false;
+        const found = findRuleNode(ruleEditorDraftNodeId);
+        if (!found) return false;
+        readRuleEditorDraft();
+        const draft = ruleEditorDraftState;
+        const node = found.node;
+        const buildChild = (ref) => {
+            if (ref.type !== "R") return ref.node;
+            if (!ruleDefinitionById(ref.ruleId)) return null;
+            if (!ref.node) return createAtomicRule(ref.ruleId);
+            return {
+                ...ref.node,
+                expression: ref.ruleId,
+                children: []
+            };
+        };
+        let replacement;
+        if (node.type === "H") {
+            const children = draft.refs.map(buildChild);
+            if (children.some((child) => !child)) return false;
+            replacement = {
+                ...node,
+                name: draft.name,
+                expression: draft.hitsExpr || node.expression,
+                children
+            };
+        } else if (node.type === "R" && draft.refs.length >= 2) {
+            const children = draft.refs.map(buildChild);
+            if (children.some((child) => !child)) return false;
+            children[0].name = draft.name;
+            children.forEach((child) => { child.relation = "rule"; });
+            replacement = {
+                id: `n${nextId++}`,
+                type: "L",
+                name: "",
+                expression: draft.logic,
+                relation: node.relation,
+                children
+            };
+        } else if (draft.refs.length === 1) {
+            replacement = buildChild(draft.refs[0]);
+            if (!replacement) return false;
+            replacement.relation = node.relation;
+            if (node.type === "R") {
+                replacement.id = node.id;
+                replacement.name = draft.name;
+            }
+        } else {
+            const children = draft.refs.map(buildChild);
+            if (children.some((child) => !child)) return false;
+            replacement = {
+                ...node,
+                type: "L",
+                name: draft.name,
+                expression: draft.logic,
+                children
+            };
+        }
+        if (found.parent) {
+            const idx = found.parent.children.findIndex((child) => child.id === node.id);
+            if (idx >= 0) found.parent.children.splice(idx, 1, replacement);
+        }
+        ruleSelectedId = replacement.id;
+        ruleEditorEditing = false;
+        ruleEditorDraftState = null;
+        if (refresh) refreshRuleAfterEdit(findRuleNode(ruleSelectedId));
         return true;
     }
 
@@ -808,26 +999,6 @@
         return ACTION_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
     }
 
-    function populateFlowDefinitionSelect(select, definitions, selectedRuleId, selectedLabel) {
-        const current = selectedRuleId && !definitions.some((definition) => definition.ruleId === selectedRuleId)
-            ? [{ ruleId: selectedRuleId, desc: selectedLabel || `${selectedRuleId}（当前引用）`, useType: null }]
-            : [];
-        select.innerHTML = [...current, ...definitions]
-            .map((definition) => `<option value="${escapeText(definition.ruleId)}">${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`)
-            .join("");
-        select.value = selectedRuleId || definitions[0]?.ruleId || "";
-    }
-
-    function populateRuleDefinitionSelect(select, selectedRuleId = "") {
-        const current = selectedRuleId && !ruleDefinitionById(selectedRuleId)
-            ? [{ ruleId: selectedRuleId, desc: `${selectedRuleId}（当前引用）`, useType: null }]
-            : [];
-        select.innerHTML = [...current, ...RULE_DEFINITIONS]
-            .map((definition) => `<option value="${escapeText(definition.ruleId)}">${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`)
-            .join("");
-        select.value = selectedRuleId || RULE_DEFINITIONS[0]?.ruleId || "";
-    }
-
     function createAtomicRule(ruleId, name = "") {
         const definition = ruleDefinitionById(ruleId);
         if (!definition) return null;
@@ -901,7 +1072,7 @@
         ruleAddAnchorId = mode === "root" ? null : found.node.id;
         $("#ruleAddTitle").textContent = mode === "root"
             ? "配置根规则"
-            : (mode === "before" ? "前插规则" : "后插规则");
+            : (mode === "before" ? "上方插入规则" : "下方插入规则");
 
         ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
         document.querySelector('input[name="ruleAddLogic"][value="&&"]').checked = true;
@@ -947,85 +1118,6 @@
         render({ preserveView: true });
     }
 
-    function renderRuleExtendRows(focusIndex = -1) {
-        $("#ruleExtendRows").innerHTML = ruleExtendRuleIds.map((ruleId, index) => `
-            <div class="rule-add-row">
-                <label>
-                    引用规则 ${index + 1}
-                    <select data-rule-extend-select="${index}">
-                        ${RULE_DEFINITIONS.map((definition) => `
-                            <option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ruleId ? "selected" : ""}>
-                                ${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}
-                            </option>`).join("")}
-                    </select>
-                </label>
-                <button type="button" data-rule-extend-remove="${index}" aria-label="删除新增规则 ${index + 1}" ${ruleExtendRuleIds.length === 1 ? "disabled" : ""}>×</button>
-            </div>`).join("");
-        requestAnimationFrame(() => {
-            positionRulePopover();
-            if (focusIndex >= 0) {
-                $(`[data-rule-extend-select="${focusIndex}"]`)?.focus();
-            }
-        });
-    }
-
-    function appendRuleExtendRow() {
-        const found = findRuleNode(ruleSelectedId);
-        const excluded = new Set([found?.node.expression, ...ruleExtendRuleIds]);
-        const unused = RULE_DEFINITIONS.find((definition) => !excluded.has(definition.ruleId));
-        ruleExtendRuleIds.push(unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "");
-        renderRuleExtendRows(ruleExtendRuleIds.length - 1);
-    }
-
-    function removeRuleExtendRow(index) {
-        if (ruleExtendRuleIds.length <= 1 || index < 0 || index >= ruleExtendRuleIds.length) return;
-        ruleExtendRuleIds.splice(index, 1);
-        renderRuleExtendRows(Math.min(index, ruleExtendRuleIds.length - 1));
-    }
-
-    function startRuleExtend() {
-        const found = findRuleNode(ruleSelectedId);
-        if (!found || found.node.type !== "R") return;
-        const definition = ruleDefinitionById(found.node.expression);
-        $("#ruleExtendCurrent").textContent = `${definition?.desc || ruleNodeDisplayName(found.node)} · ${found.node.expression}`;
-        const alternate = RULE_DEFINITIONS.find((candidate) => candidate.ruleId !== found.node.expression);
-        ruleExtendRuleIds = [alternate?.ruleId || RULE_DEFINITIONS[0]?.ruleId || ""];
-        document.querySelector('input[name="ruleExtendLogic"][value="&&"]').checked = true;
-        showRulePopover("ruleExtendPanel", found.node.id);
-        renderRuleExtendRows(0);
-    }
-
-    function cancelRuleExtend() {
-        ruleExtendRuleIds = [];
-        hideRulePopover();
-    }
-
-    function saveRuleExtend() {
-        const found = findRuleNode(ruleSelectedId);
-        if (!found || found.node.type !== "R" || ruleExtendRuleIds.length === 0) return;
-        const additions = ruleExtendRuleIds.map((ruleId) => createAtomicRule(ruleId));
-        if (additions.some((rule) => !rule)) return;
-        const current = found.node;
-        const parent = found.parent;
-        const currentIndex = parent.children.findIndex((child) => child.id === current.id);
-        if (currentIndex < 0) return;
-        const composite = {
-            id: `n${nextId++}`,
-            type: "L",
-            name: "",
-            expression: document.querySelector('input[name="ruleExtendLogic"]:checked').value,
-            relation: current.relation,
-            children: [current, ...additions]
-        };
-        current.relation = "rule";
-        parent.children.splice(currentIndex, 1, composite);
-        ruleSelectedId = composite.id;
-        ruleExtendRuleIds = [];
-        hideRulePopover();
-        renderRuleDialog();
-        render({ preserveView: true });
-    }
-
     function refreshRuleAfterEdit(found, updateEditor = true) {
         if (!found) return;
         const judge = currentRuleJudge();
@@ -1039,13 +1131,13 @@
         requestAnimationFrame(positionRulePopover);
     }
 
-    function deleteSelectedRule() {
+    async function deleteSelectedRule() {
         const found = findRuleNode(ruleSelectedId);
         if (!canDeleteRule(found)) return;
         const descendants = countNodes(found.node) - 1;
         const name = ruleNodeDisplayName(found.node);
         const message = descendants ? `删除「${name}」及其 ${descendants} 个子规则？` : `删除「${name}」？`;
-        if (!window.confirm(message)) return;
+        if (!(await openConfirm(message, { title: "确认删除", confirmLabel: "删除" }))) return;
         hideRulePopover();
         found.parent.children = found.parent.children.filter((child) => child.id !== found.node.id);
         ruleSelectedId = ["L", "H"].includes(found.parent.type) ? found.parent.id : null;
@@ -1087,22 +1179,23 @@
             ? parent.children.filter((child) => child.relation === addRelation)
             : [];
         const placementField = $("#newNodePlacementField");
-        const anchorField = $("#newNodeAnchorField");
         const placement = $("#newNodePlacement");
         const anchor = $("#newNodeAnchor");
         const showPosition = children.length > 0;
         placementField.hidden = !showPosition;
-        anchorField.hidden = !showPosition;
-        placement.disabled = !showPosition;
-        anchor.disabled = !showPosition;
-        anchor.required = showPosition;
+        placement.value = "last";
         anchor.innerHTML = children
             .map((child, index) => `
                 <option value="${escapeText(child.id)}">
                     ${index + 1}. ${escapeText(flowNodeDisplayName(child))}
                 </option>`)
             .join("");
-        placement.value = "after";
+        updatePlacementVisibility();
+    }
+
+    function updatePlacementVisibility() {
+        const value = $("#newNodePlacement").value;
+        $("#newNodeAnchorField").hidden = !(value === "before" || value === "after");
     }
 
     function updateNewNodeFields() {
@@ -1115,13 +1208,19 @@
         const operation = flowNodeOperations(found.node).find((item) => item.relation === relation);
         if (!operation) return;
         addRelation = relation;
-        $("#dialogTitle").textContent = operation.dialogTitle;
+        $("#inspectorAddTitle").textContent = operation.dialogTitle;
         populateNewNodeTypes();
         populateNewNodeAnchors(found.node);
-        dialog.showModal();
-        requestAnimationFrame(() => {
-            $("#newNodeType").focus();
-        });
+        $("#inspectorViewActions").hidden = true;
+        $("#inspectorFooter").hidden = true;
+        $("#inspectorAddPanel").hidden = false;
+        requestAnimationFrame(() => { $("#newNodeType").focus(); });
+    }
+
+    function closeAddPanel() {
+        addRelation = null;
+        $("#inspectorAddPanel").hidden = true;
+        updateInspector();
     }
 
     function addNode() {
@@ -1148,43 +1247,50 @@
             node.children.push(rule);
         }
         parent.collapsed = false;
-        const anchorId = $("#newNodeAnchor").disabled ? "" : $("#newNodeAnchor").value;
-        const anchorIndex = parent.children.findIndex((child) =>
-            child.id === anchorId && child.relation === addRelation);
-        if (anchorIndex >= 0) {
-            const insertIndex = $("#newNodePlacement").value === "before"
-                ? anchorIndex
-                : anchorIndex + 1;
-            parent.children.splice(insertIndex, 0, node);
+        const placement = $("#newNodePlacementField").hidden ? "last" : $("#newNodePlacement").value;
+        const siblingIndexes = parent.children
+            .map((child, index) => ({ child, index }))
+            .filter((entry) => entry.child.relation === addRelation)
+            .map((entry) => entry.index);
+        if (placement === "first" && siblingIndexes.length) {
+            parent.children.splice(siblingIndexes[0], 0, node);
+        } else if ((placement === "before" || placement === "after")) {
+            const anchorId = $("#newNodeAnchor").value;
+            const anchorIndex = parent.children.findIndex((child) =>
+                child.id === anchorId && child.relation === addRelation);
+            if (anchorIndex >= 0) {
+                parent.children.splice(placement === "before" ? anchorIndex : anchorIndex + 1, 0, node);
+            } else {
+                parent.children.push(node);
+            }
+        } else if (placement === "last" && siblingIndexes.length) {
+            parent.children.splice(siblingIndexes[siblingIndexes.length - 1] + 1, 0, node);
         } else {
             parent.children.push(node);
         }
         selectedId = node.id;
+        addRelation = null;
+        $("#inspectorAddPanel").hidden = true;
         fitMode = false;
         render({ preserveView: true });
         return node;
     }
 
-    function deleteSelected() {
+    async function deleteSelected() {
         const found = findNode(selectedId);
         if (!found || !canDeleteFlowNode(found.node, found.parent)) return;
         const descendants = countFlowNodes(found.node) - 1;
         const nodeName = flowNodeDisplayName(found.node);
-        deleteNodeId = found.node.id;
-        $("#deleteNodeMessage").textContent = descendants
+        const nodeId = found.node.id;
+        const message = descendants
             ? `确定删除「${nodeName}」及其 ${descendants} 个流程子节点吗？`
             : `确定删除「${nodeName}」吗？`;
-        deleteNodeDialog.showModal();
-    }
-
-    function confirmDeleteSelected() {
-        const found = findNode(deleteNodeId);
-        if (!found || !canDeleteFlowNode(found.node, found.parent)) return false;
-        found.parent.children = found.parent.children.filter((child) => child.id !== found.node.id);
-        selectedId = found.parent.id;
-        deleteNodeId = null;
+        if (!(await openConfirm(message, { title: "确认删除", confirmLabel: "删除" }))) return;
+        const current = findNode(nodeId);
+        if (!current || !canDeleteFlowNode(current.node, current.parent)) return;
+        current.parent.children = current.parent.children.filter((child) => child.id !== current.node.id);
+        selectedId = current.parent.id;
         render({ preserveView: true });
-        return true;
     }
 
     function toggleCollapse() {
@@ -1216,7 +1322,7 @@
         const width = treeRoot.offsetWidth + 140;
         const height = treeRoot.offsetHeight + 140;
         if (!width || !height) return;
-        scale = Math.min(1.12, Math.max(.35, Math.min((viewport.clientWidth - 46) / width, (viewport.clientHeight - 46) / height)));
+        scale = Math.min(1.12, Math.max(.68, Math.min((viewport.clientWidth - 46) / width, (viewport.clientHeight - 46) / height)));
         panX = Math.max(12, (viewport.clientWidth - width * scale) / 2);
         panY = Math.max(12, (viewport.clientHeight - height * scale) / 2);
         fitMode = true;
@@ -1226,7 +1332,9 @@
     treeRoot.addEventListener("click", (event) => {
         const shell = event.target.closest(".node-shell");
         if (!shell) return;
-        selectNode(shell.dataset.nodeId);
+        const nextId = shell.dataset.nodeId;
+        if (nextId !== selectedId && !confirmDiscardInspectorEdit()) return;
+        selectNode(nextId);
         const action = event.target.closest("[data-action]")?.dataset.action;
         if (action === "collapse") toggleCollapse();
     });
@@ -1234,7 +1342,9 @@
     treeRoot.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && event.target.matches(".node-shell")) {
             event.preventDefault();
-            selectNode(event.target.dataset.nodeId);
+            const nextId = event.target.dataset.nodeId;
+            if (nextId !== selectedId && !confirmDiscardInspectorEdit()) return;
+            selectNode(nextId);
         }
     });
 
@@ -1321,14 +1431,23 @@
     }, { passive: false });
 
     $("#flowNodeActions").addEventListener("click", (event) => {
+        const convertTo = event.target.closest("[data-convert]")?.dataset.convert;
+        if (convertTo) {
+            const found = findNode(selectedId);
+            if (found && ["S", "P"].includes(found.node.type) && ["S", "P"].includes(convertTo)) {
+                found.node.type = convertTo;
+                render({ preserveView: true });
+            }
+            return;
+        }
         const relation = event.target.closest("[data-flow-relation]")?.dataset.flowRelation;
         if (relation) openAddDialog(relation);
     });
     $("#zoomOutButton").addEventListener("click", () => setZoom(scale - .1));
     $("#zoomInButton").addEventListener("click", () => setZoom(scale + .1));
     $("#fitButton").addEventListener("click", fitTree);
-    $("#resetButton").addEventListener("click", () => {
-        if (!window.confirm("恢复初始示例树？当前修改将丢失。")) return;
+    $("#resetButton").addEventListener("click", async () => {
+        if (!(await openConfirm("恢复初始示例树？当前修改将丢失。", { title: "重置示例", confirmLabel: "重置" }))) return;
         tree = sampleTree();
         selectedId = null;
         ruleJudgeId = null;
@@ -1337,7 +1456,25 @@
         render({ preserveView: false });
     });
     $("#deleteButton").addEventListener("click", deleteSelected);
-    $("#editNodeButton").addEventListener("click", openSelectedNodeEditor);
+    $("#editNodeButton").addEventListener("click", () => {
+        const found = findNode(selectedId);
+        if (found?.node.type === "J") openRuleDialog(found.node.id);
+    });
+    const inspectorFieldClick = (event) => {
+        const editBtn = event.target.closest("[data-field-edit]");
+        if (editBtn) { beginFieldEdit(editBtn.dataset.fieldEdit); return; }
+        if (event.target.closest("[data-field-confirm]")) { confirmFieldEdit(); return; }
+        if (event.target.closest("[data-field-cancel]")) { cancelFieldEdit(); return; }
+    };
+    const inspectorFieldKeydown = (event) => {
+        if (!inspectorEditingField) return;
+        if (event.key === "Enter" && event.target.matches("input")) { event.preventDefault(); confirmFieldEdit(); }
+        else if (event.key === "Escape") { event.preventDefault(); cancelFieldEdit(); }
+    };
+    $("#nodeDetailFields").addEventListener("click", inspectorFieldClick);
+    $("#nodeDetailFields").addEventListener("keydown", inspectorFieldKeydown);
+    $("#inspectorHeading").addEventListener("click", inspectorFieldClick);
+    $("#inspectorHeading").addEventListener("keydown", inspectorFieldKeydown);
 
     $("#ruleDialogCloseButton").addEventListener("click", () => {
         if (confirmDiscardRuleEditorChanges()) ruleDialog.close();
@@ -1350,25 +1487,16 @@
             enterRuleEditorEditMode();
             return;
         }
+        if (action === "extend") {
+            hideRulePopover();
+            enterRuleEditorEditMode();
+            addRuleEditorSubrule();
+            return;
+        }
         if (!confirmDiscardRuleEditorChanges()) return;
         if (action === "before") startRuleAdd("before");
         else if (action === "after") startRuleAdd("after");
-        else if (action === "extend") startRuleExtend();
         else if (action === "delete") deleteSelectedRule();
-    });
-    $("#ruleExtendCloseButton").addEventListener("click", cancelRuleExtend);
-    $("#ruleExtendCancelButton").addEventListener("click", cancelRuleExtend);
-    $("#ruleExtendSaveButton").addEventListener("click", saveRuleExtend);
-    $("#ruleExtendRowButton").addEventListener("click", appendRuleExtendRow);
-    $("#ruleExtendRows").addEventListener("change", (event) => {
-        const index = Number(event.target.dataset.ruleExtendSelect);
-        if (Number.isInteger(index) && ruleExtendRuleIds[index] !== undefined) {
-            ruleExtendRuleIds[index] = event.target.value;
-        }
-    });
-    $("#ruleExtendRows").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-rule-extend-remove]");
-        if (button) removeRuleExtendRow(Number(button.dataset.ruleExtendRemove));
     });
     $("#ruleAddCancelButton").addEventListener("click", cancelRuleAdd);
     $("#ruleAddConfirmButton").addEventListener("click", confirmRuleAdd);
@@ -1383,12 +1511,20 @@
         const button = event.target.closest("[data-rule-add-remove]");
         if (button) removeRuleAddRow(Number(button.dataset.ruleAddRemove));
     });
-    $("#ruleEditorEditButton").addEventListener("click", enterRuleEditorEditMode);
+    $("#ruleEditorAddRuleButton").addEventListener("click", addRuleEditorSubrule);
+    $("#ruleEditorSubrules").addEventListener("change", (event) => {
+        if (event.target.dataset.subruleSelect !== undefined) updateRuleEditorDirtyState();
+    });
+    $("#ruleEditorSubrules").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-subrule-remove]");
+        if (button) removeRuleEditorSubrule(Number(button.dataset.subruleRemove));
+    });
+    $("#ruleEditorLogicField").addEventListener("change", updateRuleEditorDirtyState);
     $("#ruleEditorCancelButton").addEventListener("click", finishRuleEditorCancel);
     $("#ruleEditorSaveButton").addEventListener("click", finishRuleEditorSave);
-    $("#ruleNodeLabel").addEventListener("input", updateRuleEditorDirtyState);
-    $("#ruleDefinitionSelect").addEventListener("change", updateRuleDefinitionDraft);
-    $("#ruleLogicSelect").addEventListener("change", updateRuleEditorDirtyState);
+    $("#ruleEditorHeading").addEventListener("input", (event) => {
+        if (event.target.id === "ruleAliasInput") updateRuleEditorDirtyState();
+    });
     $("#ruleNodeExpression").addEventListener("input", updateRuleEditorDirtyState);
     ruleDialog.addEventListener("cancel", (event) => {
         if (!confirmDiscardRuleEditorChanges()) event.preventDefault();
@@ -1396,6 +1532,7 @@
     ruleDialog.addEventListener("close", () => {
         ruleEditorEditing = false;
         ruleEditorDraftNodeId = null;
+        ruleEditorDraftState = null;
         closeRuleDialogAfterEdit = false;
         ruleJudgeId = null;
         ruleSelectedId = null;
@@ -1416,30 +1553,14 @@
     }, true);
 
     $("#newNodeType").addEventListener("change", updateNewNodeFields);
-    $("#nodeDialogForm").addEventListener("submit", (event) => {
-        if (event.submitter?.value !== "default") return;
-        event.preventDefault();
-        if (!$("#nodeDialogForm").reportValidity()) return;
+    $("#newNodePlacement").addEventListener("change", updatePlacementVisibility);
+    $("#confirmAddButton").addEventListener("click", () => {
         const node = addNode();
-        dialog.close();
         if (node?.type === "J") requestAnimationFrame(() => openRuleDialog(node.id));
     });
-    $("#nodeEditDialogForm").addEventListener("submit", (event) => {
-        if (event.submitter?.value !== "default") return;
-        event.preventDefault();
-        saveSelectedNodeEditor();
-        nodeEditDialog.close();
-    });
-    $("#deleteNodeDialogForm").addEventListener("submit", (event) => {
-        if (event.submitter?.value !== "default") return;
-        event.preventDefault();
-        if (confirmDeleteSelected()) deleteNodeDialog.close();
-    });
-    deleteNodeDialog.addEventListener("close", () => {
-        deleteNodeId = null;
-    });
+    $("#newNodeCancelButton").addEventListener("click", closeAddPanel);
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && dialog.open) dialog.close();
+        if (event.key === "Escape" && !$("#inspectorAddPanel").hidden) closeAddPanel();
         const editing = event.target.matches("input, select, textarea");
         if (!editing && ruleDialog.open && (event.key === "Delete" || event.key === "Backspace")) {
             deleteSelectedRule();
