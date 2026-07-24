@@ -2,16 +2,16 @@
     "use strict";
 
     const TYPES = {
-        ROOT: { name: "开始", kind: "root", short: "开始", help: "规则树入口，仅承担根节点定位。" },
-        S: { name: "串行", kind: "structure", short: "串", help: "子节点按顺序执行，顺序由树中从左到右的位置表达。" },
-        P: { name: "并行", kind: "structure", short: "并", help: "多个子节点并发执行；结构节点本身不承载业务结果。" },
-        D: { name: "分支", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
-        J: { name: "判断规则", kind: "structure", short: "规则", help: "引用一棵可递归嵌套的纯规则树，并连接可选的命中流程。" },
+        ROOT: { name: "根节点", kind: "root", short: "开始", help: "规则树入口，仅承担根节点定位。" },
+        S: { name: "串行节点", kind: "structure", short: "串", help: "子节点按顺序执行，顺序由树中从左到右的位置表达。" },
+        P: { name: "并行节点", kind: "structure", short: "并", help: "多个子节点并发执行；结构节点本身不承载业务结果。" },
+        D: { name: "分支节点", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
+        J: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的纯规则树，并连接可选的后续流程。" },
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
         R: { name: "原子规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
-        C: { name: "业务判断规则", kind: "condition", short: "C", help: "有业务语义的原子判断，可继续连接命中后的操作。" },
-        A: { name: "业务操作规则", kind: "action", short: "A", help: "有业务语义的执行动作，可继续连接后继结构。" }
+        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台条件规则，可连接一个可选的后续流程。" },
+        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台动作规则，执行后可连接一个可选的下一步。" }
     };
 
     // 模拟 RuleDefinition 查询结果。expression 属于后端定义，不下发给本编辑器；
@@ -21,15 +21,20 @@
         desc: `业务判断规则${index + 1}`,
         useType: 0
     }));
+    const ACTION_DEFINITIONS = Array.from({ length: 13 }, (_, index) => ({
+        ruleId: `a${index + 1}`,
+        desc: `业务操作${index + 1}`,
+        useType: 0
+    }));
 
     // 与 src/main/resources/img/ui-tree.png 逐节点对应。
     const sampleTree = () => ({
         id: "n1", type: "ROOT", relation: "root", children: [
             { id: "n2", type: "S", relation: "root", children: [
                 { id: "n3", type: "P", relation: "branch", children: [
-                    { id: "n4", type: "A", label: "业务操作规则11", expression: "a11", relation: "branch", children: [] },
-                    { id: "n5", type: "A", label: "业务操作规则12", expression: "a12", relation: "branch", children: [] },
-                    { id: "n6", type: "A", label: "业务操作规则13", expression: "a13", relation: "branch", children: [] }
+                    { id: "n4", type: "A", label: "业务操作11", expression: "a11", relation: "branch", children: [] },
+                    { id: "n5", type: "A", label: "业务操作12", expression: "a12", relation: "branch", children: [] },
+                    { id: "n6", type: "A", label: "业务操作13", expression: "a13", relation: "branch", children: [] }
                 ]},
                 { id: "n7", type: "D", relation: "branch", children: [
                     { id: "n8", type: "J", relation: "decision", children: [
@@ -44,19 +49,19 @@
                             { id: "n15", type: "D", relation: "branch", children: [
                             { id: "n16", type: "J", relation: "decision", children: [
                                 { id: "n37", type: "R", name: "", expression: "c1", relation: "rule", children: [] },
-                                { id: "n17", type: "A", label: "业务操作规则1", expression: "a1", relation: "action", children: [] }
+                                { id: "n17", type: "A", label: "业务操作1", expression: "a1", relation: "action", children: [] }
                             ]},
                                 { id: "n18", type: "J", relation: "decision", children: [
                                     { id: "n19", type: "L", name: "业务复合规则2", expression: "&&", relation: "rule", children: [
                                         { id: "n20", type: "R", name: "", expression: "c2", relation: "rule", children: [] },
                                         { id: "n21", type: "R", name: "", expression: "c3", relation: "rule", children: [] }
                                     ]},
-                                    { id: "n22", type: "A", label: "业务操作规则3", expression: "a3", relation: "action", children: [] }
+                                    { id: "n22", type: "A", label: "业务操作3", expression: "a3", relation: "action", children: [] }
                                 ]}
                             ]},
                             { id: "n23", type: "J", relation: "branch", children: [
                                 { id: "n38", type: "R", name: "", expression: "c4", relation: "rule", children: [] },
-                                { id: "n24", type: "A", label: "业务操作规则4", expression: "a4", relation: "action", children: [] }
+                                { id: "n24", type: "A", label: "业务操作4", expression: "a4", relation: "action", children: [] }
                             ]}
                         ]}
                     ]},
@@ -65,23 +70,23 @@
                         { id: "n26", type: "D", relation: "action", children: [
                             { id: "n27", type: "J", relation: "decision", children: [
                                 { id: "n40", type: "R", name: "", expression: "c6", relation: "rule", children: [] },
-                                { id: "n28", type: "A", label: "业务操作规则6", expression: "a6", relation: "action", children: [] }
+                                { id: "n28", type: "A", label: "业务操作6", expression: "a6", relation: "action", children: [] }
                             ]},
                             { id: "n29", type: "J", relation: "decision", children: [
                                 { id: "n41", type: "R", name: "", expression: "c7", relation: "rule", children: [] },
-                                { id: "n30", type: "A", label: "业务操作规则7", expression: "a7", relation: "action", children: [] }
+                                { id: "n30", type: "A", label: "业务操作7", expression: "a7", relation: "action", children: [] }
                             ]},
-                            { id: "n31", type: "A", label: "业务操作规则5", expression: "a5", relation: "default", children: [] }
+                            { id: "n31", type: "A", label: "业务操作5", expression: "a5", relation: "default", children: [] }
                         ]}
                     ]},
                     { id: "n32", type: "S", relation: "default", children: [
                         { id: "n33", type: "J", relation: "branch", children: [
                             { id: "n42", type: "R", name: "", expression: "c8", relation: "rule", children: [] },
-                            { id: "n34", type: "A", label: "业务操作规则8", expression: "a8", relation: "action", children: [] }
+                            { id: "n34", type: "A", label: "业务操作8", expression: "a8", relation: "action", children: [] }
                         ]},
                         { id: "n35", type: "J", relation: "branch", children: [
                             { id: "n43", type: "R", name: "", expression: "c9", relation: "rule", children: [] },
-                            { id: "n36", type: "A", label: "业务操作规则9", expression: "a9", relation: "action", children: [] }
+                            { id: "n36", type: "A", label: "业务操作9", expression: "a9", relation: "action", children: [] }
                         ]}
                     ]}
                 ]}
@@ -92,7 +97,7 @@
     let tree = sampleTree();
     let selectedId = null;
     let nextId = 44;
-    let addMode = "child";
+    let addRelation = null;
     let scale = 1;
     let panX = 0;
     let panY = 0;
@@ -109,15 +114,17 @@
     let rulePopoverPoint = null;
     let ruleEditorEditing = false;
     let ruleEditorDraftNodeId = null;
+    let closeRuleDialogAfterEdit = false;
+    let deleteNodeId = null;
 
     const FLOW_TYPES = ["A", "S", "P", "D", "J"];
     const RELATIONS = {
-        root: { label: "入口", types: FLOW_TYPES },
-        next: { label: "下一步", types: FLOW_TYPES },
-        action: { label: "命中动作", types: FLOW_TYPES },
-        branch: { label: "分支", types: FLOW_TYPES },
-        decision: { label: "条件分支", types: ["J"] },
-        default: { label: "默认分支", types: FLOW_TYPES }
+        root: { types: FLOW_TYPES },
+        next: { types: FLOW_TYPES },
+        action: { types: FLOW_TYPES },
+        branch: { types: FLOW_TYPES },
+        decision: { types: ["J"] },
+        default: { types: FLOW_TYPES }
     };
 
     const $ = (selector) => document.querySelector(selector);
@@ -126,6 +133,7 @@
     const stage = $("#treeStage");
     const dialog = $("#nodeDialog");
     const nodeEditDialog = $("#nodeEditDialog");
+    const deleteNodeDialog = $("#deleteNodeDialog");
     const ruleDialog = $("#ruleDialog");
     const ruleTreeRoot = $("#ruleTreeRoot");
 
@@ -173,6 +181,13 @@
         return ruleNodeDisplayName(rule);
     }
 
+    function flowNodeName(node) {
+        if (node.type === "J") {
+            return judgeParts(node).rule?.name?.trim() || "";
+        }
+        return node.name?.trim() || "";
+    }
+
     function ruleNodeDisplayName(node) {
         const alias = node.name?.trim();
         if (alias) return alias;
@@ -187,8 +202,21 @@
     }
 
     function flowNodeDisplayName(node) {
+        if (node.type === "ROOT") return "开始";
+        const name = flowNodeName(node);
+        if (name) return name;
         if (isStructuralFlowType(node.type)) return TYPES[node.type].name;
         if (node.type === "J") return ruleDisplayName(node);
+        if (node.type === "A") {
+            return actionDefinitionById(node.expression)?.desc
+                || node.label?.trim()
+                || TYPES[node.type].name;
+        }
+        if (node.type === "C") {
+            return ruleDefinitionById(node.expression)?.desc
+                || node.label?.trim()
+                || TYPES[node.type].name;
+        }
         return node.label?.trim() || TYPES[node.type]?.name || "未命名节点";
     }
 
@@ -220,11 +248,42 @@
         return [];
     }
 
-    function canAddSibling(node, parent) {
+    function flowNodeOperations(node) {
+        const available = new Set(availableRelations(node));
+        const operations = [];
+        const add = (relation, label, dialogTitle) => {
+            if (available.has(relation)) operations.push({ relation, label, dialogTitle });
+        };
+        if (node.type === "ROOT") {
+            add("root", "设置流程入口", "设置流程入口");
+        } else if (node.type === "A") {
+            add("next", "添加下一步", "添加下一步");
+        } else if (["C", "J"].includes(node.type)) {
+            add("action", "添加后续", "添加后续");
+        } else if (node.type === "S") {
+            add("branch", "添加分支", "添加分支");
+        } else if (node.type === "P") {
+            add("branch", "添加分支", "添加分支");
+        } else if (node.type === "D") {
+            add("decision", "添加分支", "添加分支");
+            add("default", "设置默认分支", "设置默认分支");
+        }
+        return operations;
+    }
+
+    function relationChild(node, relation) {
+        return node.children.find((child) => child.relation === relation) || null;
+    }
+
+    function canDeleteFlowNode(node, parent) {
         if (!parent) return false;
-        if (["S", "P"].includes(parent.type)) return node.relation === "branch";
-        if (parent.type === "D") return node.relation === "decision";
-        return false;
+        if (["S", "P"].includes(parent.type) && node.relation === "branch") {
+            return parent.children.filter((child) => child.relation === "branch").length > 1;
+        }
+        if (parent.type === "D" && node.relation === "decision") {
+            return parent.children.filter((child) => child.relation === "decision").length > 1;
+        }
+        return true;
     }
 
     function escapeText(value) {
@@ -262,16 +321,18 @@
         const collapsedBadge = collapsed ? `<span class="collapsed-count">+${countFlowNodes(node) - 1}</span>` : "";
         const title = node.type === "J"
             ? ruleDisplayName(node)
-            : (type.kind === "structure" || type.kind === "root" ? compactStructureLabel(node, type) : node.label);
+            : (type.kind === "structure" || type.kind === "root"
+                ? compactStructureLabel(node, type)
+                : flowNodeDisplayName(node));
         const cardKind = `${node.type === "J" ? "condition judge-summary" : type.kind} node-type-${node.type.toLowerCase()}`;
         const cardTitle = node.type === "J"
-            ? `规则 · ${ruleDisplayName(node)}`
+            ? `条件节点 · ${ruleDisplayName(node)}`
             : (["A", "C"].includes(node.type)
-                ? `${type.name} · ${node.label}`
+                ? `${type.name} · ${flowNodeDisplayName(node)}`
                 : type.name);
         const canCollapse = node.type !== "J" && Boolean(node.children.length);
         const nodeShell = `
-            <div class="node-shell" data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
+            <div class="node-shell${canCollapse ? " has-fold-toggle" : ""}" data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
                     <div class="node-card ${cardKind}" title="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
@@ -301,7 +362,23 @@
 
     function populateTypeSelect(select, allowedTypes) {
         select.innerHTML = allowedTypes
-            .map((key) => `<option value="${key}">${key} · ${TYPES[key].name}</option>`).join("");
+            .map((key) => `<option value="${key}">${TYPES[key].name}</option>`).join("");
+    }
+
+    function definitionReference(definitions, ruleId, fallback = "") {
+        const definition = definitions.find((candidate) => candidate.ruleId === ruleId);
+        if (definition) return `${definition.desc} · ${definition.ruleId}`;
+        if (!ruleId) return "未设置";
+        return fallback && fallback !== ruleId ? `${fallback} · ${ruleId}` : ruleId;
+    }
+
+    function judgeRuleReference(node) {
+        const rule = judgeParts(node).rule;
+        if (!rule) return "未设置";
+        if (rule.type === "R") {
+            return definitionReference(RULE_DEFINITIONS, rule.expression);
+        }
+        return `复合规则 · ${countNodes(rule)} 个规则节点`;
     }
 
     function updateInspector() {
@@ -311,65 +388,72 @@
         if (!found) {
             empty.hidden = false;
             form.hidden = true;
-            $("#addSiblingButton").disabled = true;
-            $("#addChildButton").disabled = true;
             return;
         }
         const { node } = found;
         empty.hidden = true;
         form.hidden = false;
-        $("#inspectorTitle").textContent = flowNodeDisplayName(node);
-        $("#nodeType").value = `${node.type} · ${TYPES[node.type].name}`;
-        const structural = isStructuralFlowType(node.type);
-        $("#nodeLabelField").hidden = structural;
-        $("#nodeExpressionField").hidden = false;
+        $("#inspectorTitle").textContent = "节点属性";
+        $("#nodeType").textContent = TYPES[node.type].name;
+        const nodeName = flowNodeName(node);
+        const fields = nodeName ? [{ label: "节点名称", value: nodeName }] : [];
         if (node.type === "J") {
-            const rule = judgeParts(node).rule;
-            $("#nodeLabelCaption").textContent = "规则名称";
-            $("#nodeLabel").value = ruleDisplayName(node);
-            $("#nodeExpressionCaption").textContent = "规则结构";
-            $("#nodeExpression").value = rule
-                ? `${rule.type === "R" ? "单一规则" : "复合规则"} · ${countNodes(rule)} 个规则节点`
-                : "未配置规则";
+            fields.push({ label: "引用规则", value: judgeRuleReference(node) });
         } else if (node.type === "A") {
-            $("#nodeLabelCaption").textContent = "动作名称";
-            $("#nodeLabel").value = node.label || "";
-            $("#nodeExpressionCaption").textContent = "方法标识";
-            $("#nodeExpression").value = node.expression || "未配置";
+            const next = relationChild(node, "next");
+            fields.push({
+                label: "引用规则",
+                value: definitionReference(ACTION_DEFINITIONS, node.expression, node.label)
+            });
+            if (next) {
+                fields.push({ label: "下一步", value: flowNodeDisplayName(next) });
+            }
         } else if (node.type === "C") {
-            $("#nodeLabelCaption").textContent = "规则名称";
-            $("#nodeLabel").value = node.label || "";
-            $("#nodeExpressionCaption").textContent = "规则标识";
-            $("#nodeExpression").value = node.expression || "未配置";
-        } else if (node.type === "S") {
-            $("#nodeExpressionCaption").textContent = "步骤数量";
-            $("#nodeExpression").value = `${node.children.length} 个`;
-        } else if (node.type === "P") {
-            $("#nodeExpressionCaption").textContent = "并行分支";
-            $("#nodeExpression").value = `${node.children.length} 个`;
+            fields.push({
+                label: "引用规则",
+                value: definitionReference(RULE_DEFINITIONS, node.expression, node.label)
+            });
+        } else if (["S", "P"].includes(node.type)) {
+            fields.push({ label: "分支数", value: `${node.children.length} 个` });
         } else if (node.type === "D") {
             const branches = node.children.filter((child) => child.relation === "decision").length;
-            const hasDefault = node.children.some((child) => child.relation === "default");
-            $("#nodeExpressionCaption").textContent = "条件分支";
-            $("#nodeExpression").value = `${branches} 个${hasDefault ? " · 含默认分支" : ""}`;
+            fields.push({ label: "分支数", value: `${branches} 个` });
+            fields.push({
+                label: "默认分支",
+                value: relationChild(node, "default") ? "已设置" : "未设置"
+            });
         } else {
-            $("#nodeExpressionCaption").textContent = "入口数量";
-            $("#nodeExpression").value = `${node.children.length} 个`;
+            const root = relationChild(node, "root");
+            fields.push({
+                label: "流程入口",
+                value: root ? flowNodeDisplayName(root) : "未设置"
+            });
         }
-        $("#nodeLabel").readOnly = true;
-        $("#nodeExpression").readOnly = true;
-        $("#editNodeButton").textContent = ["J", "C"].includes(node.type)
-            ? "编辑规则"
-            : (node.type === "A" ? "编辑动作" : "编辑节点");
-        $("#editNodeButton").hidden = structural;
+        $("#nodeDetailFields").innerHTML = fields.map((field) => `
+            <label>
+                ${escapeText(field.label)}
+                <input value="${escapeText(field.value)}" readonly>
+            </label>
+        `).join("");
+        const operations = flowNodeOperations(node);
+        const primaryOperation = ["ROOT", "S", "P", "D"].includes(node.type);
+        $("#flowNodeActions").innerHTML = operations.map((operation, index) => `
+            <button class="${primaryOperation && index === 0 ? "primary " : ""}flow-operation${operations.length === 1 ? " wide" : ""}"
+                    type="button" data-flow-relation="${operation.relation}">
+                ${escapeText(operation.label)}
+            </button>
+        `).join("");
+        const editButton = $("#editNodeButton");
+        editButton.textContent = node.type === "J" ? "查看规则" : "编辑";
+        editButton.hidden = node.type === "ROOT";
+        editButton.classList.toggle("primary", ["A", "C", "J"].includes(node.type));
+        editButton.style.order = ["A", "C", "J"].includes(node.type) ? "-1" : "0";
+        $(".inspector-actions").hidden = operations.length === 0 && editButton.hidden;
         $("#deleteButton").hidden = node.type === "ROOT";
-        $("#addSiblingButton").disabled = !canAddSibling(node, found.parent);
-        $("#addChildButton").disabled = availableRelations(node).length === 0;
-        const showCollapse = node.type !== "J" && node.children.length > 0;
-        $("#collapseButton").hidden = !showCollapse;
-        $(".inspector-actions").classList.toggle("no-collapse", !showCollapse);
-        $(".inspector-actions").classList.toggle("root-actions", node.type === "ROOT");
-        $("#collapseButton").textContent = node.collapsed ? "展开分支" : "折叠分支";
+        $("#deleteButton").disabled = !canDeleteFlowNode(node, found.parent);
+        $("#deleteButton").title = $("#deleteButton").disabled
+            ? "当前节点是所属结构的唯一必需分支，不能直接删除"
+            : "";
     }
 
     function selectNode(id) {
@@ -384,33 +468,46 @@
         const found = findNode(selectedId);
         if (!found) return;
         const { node } = found;
-        if (isStructuralFlowType(node.type)) return;
+        if (node.type === "ROOT") return;
         if (node.type === "J") {
             openRuleDialog(node.id);
             return;
         }
-        const action = node.type === "A";
-        $("#nodeEditDialogEyebrow").textContent = action ? "业务配置" : "规则配置";
-        $("#nodeEditDialogTitle").textContent = action ? "编辑动作" : "编辑规则";
-        $("#editNodeType").value = `${node.type} · ${TYPES[node.type].name}`;
-        $("#editNodeLabelCaption").textContent = action ? "动作名称" : "规则名称";
-        $("#editNodeExpressionCaption").textContent = action ? "方法标识" : "规则标识";
-        $("#editNodeLabel").value = node.label || "";
-        $("#editNodeExpression").value = node.expression || "";
-        $("#editNodeLabelField").hidden = false;
-        $("#editNodeExpressionField").hidden = false;
+        const ruleBacked = ["A", "C"].includes(node.type);
+        $("#nodeEditDialogTitle").textContent = "编辑节点";
+        $("#editNodeDefinitionField").hidden = !ruleBacked;
+        $("#editNodeDefinition").disabled = !ruleBacked;
+        if (ruleBacked) {
+            populateFlowDefinitionSelect(
+                $("#editNodeDefinition"),
+                node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS,
+                node.expression,
+                node.label
+            );
+        }
+        $("#editNodeAlias").value = flowNodeName(node);
+        $("#editNodeAlias").placeholder = ruleBacked ? flowNodeDisplayName(node) : "";
         nodeEditDialog.showModal();
         requestAnimationFrame(() => {
-            $("#editNodeLabel").focus();
-            $("#editNodeLabel").select();
+            (ruleBacked ? $("#editNodeDefinition") : $("#editNodeAlias")).focus();
         });
     }
 
     function saveSelectedNodeEditor() {
         const found = findNode(selectedId);
-        if (!found || !["A", "C"].includes(found.node.type)) return;
-        found.node.label = $("#editNodeLabel").value.trim();
-        found.node.expression = $("#editNodeExpression").value.trim();
+        if (!found || !["A", "C", "S", "P", "D"].includes(found.node.type)) return;
+        if (["A", "C"].includes(found.node.type)) {
+            const definitions = found.node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS;
+            const selectedRuleId = $("#editNodeDefinition").value;
+            const definition = definitions.find((candidate) =>
+                candidate.ruleId === selectedRuleId);
+            if (!definition && selectedRuleId !== found.node.expression) return;
+            if (definition) {
+                found.node.label = definition.desc;
+                found.node.expression = definition.ruleId;
+            }
+        }
+        found.node.name = $("#editNodeAlias").value.trim();
         render({ preserveView: true });
     }
 
@@ -493,12 +590,14 @@
         empty.hidden = true;
         panel.hidden = false;
         $("#ruleEditorTitle").textContent = ruleNodeDisplayName(node);
-        $("#ruleNodeType").value = `${node.type} · ${TYPES[node.type].name}`;
+        $("#ruleNodeType").value = TYPES[node.type].name;
         const aliasInput = $("#ruleNodeLabel");
         const fallbackName = ruleNodeDisplayName(node);
-        aliasInput.value = node.name?.trim() || fallbackName;
+        aliasInput.value = node.name?.trim() || "";
+        aliasInput.placeholder = fallbackName;
         aliasInput.dataset.initialAlias = node.name || "";
         aliasInput.dataset.fallbackName = fallbackName;
+        $("#ruleNodeNameField").hidden = !node.name?.trim();
         $("#ruleNodeExpression").value = node.expression || "";
         const atomic = node.type === "R";
         const logic = node.type === "L";
@@ -528,6 +627,7 @@
         if (!found) return;
         ruleEditorEditing = true;
         ruleEditorDraftNodeId = found.node.id;
+        $("#ruleNodeNameField").hidden = false;
         $("#ruleNodeLabel").readOnly = false;
         $("#ruleDefinitionSelect").disabled = found.node.type !== "R";
         $("#ruleLogicSelect").disabled = found.node.type !== "L";
@@ -571,26 +671,40 @@
     function updateRuleDefinitionDraft() {
         const aliasInput = $("#ruleNodeLabel");
         const initialAlias = aliasInput.dataset.initialAlias || "";
-        const previousFallback = aliasInput.dataset.fallbackName || "";
         const definition = ruleDefinitionById($("#ruleDefinitionSelect").value);
-        if (!initialAlias.trim() && aliasInput.value === previousFallback && definition) {
-            aliasInput.value = definition.desc;
+        if (!initialAlias.trim() && !aliasInput.value.trim() && definition) {
+            aliasInput.placeholder = definition.desc;
             aliasInput.dataset.fallbackName = definition.desc;
         }
         updateRuleEditorDirtyState();
     }
 
-    function saveRuleEditorChanges() {
+    function saveRuleEditorChanges({ refresh = true } = {}) {
         const draft = ruleEditorDraft();
-        if (!draft || !ruleEditorHasUnsavedChanges()) return;
+        if (!draft || !ruleEditorHasUnsavedChanges()) return false;
         draft.found.node.name = draft.name;
         draft.found.node.expression = draft.expression;
-        refreshRuleAfterEdit(draft.found);
+        if (refresh) refreshRuleAfterEdit(draft.found);
+        return true;
     }
 
     function cancelRuleEditorChanges() {
         if (!ruleEditorEditing) return;
         updateRuleEditor();
+    }
+
+    function finishRuleEditorCancel() {
+        if (closeRuleDialogAfterEdit) {
+            ruleDialog.close();
+            return;
+        }
+        cancelRuleEditorChanges();
+    }
+
+    function finishRuleEditorSave() {
+        const closeAfterSave = closeRuleDialogAfterEdit;
+        if (!saveRuleEditorChanges({ refresh: !closeAfterSave })) return;
+        if (closeAfterSave) ruleDialog.close();
     }
 
     function confirmDiscardRuleEditorChanges() {
@@ -605,19 +719,20 @@
         if (!judge) return;
         const name = ruleDisplayName(judge);
         $("#ruleDialogTitle").textContent = name;
-        $("#ruleDialogSummary").textContent = "编辑该规则包含的条件组合";
         renderRuleTree();
         updateRuleEditor();
     }
 
-    function openRuleDialog(judgeId) {
+    function openRuleDialog(judgeId, { edit = false } = {}) {
         const found = findNode(judgeId);
         if (!found || found.node.type !== "J") return;
         ruleJudgeId = judgeId;
         ruleSelectedId = judgeParts(found.node).rule?.id || null;
+        closeRuleDialogAfterEdit = edit;
         hideRulePopover();
         renderRuleDialog();
         if (!ruleDialog.open) ruleDialog.showModal();
+        if (edit) enterRuleEditorEditMode();
     }
 
     function hideRulePopover() {
@@ -689,6 +804,20 @@
         return RULE_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
     }
 
+    function actionDefinitionById(ruleId) {
+        return ACTION_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
+    }
+
+    function populateFlowDefinitionSelect(select, definitions, selectedRuleId, selectedLabel) {
+        const current = selectedRuleId && !definitions.some((definition) => definition.ruleId === selectedRuleId)
+            ? [{ ruleId: selectedRuleId, desc: selectedLabel || `${selectedRuleId}（当前引用）`, useType: null }]
+            : [];
+        select.innerHTML = [...current, ...definitions]
+            .map((definition) => `<option value="${escapeText(definition.ruleId)}">${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`)
+            .join("");
+        select.value = selectedRuleId || definitions[0]?.ruleId || "";
+    }
+
     function populateRuleDefinitionSelect(select, selectedRuleId = "") {
         const current = selectedRuleId && !ruleDefinitionById(selectedRuleId)
             ? [{ ruleId: selectedRuleId, desc: `${selectedRuleId}（当前引用）`, useType: null }]
@@ -729,7 +858,7 @@
         $("#ruleAddRows").innerHTML = ruleAddRuleIds.map((ruleId, index) => `
             <div class="rule-add-row">
                 <label>
-                    规则 ${index + 1}
+                    引用规则 ${index + 1}
                     <select data-rule-add-select="${index}">
                         ${RULE_DEFINITIONS.map((definition) => `
                             <option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ruleId ? "selected" : ""}>
@@ -822,7 +951,7 @@
         $("#ruleExtendRows").innerHTML = ruleExtendRuleIds.map((ruleId, index) => `
             <div class="rule-add-row">
                 <label>
-                    新增规则 ${index + 1}
+                    引用规则 ${index + 1}
                     <select data-rule-extend-select="${index}">
                         ${RULE_DEFINITIONS.map((definition) => `
                             <option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ruleId ? "selected" : ""}>
@@ -924,85 +1053,111 @@
         render({ preserveView: true });
     }
 
-    function populateRelations(relations, selectedRelation) {
-        const select = $("#newNodeRelation");
-        select.innerHTML = relations.map((relation) => `<option value="${relation}">${RELATIONS[relation].label}</option>`).join("");
-        select.value = selectedRelation || relations[0];
-        select.disabled = relations.length === 1;
-        $("#relationField").hidden = relations.length === 1;
-        populateNewNodeTypes();
-    }
-
     function populateNewNodeTypes() {
-        const relation = $("#newNodeRelation").value;
-        populateTypeSelect($("#newNodeType"), RELATIONS[relation].types);
-        $("#newNodeType").value = RELATIONS[relation].types.includes("A") ? "A" : RELATIONS[relation].types[0];
-        updateTypeHelp();
+        const types = RELATIONS[addRelation]?.types || [];
+        populateTypeSelect($("#newNodeType"), types);
+        $("#newNodeType").value = types.includes("A") ? "A" : types[0];
+        updateNewNodeFields();
     }
 
-    function openAddDialog(mode) {
+    function newNodeDefinitions(nodeType) {
+        if (nodeType === "J") return RULE_DEFINITIONS;
+        if (nodeType === "A") return ACTION_DEFINITIONS;
+        return [];
+    }
+
+    function populateNewNodeDefinitions() {
+        const definitions = newNodeDefinitions($("#newNodeType").value);
+        const field = $("#newNodeDefinitionField");
+        const select = $("#newNodeDefinition");
+        field.hidden = definitions.length === 0;
+        select.disabled = definitions.length === 0;
+        select.required = definitions.length > 0;
+        select.innerHTML = definitions
+            .map((definition) => `
+                <option value="${escapeText(definition.ruleId)}">
+                    ${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}
+                </option>`)
+            .join("");
+    }
+
+    function populateNewNodeAnchors(parent) {
+        const positionable = ["branch", "decision"].includes(addRelation);
+        const children = positionable
+            ? parent.children.filter((child) => child.relation === addRelation)
+            : [];
+        const placementField = $("#newNodePlacementField");
+        const anchorField = $("#newNodeAnchorField");
+        const placement = $("#newNodePlacement");
+        const anchor = $("#newNodeAnchor");
+        const showPosition = children.length > 0;
+        placementField.hidden = !showPosition;
+        anchorField.hidden = !showPosition;
+        placement.disabled = !showPosition;
+        anchor.disabled = !showPosition;
+        anchor.required = showPosition;
+        anchor.innerHTML = children
+            .map((child, index) => `
+                <option value="${escapeText(child.id)}">
+                    ${index + 1}. ${escapeText(flowNodeDisplayName(child))}
+                </option>`)
+            .join("");
+        placement.value = "after";
+    }
+
+    function updateNewNodeFields() {
+        populateNewNodeDefinitions();
+    }
+
+    function openAddDialog(relation) {
         const found = findNode(selectedId);
         if (!found) return;
-        if (mode === "sibling" && !canAddSibling(found.node, found.parent)) return;
-        addMode = mode;
-        const relations = mode === "child" ? availableRelations(found.node) : [found.node.relation];
-        if (!relations.length) return;
-        const nodeName = flowNodeDisplayName(found.node);
-        $("#dialogTitle").textContent = mode === "child" ? `添加到「${nodeName}」` : `添加「${nodeName}」的同级节点`;
-        delete $("#newNodeLabel").dataset.edited;
-        $("#newNodeExpression").value = "";
-        populateRelations(relations, relations[0]);
+        const operation = flowNodeOperations(found.node).find((item) => item.relation === relation);
+        if (!operation) return;
+        addRelation = relation;
+        $("#dialogTitle").textContent = operation.dialogTitle;
+        populateNewNodeTypes();
+        populateNewNodeAnchors(found.node);
         dialog.showModal();
         requestAnimationFrame(() => {
-            const target = $("#newNodeLabelField").hidden ? $("#newNodeType") : $("#newNodeLabel");
-            target.focus();
-            target.select?.();
+            $("#newNodeType").focus();
         });
-    }
-
-    function updateTypeHelp() {
-        const nodeType = $("#newNodeType").value;
-        const type = TYPES[nodeType];
-        const metadataFree = isStructuralFlowType(nodeType) || nodeType === "J";
-        $("#typeHelp").textContent = type.help;
-        $("#newNodeExpressionField").hidden = metadataFree;
-        $("#newNodeLabelField").hidden = metadataFree;
-        $("#newNodeLabelCaption").textContent = nodeType === "A" ? "动作名称" : "规则名称";
-        $("#newNodeExpressionCaption").textContent = nodeType === "A" ? "方法标识" : "规则标识";
-        $("#newNodeLabel").required = !metadataFree;
-        if (metadataFree) {
-            $("#newNodeLabel").value = "";
-            $("#newNodeExpression").value = "";
-            return;
-        }
-        const label = $("#newNodeLabel");
-        if (!label.dataset.edited || ["新业务操作", "新业务判断"].includes(label.value)) {
-            label.value = nodeType === "A" ? "新业务操作" : "新业务判断";
-        }
     }
 
     function addNode() {
         const found = findNode(selectedId);
-        if (!found) return;
-        const parent = addMode === "child" ? found.node : found.parent;
-        if (!parent) return;
+        if (!found || !availableRelations(found.node).includes(addRelation)) return;
+        const parent = found.node;
         const type = $("#newNodeType").value;
+        const definitionId = $("#newNodeDefinition").value;
+        const definition = newNodeDefinitions(type)
+            .find((candidate) => candidate.ruleId === definitionId);
+        if (["A", "J"].includes(type) && !definition) return;
         const node = {
             id: `n${nextId++}`,
             type,
-            relation: $("#newNodeRelation").value,
+            relation: addRelation,
             children: []
         };
-        if (!isStructuralFlowType(type) && type !== "J") {
-            node.label = $("#newNodeLabel").value.trim();
-            node.expression = $("#newNodeExpression").value.trim();
+        if (type === "A") {
+            node.label = definition.desc;
+            node.expression = definition.ruleId;
+        } else if (type === "J") {
+            const rule = createAtomicRule(definition.ruleId);
+            if (!rule) return;
+            node.children.push(rule);
         }
-        if (addMode === "child") {
-            parent.collapsed = false;
-            parent.children.push(node);
+        parent.collapsed = false;
+        const anchorId = $("#newNodeAnchor").disabled ? "" : $("#newNodeAnchor").value;
+        const anchorIndex = parent.children.findIndex((child) =>
+            child.id === anchorId && child.relation === addRelation);
+        if (anchorIndex >= 0) {
+            const insertIndex = $("#newNodePlacement").value === "before"
+                ? anchorIndex
+                : anchorIndex + 1;
+            parent.children.splice(insertIndex, 0, node);
         } else {
-            const index = parent.children.findIndex((child) => child.id === found.node.id);
-            parent.children.splice(index + 1, 0, node);
+            parent.children.push(node);
         }
         selectedId = node.id;
         fitMode = false;
@@ -1012,14 +1167,24 @@
 
     function deleteSelected() {
         const found = findNode(selectedId);
-        if (!found || !found.parent) return;
+        if (!found || !canDeleteFlowNode(found.node, found.parent)) return;
         const descendants = countFlowNodes(found.node) - 1;
         const nodeName = flowNodeDisplayName(found.node);
-        const message = descendants ? `删除「${nodeName}」及其 ${descendants} 个流程子节点？` : `删除「${nodeName}」？`;
-        if (!window.confirm(message)) return;
+        deleteNodeId = found.node.id;
+        $("#deleteNodeMessage").textContent = descendants
+            ? `确定删除「${nodeName}」及其 ${descendants} 个流程子节点吗？`
+            : `确定删除「${nodeName}」吗？`;
+        deleteNodeDialog.showModal();
+    }
+
+    function confirmDeleteSelected() {
+        const found = findNode(deleteNodeId);
+        if (!found || !canDeleteFlowNode(found.node, found.parent)) return false;
         found.parent.children = found.parent.children.filter((child) => child.id !== found.node.id);
         selectedId = found.parent.id;
+        deleteNodeId = null;
         render({ preserveView: true });
+        return true;
     }
 
     function toggleCollapse() {
@@ -1155,16 +1320,22 @@
         }
     }, { passive: false });
 
-    $("#addChildButton").addEventListener("click", () => openAddDialog("child"));
-    $("#addSiblingButton").addEventListener("click", () => openAddDialog("sibling"));
+    $("#flowNodeActions").addEventListener("click", (event) => {
+        const relation = event.target.closest("[data-flow-relation]")?.dataset.flowRelation;
+        if (relation) openAddDialog(relation);
+    });
     $("#zoomOutButton").addEventListener("click", () => setZoom(scale - .1));
     $("#zoomInButton").addEventListener("click", () => setZoom(scale + .1));
     $("#fitButton").addEventListener("click", fitTree);
     $("#resetButton").addEventListener("click", () => {
         if (!window.confirm("恢复初始示例树？当前修改将丢失。")) return;
-        tree = sampleTree(); selectedId = null; ruleJudgeId = null; ruleSelectedId = null; nextId = 44; render({ preserveView: false });
+        tree = sampleTree();
+        selectedId = null;
+        ruleJudgeId = null;
+        ruleSelectedId = null;
+        nextId = 44;
+        render({ preserveView: false });
     });
-    $("#collapseButton").addEventListener("click", toggleCollapse);
     $("#deleteButton").addEventListener("click", deleteSelected);
     $("#editNodeButton").addEventListener("click", openSelectedNodeEditor);
 
@@ -1213,8 +1384,8 @@
         if (button) removeRuleAddRow(Number(button.dataset.ruleAddRemove));
     });
     $("#ruleEditorEditButton").addEventListener("click", enterRuleEditorEditMode);
-    $("#ruleEditorCancelButton").addEventListener("click", cancelRuleEditorChanges);
-    $("#ruleEditorSaveButton").addEventListener("click", saveRuleEditorChanges);
+    $("#ruleEditorCancelButton").addEventListener("click", finishRuleEditorCancel);
+    $("#ruleEditorSaveButton").addEventListener("click", finishRuleEditorSave);
     $("#ruleNodeLabel").addEventListener("input", updateRuleEditorDirtyState);
     $("#ruleDefinitionSelect").addEventListener("change", updateRuleDefinitionDraft);
     $("#ruleLogicSelect").addEventListener("change", updateRuleEditorDirtyState);
@@ -1225,6 +1396,7 @@
     ruleDialog.addEventListener("close", () => {
         ruleEditorEditing = false;
         ruleEditorDraftNodeId = null;
+        closeRuleDialogAfterEdit = false;
         ruleJudgeId = null;
         ruleSelectedId = null;
         hideRulePopover();
@@ -1243,13 +1415,11 @@
         document.activeElement?.closest?.(".node-shell")?.blur();
     }, true);
 
-    $("#newNodeType").addEventListener("change", updateTypeHelp);
-    $("#newNodeRelation").addEventListener("change", populateNewNodeTypes);
-    $("#newNodeLabel").addEventListener("input", (event) => { event.target.dataset.edited = "true"; });
+    $("#newNodeType").addEventListener("change", updateNewNodeFields);
     $("#nodeDialogForm").addEventListener("submit", (event) => {
         if (event.submitter?.value !== "default") return;
         event.preventDefault();
-        if (!$("#newNodeLabel").reportValidity()) return;
+        if (!$("#nodeDialogForm").reportValidity()) return;
         const node = addNode();
         dialog.close();
         if (node?.type === "J") requestAnimationFrame(() => openRuleDialog(node.id));
@@ -1260,7 +1430,14 @@
         saveSelectedNodeEditor();
         nodeEditDialog.close();
     });
-
+    $("#deleteNodeDialogForm").addEventListener("submit", (event) => {
+        if (event.submitter?.value !== "default") return;
+        event.preventDefault();
+        if (confirmDeleteSelected()) deleteNodeDialog.close();
+    });
+    deleteNodeDialog.addEventListener("close", () => {
+        deleteNodeId = null;
+    });
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && dialog.open) dialog.close();
         const editing = event.target.matches("input, select, textarea");
