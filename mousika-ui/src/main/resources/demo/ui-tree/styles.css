@@ -299,6 +299,8 @@ select:disabled { opacity: 1; color: #7d899b; background: #f5f7fa; }
 .inspector-actions button { min-height: 36px; border-radius: 8px; }
 .inspector-actions #editNodeButton { height: 38px; }
 .flow-node-actions { display: contents; }
+.flow-operation { border-color: var(--blue); color: var(--blue); }
+.flow-operation:hover { background: #eef3ff; }
 .flow-operation.wide,
 .inspector-actions #editNodeButton { grid-column: 1; }
 .form-note { margin: 0; color: #9aa4b4; font-size: 10px; line-height: 1.55; }

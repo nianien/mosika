@@ -99,6 +99,7 @@
     let inspectorEditingField = null;
     let nextId = 44;
     let addRelation = null;
+    let insertBeforeMode = false;
     let scale = 1;
     let panX = 0;
     let panY = 0;
@@ -269,9 +270,9 @@
         if (node.type === "ROOT") {
             add("root", "设置流程入口", "设置流程入口");
         } else if (node.type === "A") {
-            add("next", "添加下一步", "添加下一步");
+            add("next", "添加流程", "添加流程");
         } else if (["C", "J"].includes(node.type)) {
-            add("action", "添加后续流程", "添加后续流程");
+            add("action", "添加流程", "添加流程");
         } else if (node.type === "S") {
             add("branch", "添加分支", "添加分支");
         } else if (node.type === "P") {
@@ -404,14 +405,7 @@
     function renderInspectorHeading(node) {
         const container = $("#inspectorHeading");
         if (!container) return;
-        const editable = inspectorEditableType(node.type);
-        const active = editable && inspectorEditingField === editKey(node.id, "alias");
-        const typeChip = `<span class="inspector-type">${escapeText(TYPES[node.type].name)}</span>`;
-        container.innerHTML = `<div class="rule-heading-view">
-            <strong id="inspectorTitle">节点属性</strong>
-            ${editable && !active ? `<button class="field-edit" type="button" data-field-edit="alias" aria-label="设置节点名称" title="设置节点名称"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg></button>` : ""}
-        </div>
-        ${typeChip}`;
+        container.innerHTML = `<strong id="inspectorTitle">节点属性</strong>`;
     }
 
     function renderInspectorFields(node) {
@@ -424,6 +418,33 @@
             <button class="field-confirm" type="button" data-field-confirm aria-label="确认" title="确认"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></button>
             <button class="field-cancel" type="button" data-field-cancel aria-label="取消" title="取消"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>`;
+        if (inspectorEditableType(node.type)) {
+            const aliasActive = inspectorEditingField === editKey(node.id, "alias");
+            parts.push(`<div class="detail-field editable${aliasActive ? " field-editing" : ""}" data-field="alias">
+                <span class="detail-label">节点名称</span>
+                <div class="field-row">
+                    <span class="detail-value">${escapeText(nodeName || "未设置")}</span>
+                    ${aliasActive ? "" : pencil("alias")}
+                    <input class="field-control" id="inspectorAliasInput" maxlength="28" autocomplete="off"
+                           value="${escapeText(nodeName)}" placeholder="为该节点设置名称">
+                    ${aliasActive ? confirmCancel() : ""}
+                </div>
+            </div>`);
+        }
+        const typeEditable = ["S", "P"].includes(node.type);
+        const typeActive = typeEditable && inspectorEditingField === editKey(node.id, "type");
+        parts.push(`<div class="detail-field${typeEditable ? " editable" : ""}${typeActive ? " field-editing" : ""}" data-field="type">
+            <span class="detail-label">节点类型</span>
+            <div class="field-row">
+                <span class="detail-value">${escapeText(TYPES[node.type].name)}</span>
+                ${typeEditable && !typeActive ? pencil("type") : ""}
+                <select class="field-control" id="inspectorTypeSelect">
+                    <option value="S" ${node.type === "S" ? "selected" : ""}>串行节点</option>
+                    <option value="P" ${node.type === "P" ? "selected" : ""}>并行节点</option>
+                </select>
+                ${typeActive ? confirmCancel() : ""}
+            </div>
+        </div>`);
         const ruleField = (definitions, selectedId, fallbackLabel) => {
             const active = inspectorEditingField === editKey(node.id, "expression");
             const options = [...(selectedId && !definitions.some((d) => d.ruleId === selectedId)
@@ -446,24 +467,11 @@
                 <span class="detail-value">${escapeText(value)}</span>
             </div>`);
         };
-        const aliasActive = inspectorEditingField === editKey(node.id, "alias");
-        if (nodeName || aliasActive) {
-            parts.push(`<div class="detail-field editable${aliasActive ? " field-editing" : ""}" data-field="alias">
-                <span class="detail-label">节点名称</span>
-                <div class="field-row">
-                    <span class="detail-value">${escapeText(nodeName)}</span>
-                    ${aliasActive ? "" : pencil("alias")}
-                    <input class="field-control" id="inspectorAliasInput" maxlength="28" autocomplete="off"
-                           value="${escapeText(nodeName)}" placeholder="未设置">
-                    ${aliasActive ? confirmCancel() : ""}
-                </div>
-            </div>`);
-        }
 
         if (node.type === "A") {
             ruleField(ACTION_DEFINITIONS, node.expression, node.label);
             const next = relationChild(node, "next");
-            if (next) readonlyField("下一步", flowNodeDisplayName(next));
+            if (next) readonlyField("流程", flowNodeDisplayName(next));
         } else if (node.type === "C") {
             ruleField(RULE_DEFINITIONS, node.expression, node.label);
         } else if (node.type === "J") {
@@ -504,15 +512,15 @@
         renderInspectorFields(node);
         $("#inspectorAddPanel").hidden = true;
         const operations = flowNodeOperations(node);
-        const convertButton = ["S", "P"].includes(node.type)
-            ? `<button class="flow-operation wide" type="button" data-convert="${node.type === "S" ? "P" : "S"}">${node.type === "S" ? "转为并行" : "转为串行"}</button>`
+        const insertButton = node.type !== "ROOT"
+            ? `<button class="flow-operation wide" type="button" data-insert-before>插入节点</button>`
             : "";
-        $("#flowNodeActions").innerHTML = operations.map((operation, index) => `
-            <button class="${index === 0 ? "primary " : ""}flow-operation${operations.length === 1 && !convertButton ? " wide" : ""}"
+        $("#flowNodeActions").innerHTML = insertButton + operations.map((operation) => `
+            <button class="flow-operation wide"
                     type="button" data-flow-relation="${operation.relation}">
                 ${escapeText(operation.label)}
             </button>
-        `).join("") + convertButton;
+        `).join("");
         const editButton = $("#editNodeButton");
         editButton.hidden = node.type !== "J";
         $("#inspectorViewActions").hidden = operations.length === 0 && editButton.hidden;
@@ -546,6 +554,9 @@
                 node.label = definition.desc;
                 node.expression = definition.ruleId;
             }
+        } else if (field === "type" && ["S", "P"].includes(node.type)) {
+            const newType = $("#inspectorTypeSelect").value;
+            if (["S", "P"].includes(newType)) node.type = newType;
         }
         inspectorEditingField = null;
         render({ preserveView: true });
@@ -730,10 +741,21 @@
         if (["&&", "||"].includes(node.expression)) {
             document.querySelector(`input[name="ruleEditorLogic"][value="${node.expression === "||" ? "||" : "&&"}"]`).checked = true;
         }
+        $("#ruleEditorSubrulesField").hidden = false;
         renderRuleEditorSubrules();
         $("#ruleEditorEditActions").hidden = true;
         $("#ruleEditorSaveButton").disabled = true;
         $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = true; });
+        $("#ruleAddPanel").hidden = true;
+        $("#ruleEditorViewActions").hidden = false;
+        $("#ruleEditorFooter").hidden = false;
+        const canInsertSibling = ["L", "H"].includes(found.parent?.type);
+        $("#ruleViewBefore").hidden = !canInsertSibling;
+        $("#ruleViewAfter").hidden = !canInsertSibling;
+        $("#ruleEditorDeleteButton").disabled = !canDeleteRule(found);
+        $("#ruleEditorDeleteButton").title = canDeleteRule(found)
+            ? ""
+            : "组合规则至少需要保留两个子规则，不能直接删除";
     }
 
     function enterRuleEditorEditMode() {
@@ -756,6 +778,9 @@
         $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = false; });
         renderRuleEditorSubrules();
         $("#ruleEditorEditActions").hidden = false;
+        $("#ruleEditorViewActions").hidden = true;
+        $("#ruleEditorFooter").hidden = true;
+        $("#ruleAddPanel").hidden = true;
         updateRuleEditorDirtyState();
     }
 
@@ -927,69 +952,10 @@
     }
 
     function hideRulePopover() {
-        const popover = $("#ruleContextPopover");
-        popover.hidden = true;
-        popover.querySelectorAll(".rule-context-section").forEach((section) => {
-            section.hidden = true;
-        });
-        popover.classList.remove("menu-mode");
-        rulePopoverAnchorId = null;
-        rulePopoverPoint = null;
+        $("#ruleAddPanel").hidden = true;
     }
 
-    function positionRulePopover() {
-        const popover = $("#ruleContextPopover");
-        if (popover.hidden) return;
-        const panel = $("#ruleTreePanel");
-        const panelRect = panel.getBoundingClientRect();
-        const gap = 12;
-        const anchor = rulePopoverPoint ? null : (rulePopoverAnchorId
-            ? ruleTreeRoot.querySelector(`[data-rule-node-id="${rulePopoverAnchorId}"]`)
-            : $("#ruleAddRootButton"));
-        if (!rulePopoverPoint && !anchor) {
-            hideRulePopover();
-            return;
-        }
-        const anchorRect = anchor?.getBoundingClientRect();
-        let left = rulePopoverPoint
-            ? rulePopoverPoint.x - panelRect.left
-            : anchorRect.right - panelRect.left + gap;
-        if (left + popover.offsetWidth > panel.clientWidth - gap) {
-            left = rulePopoverPoint
-                ? panel.clientWidth - popover.offsetWidth - gap
-                : anchorRect.left - panelRect.left - popover.offsetWidth - gap;
-        }
-        left = Math.max(gap, Math.min(left, panel.clientWidth - popover.offsetWidth - gap));
-        const top = Math.max(46, Math.min(
-            rulePopoverPoint ? rulePopoverPoint.y - panelRect.top : anchorRect.top - panelRect.top,
-            panel.clientHeight - popover.offsetHeight - gap
-        ));
-        popover.style.left = `${left}px`;
-        popover.style.top = `${top}px`;
-    }
-
-    function showRulePopover(sectionId, anchorId = ruleSelectedId) {
-        const popover = $("#ruleContextPopover");
-        popover.querySelectorAll(".rule-context-section").forEach((section) => {
-            section.hidden = section.id !== sectionId;
-        });
-        popover.classList.toggle("menu-mode", sectionId === "ruleActionPanel");
-        rulePopoverAnchorId = anchorId;
-        popover.hidden = false;
-        requestAnimationFrame(positionRulePopover);
-    }
-
-    function startRuleActions(point) {
-        const found = findRuleNode(ruleSelectedId);
-        if (!found) return;
-        const canInsertSibling = ["L", "H"].includes(found.parent?.type);
-        $("#ruleActionBefore").hidden = !canInsertSibling;
-        $("#ruleActionAfter").hidden = !canInsertSibling;
-        $("#ruleActionExtend").hidden = found.node.type !== "R";
-        $("#ruleActionDelete").disabled = !canDeleteRule(found);
-        rulePopoverPoint = point;
-        showRulePopover("ruleActionPanel", found.node.id);
-    }
+    function positionRulePopover() {}
 
     function ruleDefinitionById(ruleId) {
         return RULE_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
@@ -1070,13 +1036,24 @@
         ruleAddMode = mode;
         ruleAddParentId = parent?.id || null;
         ruleAddAnchorId = mode === "root" ? null : found.node.id;
+        if (mode === "root") {
+            $("#ruleEditorEmpty").hidden = true;
+            $("#ruleEditorPanel").hidden = false;
+            $("#ruleEditorHeading").innerHTML = "";
+            $("#ruleEditorSubrulesField").hidden = true;
+            $("#ruleEditorLogicField").hidden = true;
+            $("#ruleReferenceField").hidden = true;
+        }
         $("#ruleAddTitle").textContent = mode === "root"
             ? "配置根规则"
             : (mode === "before" ? "上方插入规则" : "下方插入规则");
 
         ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
         document.querySelector('input[name="ruleAddLogic"][value="&&"]').checked = true;
-        showRulePopover("ruleAddPanel", mode === "root" ? null : found.node.id);
+        $("#ruleEditorViewActions").hidden = true;
+        $("#ruleEditorEditActions").hidden = true;
+        $("#ruleEditorFooter").hidden = true;
+        $("#ruleAddPanel").hidden = false;
         renderRuleAddRows(0);
     }
 
@@ -1084,7 +1061,8 @@
         ruleAddParentId = null;
         ruleAddAnchorId = null;
         ruleAddRuleIds = [];
-        hideRulePopover();
+        $("#ruleAddPanel").hidden = true;
+        updateRuleEditor();
     }
 
     function confirmRuleAdd() {
@@ -1202,6 +1180,25 @@
         populateNewNodeDefinitions();
     }
 
+    function openInsertPanel() {
+        const found = findNode(selectedId);
+        if (!found || found.node.type === "ROOT") return;
+        insertBeforeMode = true;
+        addRelation = null;
+        $("#inspectorAddTitle").textContent = "插入节点";
+        const restricted = found.node.relation === "decision";
+        const types = restricted ? ["J"] : FLOW_TYPES;
+        populateTypeSelect($("#newNodeType"), types);
+        $("#newNodeType").value = restricted ? "J" : (types.includes("A") ? "A" : types[0]);
+        updateNewNodeFields();
+        $("#newNodePlacementField").hidden = true;
+        $("#newNodeAnchorField").hidden = true;
+        $("#inspectorViewActions").hidden = true;
+        $("#inspectorFooter").hidden = true;
+        $("#inspectorAddPanel").hidden = false;
+        requestAnimationFrame(() => { $("#newNodeType").focus(); });
+    }
+
     function openAddDialog(relation) {
         const found = findNode(selectedId);
         if (!found) return;
@@ -1219,6 +1216,7 @@
 
     function closeAddPanel() {
         addRelation = null;
+        insertBeforeMode = false;
         $("#inspectorAddPanel").hidden = true;
         updateInspector();
     }
@@ -1270,6 +1268,38 @@
         }
         selectedId = node.id;
         addRelation = null;
+        $("#inspectorAddPanel").hidden = true;
+        fitMode = false;
+        render({ preserveView: true });
+        return node;
+    }
+
+    function insertNodeBefore() {
+        const found = findNode(selectedId);
+        if (!found || !found.parent) return;
+        const { node: target, parent } = found;
+        const type = $("#newNodeType").value;
+        const definitionId = $("#newNodeDefinition").value;
+        const definition = newNodeDefinitions(type).find((c) => c.ruleId === definitionId);
+        if (["A", "J"].includes(type) && !definition) return;
+        const childRelation = { A: "next", S: "branch", P: "branch", C: "action", J: "action", D: "default" }[type];
+        if (!childRelation) return;
+        const node = { id: `n${nextId++}`, type, relation: target.relation, children: [] };
+        if (type === "A") {
+            node.label = definition.desc;
+            node.expression = definition.ruleId;
+        } else if (type === "J") {
+            const rule = createAtomicRule(definition.ruleId);
+            if (!rule) return;
+            node.children.push(rule);
+        }
+        const index = parent.children.indexOf(target);
+        if (index < 0) return;
+        target.relation = childRelation;
+        node.children.push(target);
+        parent.children.splice(index, 1, node);
+        selectedId = node.id;
+        insertBeforeMode = false;
         $("#inspectorAddPanel").hidden = true;
         fitMode = false;
         render({ preserveView: true });
@@ -1373,21 +1403,6 @@
         ruleTreeRoot.querySelector(`[data-rule-node-id="${ruleSelectedId}"]`)?.focus({ preventScroll: true });
     });
 
-    ruleTreeRoot.addEventListener("contextmenu", (event) => {
-        const shell = event.target.closest(".node-shell");
-        if (!shell) return;
-        event.preventDefault();
-        const nextRuleId = shell.dataset.ruleNodeId;
-        if (nextRuleId !== ruleSelectedId && !confirmDiscardRuleEditorChanges()) return;
-        ruleSelectedId = nextRuleId;
-        hideRulePopover();
-        if (!ruleEditorEditing) {
-            renderRuleTree();
-            updateRuleEditor();
-        }
-        startRuleActions({ x: event.clientX, y: event.clientY });
-    });
-
     ruleTreeRoot.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && event.target.matches(".node-shell")) {
             event.preventDefault();
@@ -1431,15 +1446,7 @@
     }, { passive: false });
 
     $("#flowNodeActions").addEventListener("click", (event) => {
-        const convertTo = event.target.closest("[data-convert]")?.dataset.convert;
-        if (convertTo) {
-            const found = findNode(selectedId);
-            if (found && ["S", "P"].includes(found.node.type) && ["S", "P"].includes(convertTo)) {
-                found.node.type = convertTo;
-                render({ preserveView: true });
-            }
-            return;
-        }
+        if (event.target.closest("[data-insert-before]")) { openInsertPanel(); return; }
         const relation = event.target.closest("[data-flow-relation]")?.dataset.flowRelation;
         if (relation) openAddDialog(relation);
     });
@@ -1479,24 +1486,17 @@
     $("#ruleDialogCloseButton").addEventListener("click", () => {
         if (confirmDiscardRuleEditorChanges()) ruleDialog.close();
     });
-    $("#ruleActionPanel").addEventListener("click", (event) => {
-        const action = event.target.closest("[data-rule-menu-action]")?.dataset.ruleMenuAction;
+    $("#ruleEditorViewActions").addEventListener("click", (event) => {
+        const action = event.target.closest("[data-rule-action]")?.dataset.ruleAction;
         if (!action) return;
-        if (action === "edit") {
-            hideRulePopover();
-            enterRuleEditorEditMode();
-            return;
-        }
-        if (action === "extend") {
-            hideRulePopover();
-            enterRuleEditorEditMode();
-            addRuleEditorSubrule();
-            return;
-        }
+        if (action === "edit") { enterRuleEditorEditMode(); return; }
         if (!confirmDiscardRuleEditorChanges()) return;
         if (action === "before") startRuleAdd("before");
         else if (action === "after") startRuleAdd("after");
-        else if (action === "delete") deleteSelectedRule();
+    });
+    $("#ruleEditorDeleteButton").addEventListener("click", () => {
+        if (!confirmDiscardRuleEditorChanges()) return;
+        deleteSelectedRule();
     });
     $("#ruleAddCancelButton").addEventListener("click", cancelRuleAdd);
     $("#ruleAddConfirmButton").addEventListener("click", confirmRuleAdd);
@@ -1539,13 +1539,6 @@
         hideRulePopover();
         render({ preserveView: true });
     });
-    ruleDialog.addEventListener("pointerdown", (event) => {
-        if ($("#ruleContextPopover").hidden) return;
-        if (event.target.closest("#ruleContextPopover, .node-shell, #ruleAddRootButton")) return;
-        hideRulePopover();
-    });
-    $(".rule-tree-viewport").addEventListener("scroll", hideRulePopover, { passive: true });
-    window.addEventListener("resize", positionRulePopover);
 
     document.addEventListener("pointerdown", (event) => {
         if (event.target.closest(".node-shell")) return;
@@ -1555,7 +1548,7 @@
     $("#newNodeType").addEventListener("change", updateNewNodeFields);
     $("#newNodePlacement").addEventListener("change", updatePlacementVisibility);
     $("#confirmAddButton").addEventListener("click", () => {
-        const node = addNode();
+        const node = insertBeforeMode ? insertNodeBefore() : addNode();
         if (node?.type === "J") requestAnimationFrame(() => openRuleDialog(node.id));
     });
     $("#newNodeCancelButton").addEventListener("click", closeAddPanel);

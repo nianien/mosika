@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <title>Mousika 规则树编辑器</title>
-    <link rel="stylesheet" href="styles.css?v=20260724-93">
+    <link rel="stylesheet" href="styles.css?v=20260724-101">
 </head>
 <body>
 <main class="app-shell">
@@ -67,7 +67,7 @@
                 <div class="inspector-fields" id="nodeDetailFields"></div>
                 <div class="inspector-actions" id="inspectorViewActions">
                     <div class="flow-node-actions" id="flowNodeActions"></div>
-                    <button class="primary" id="editNodeButton" type="button" hidden>查看规则</button>
+                    <button class="flow-operation wide" id="editNodeButton" type="button" hidden>查看规则</button>
                 </div>
                 <div class="inspector-add" id="inspectorAddPanel" hidden>
                     <div class="inspector-add-title" id="inspectorAddTitle">添加节点</div>
@@ -144,40 +144,6 @@
                 <div class="rule-tree-viewport">
                     <div id="ruleTreeRoot"></div>
                 </div>
-                <section class="rule-context-popover" id="ruleContextPopover" hidden>
-                    <section class="rule-context-section" id="ruleActionPanel" hidden>
-                        <div class="rule-action-menu">
-                            <button id="ruleActionBefore" type="button" data-rule-menu-action="before">上方插入</button>
-                            <button id="ruleActionAfter" type="button" data-rule-menu-action="after">下方插入</button>
-                            <button type="button" data-rule-menu-action="edit">编辑</button>
-                            <button id="ruleActionExtend" type="button" data-rule-menu-action="extend">转复合</button>
-                            <button class="danger" id="ruleActionDelete" type="button" data-rule-menu-action="delete">删除</button>
-                        </div>
-                    </section>
-                    <section class="rule-context-section" id="ruleAddPanel" hidden>
-                        <div class="rule-add-heading">
-                            <strong id="ruleAddTitle">添加规则</strong>
-                            <button class="icon-button" id="ruleAddCancelButton" type="button" aria-label="取消添加">×</button>
-                        </div>
-                        <div class="rule-add-rows" id="ruleAddRows">
-                        </div>
-                        <button class="rule-add-row-button" id="ruleAddRowButton" type="button">＋ 添加规则</button>
-                        <fieldset class="rule-logic-field" id="ruleAddLogicField" hidden>
-                            <legend>组合方式</legend>
-                            <div class="rule-radio-group">
-                                <label>
-                                <input type="radio" name="ruleAddLogic" value="&amp;&amp;" checked>
-                                    <span>与</span>
-                                </label>
-                                <label>
-                                    <input type="radio" name="ruleAddLogic" value="||">
-                                    <span>或</span>
-                                </label>
-                            </div>
-                        </fieldset>
-                        <button class="primary" id="ruleAddConfirmButton" type="button">确认添加</button>
-                    </section>
-                </section>
             </section>
             <aside class="rule-editor">
                 <div class="rule-editor-empty" id="ruleEditorEmpty">
@@ -213,12 +179,47 @@
                         <button id="ruleEditorCancelButton" type="button">取消</button>
                         <button class="primary" id="ruleEditorSaveButton" type="button" disabled>保存</button>
                     </div>
+                    <div class="rule-editor-actions" id="ruleEditorViewActions">
+                        <button class="flow-operation wide" type="button" data-rule-action="edit">编辑</button>
+                        <button class="flow-operation wide" id="ruleViewBefore" type="button" data-rule-action="before">上方插入</button>
+                        <button class="flow-operation wide" id="ruleViewAfter" type="button" data-rule-action="after">下方插入</button>
+                    </div>
+                    <div class="inspector-add" id="ruleAddPanel" hidden>
+                        <div class="inspector-add-title" id="ruleAddTitle">添加规则</div>
+                        <div class="rule-add-rows" id="ruleAddRows"></div>
+                        <button class="rule-add-row-button" id="ruleAddRowButton" type="button">＋ 添加规则</button>
+                        <fieldset class="rule-logic-field" id="ruleAddLogicField" hidden>
+                            <legend>组合方式</legend>
+                            <div class="rule-radio-group">
+                                <label>
+                                    <input type="radio" name="ruleAddLogic" value="&amp;&amp;" checked>
+                                    <span>与</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="ruleAddLogic" value="||">
+                                    <span>或</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                        <div class="inspector-actions">
+                            <button id="ruleAddCancelButton" type="button">取消</button>
+                            <button class="primary" id="ruleAddConfirmButton" type="button">确认添加</button>
+                        </div>
+                    </div>
+                    <div class="inspector-footer" id="ruleEditorFooter">
+                        <button class="inspector-delete" id="ruleEditorDeleteButton" type="button">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 3h6m-9 4h12m-1 0-.7 13H7.7L7 7m3 4v5m4-5v5"/>
+                            </svg>
+                            删除规则
+                        </button>
+                    </div>
                 </div>
             </aside>
         </div>
     </div>
 </dialog>
 
-<script src="app.js?v=20260724-93"></script>
+<script src="app.js?v=20260724-101"></script>
 </body>
 </html>
