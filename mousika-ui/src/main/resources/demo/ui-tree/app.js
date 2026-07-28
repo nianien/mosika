@@ -331,7 +331,7 @@
         const visibleChildren = node.type === "J" ? flows : (collapsed ? [] : node.children);
         const children = visibleChildren.length
             ? `<div class="tree-children">${visibleChildren.map((child) => renderBranch(child)).join("")}</div>` : "";
-        const collapsedBadge = collapsed ? `<span class="collapsed-count">+${countFlowNodes(node) - 1}</span>` : "";
+        const collapsedBadge = collapsed ? `<span class="collapsed-count" title="${node.children.length} 个分支">${node.children.length}</span>` : "";
         const title = node.type === "J"
             ? ruleDisplayName(node)
             : (type.kind === "structure" || type.kind === "root"
