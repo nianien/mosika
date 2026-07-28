@@ -132,22 +132,30 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .tree-children > .tree-branch:only-child::before { border: 0; }
 .tree-children > .tree-branch:only-child::after { border-top: 0; border-left: 1.5px solid var(--line); border-radius: 0; }
 .node-shell { position: relative; z-index: 2; display: grid; justify-items: center; cursor: pointer; outline: none; }
-.node-shell.has-fold-toggle { padding-bottom: 8px; }
+.node-shell.has-fold-toggle { padding-bottom: 16px; }
 .node-shell.has-fold-toggle::before {
-    content: ""; position: absolute; left: 50%; bottom: 0; height: 8px;
+    content: ""; position: absolute; left: 50%; bottom: 0; height: 16px;
     border-left: 1.5px solid var(--line); pointer-events: none;
 }
 .node-shell::after {
-    content: ""; position: absolute; inset: -6px; border: 2px solid transparent;
-    border-radius: 12px; pointer-events: none; transition: border-color .15s, background .15s;
+    content: ""; position: absolute; inset: -4px; border: 1.5px solid transparent;
+    border-radius: 9px; pointer-events: none; transition: border-color .15s;
 }
-.node-shell:hover::after { border-color: rgba(91,124,226,.23); background: rgba(91,124,226,.035); }
-.node-shell:focus-visible::after {
-    border-color: #6e8aea; background: rgba(91,124,226,.045);
-}
-.rule-dialog .node-shell:focus-visible::after {
-    border-color: #d79a31; background: rgba(216,137,22,.055);
-}
+.node-shell:hover::after { border-color: rgba(91,124,226,.3); }
+.node-shell:focus-visible::after { border-color: #6e8aea; }
+.node-shell[aria-selected="true"]::after { border-color: var(--blue); }
+.rule-dialog .node-shell:focus-visible::after { border-color: #d79a31; }
+.rule-dialog .node-shell[aria-selected="true"]::after { border-color: #d79a31; }
+
+/* circular nodes hug their shape with a round ring instead of the rounded-rect halo */
+.node-shell:has(.node-card.root)::after,
+.node-shell:has(.node-card.structure)::after { content: none; }
+.node-shell:has(.node-card.root):hover .node-card,
+.node-shell:has(.node-card.structure):hover .node-card { outline: 2px solid rgba(91,124,226,.3); outline-offset: 3px; }
+.node-shell:has(.node-card.root):focus-visible .node-card,
+.node-shell:has(.node-card.structure):focus-visible .node-card { outline: 2px solid #6e8aea; outline-offset: 3px; }
+.node-shell[aria-selected="true"]:has(.node-card.root) .node-card,
+.node-shell[aria-selected="true"]:has(.node-card.structure) .node-card { outline: 2px solid var(--blue); outline-offset: 3px; }
 
 .node-card {
     position: relative; display: grid; place-items: center; text-align: center;
@@ -204,7 +212,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .root .node-expression, .structure .node-expression { display: none; }
 
 .node-fold-toggle {
-    position: absolute; left: 50%; bottom: -14px; z-index: 6;
+    position: absolute; left: 50%; bottom: -20px; z-index: 6;
     width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 0;
     display: grid; place-items: center; transform: translateX(-50%);
     border: 1px solid #aebbd0; border-radius: 50%; color: #526481;
@@ -299,10 +307,10 @@ input, select { width: 100%; height: 35px; padding: 0 9px; border: 1px solid #d6
 input[readonly] { color: #7d899b; background: #f5f7fa; }
 .inspector input[readonly] { color: #34435c; background: #fff; }
 select:disabled { opacity: 1; color: #7d899b; background: #f5f7fa; }
-.inspector-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 2px; }
+.inspector-actions { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 2px; }
 #inspectorEditActions, #inspectorAddPanel .inspector-actions { grid-template-columns: 1fr 1fr; }
-.inspector-actions button { min-height: 36px; border-radius: 8px; }
-.inspector-actions #editNodeButton { height: 38px; }
+.inspector-actions button { min-height: 32px; height: 32px; border-radius: 7px; font-size: 13px; }
+.inspector-actions #editNodeButton { height: 32px; }
 .flow-node-actions { display: contents; }
 .flow-operation { border-color: var(--blue); color: var(--blue); }
 .flow-operation:hover { background: #eef3ff; }
