@@ -1333,8 +1333,8 @@
 
     function applyTransform() {
         stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-        $("#zoomValue").value = `${Math.round(scale * 100)}%`;
-        $("#zoomValue").textContent = `${Math.round(scale * 100)}%`;
+        const zoomInput = $("#zoomValue");
+        if (document.activeElement !== zoomInput) zoomInput.value = `${Math.round(scale * 100)}%`;
     }
 
     function setZoom(nextScale, originX = viewport.clientWidth / 2, originY = viewport.clientHeight / 2) {
@@ -1452,16 +1452,35 @@
     });
     $("#zoomOutButton").addEventListener("click", () => setZoom(scale - .1));
     $("#zoomInButton").addEventListener("click", () => setZoom(scale + .1));
-    $("#fitButton").addEventListener("click", fitTree);
-    $("#resetButton").addEventListener("click", async () => {
-        if (!(await openConfirm("恢复初始示例树？当前修改将丢失。", { title: "重置示例", confirmLabel: "重置" }))) return;
-        tree = sampleTree();
-        selectedId = null;
-        ruleJudgeId = null;
-        ruleSelectedId = null;
-        nextId = 44;
-        render({ preserveView: false });
+    const zoomInput = $("#zoomValue");
+    const revertZoomInput = () => { zoomInput.value = `${Math.round(scale * 100)}%`; };
+    const applyZoomInput = () => {
+        const pct = parseFloat(String(zoomInput.value).replace(/[^0-9.]/g, ""));
+        if (Number.isFinite(pct) && pct > 0) setZoom(pct / 100);
+        revertZoomInput();
+    };
+    zoomInput.addEventListener("focus", () => zoomInput.select());
+    zoomInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { event.preventDefault(); applyZoomInput(); zoomInput.blur(); }
+        else if (event.key === "Escape") { event.preventDefault(); revertZoomInput(); zoomInput.blur(); }
     });
+    zoomInput.addEventListener("blur", applyZoomInput);
+    $("#fitButton").addEventListener("click", fitTree);
+    $("#collapseAllButton").addEventListener("click", () => {
+        walk(tree, (node) => { if (!["J", "ROOT"].includes(node.type) && node.children.length) node.collapsed = true; });
+        render({ preserveView: true });
+    });
+    $("#expandAllButton").addEventListener("click", () => {
+        walk(tree, (node) => { node.collapsed = false; });
+        render({ preserveView: true });
+    });
+    function setInspectorCollapsed(collapsed) {
+        document.querySelector(".workspace").classList.toggle("inspector-collapsed", collapsed);
+        $("#inspectorExpand").hidden = !collapsed;
+        if (fitMode) requestAnimationFrame(fitTree);
+    }
+    $("#inspectorCollapse").addEventListener("click", () => setInspectorCollapsed(true));
+    $("#inspectorExpand").addEventListener("click", () => setInspectorCollapsed(false));
     $("#deleteButton").addEventListener("click", deleteSelected);
     $("#editNodeButton").addEventListener("click", () => {
         const found = findNode(selectedId);
