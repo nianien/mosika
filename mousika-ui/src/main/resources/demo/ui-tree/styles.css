@@ -392,17 +392,6 @@ dialog.rule-dialog {
     padding: 7px 10px; border: 1px solid #e8edf4; border-radius: 7px; background: #f7f9fc;
     color: #2b3a54; font-size: 12px; font-weight: 500;
 }
-.rule-context-section { display: grid; gap: 11px; }
-.rule-add-heading { display: flex; align-items: center; justify-content: space-between; }
-.rule-add-heading strong { color: #765116; font-size: 12px; }
-.rule-add-heading .icon-button { min-height: 26px; height: 26px; }
-.rule-current-reference {
-    display: grid; gap: 3px; padding: 9px 10px; border: 1px solid #ead9ad; border-radius: 7px; background: #fff;
-}
-.rule-current-reference span { color: #7a879b; font-size: 10px; }
-.rule-current-reference strong { color: #30405e; font-size: 11px; }
-.rule-extend-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.rule-add-fields { display: grid; gap: 11px; }
 .rule-add-rows { display: grid; gap: 8px; }
 .rule-add-row { display: flex; align-items: center; gap: 6px; }
 .rule-add-row > select, .rule-add-row > .detail-value { flex: 1; min-width: 0; }
