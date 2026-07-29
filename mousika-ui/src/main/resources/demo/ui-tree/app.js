@@ -96,6 +96,7 @@
 
     let tree = sampleTree();
     let selectedId = null;
+    let docStatus = "draft";
     let inspectorEditingField = null;
     let nextId = 44;
     let addRelation = null;
@@ -345,12 +346,15 @@
                 ? `${type.name} · ${flowNodeDisplayName(node)}`
                 : (flowNodeName(node) ? `${type.name} · ${flowNodeName(node)}` : type.name));
         const canCollapse = node.type !== "J" && Boolean(node.children.length);
+        const jNegated = node.type === "J" && Boolean(judgeParts(node).rule?.negated);
+        const negateBadge = jNegated ? `<span class="negate-badge" title="取反">!</span>` : "";
         const nodeShell = `
             <div class="node-shell${canCollapse ? " has-fold-toggle" : ""}"${reorderable ? ' data-reorderable="1"' : ""} data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
-                    <div class="node-card ${cardKind}" title="${escapeText(cardTitle)}">
+                    <div class="node-card ${cardKind}${jNegated ? " is-negated" : ""}" title="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
                     </div>
+                    ${negateBadge}
                     ${canCollapse ? `<button class="node-fold-toggle" type="button" data-action="collapse" title="${collapsed ? "展开分支" : "折叠分支"}" aria-label="${collapsed ? "展开" : "收起"}">${collapsed ? "+" : "−"}</button>` : ""}
                     ${collapsedBadge}
                 </div>`;
@@ -611,13 +615,15 @@
         const children = node.children.length
             ? `<div class="rule-children">${node.children.map((child) => renderRuleBranch(child, node)).join("")}</div>` : "";
         const title = type.kind === "structure" ? compactStructureLabel(node, type) : ruleNodeDisplayName(node);
+        const negateBadge = node.negated ? `<span class="negate-badge" title="取反">!</span>` : "";
         return `
             <div class="rule-branch" data-rule-branch-id="${node.id}">
                 <div class="node-shell"${reorderable ? ' data-reorderable="1"' : ""} data-rule-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${ruleSelectedId === node.id}">
-                    <div class="node-card ${type.kind} node-type-${node.type.toLowerCase()}" aria-label="${escapeText(`${type.name} · ${ruleNodeDisplayName(node)}`)}">
+                    <div class="node-card ${type.kind} node-type-${node.type.toLowerCase()}${node.negated ? " is-negated" : ""}" aria-label="${escapeText(`${node.negated ? "取反 · " : ""}${type.name} · ${ruleNodeDisplayName(node)}`)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
                     </div>
+                    ${negateBadge}
                 </div>
                 ${children}
             </div>`;
@@ -782,6 +788,8 @@
         $("#ruleNodeExpression").readOnly = true;
         $("#ruleEditorSubrulesField").hidden = false;
         renderRuleEditorSubrules();
+        $("#ruleNegateField").hidden = false;
+        $("#ruleNegateInput").checked = !!node.negated;
         $("#ruleAddPanel").hidden = true;
         $("#ruleEditorFooter").hidden = false;
         $("#ruleEditorDeleteButton").disabled = !canDeleteRule(found);
@@ -1007,6 +1015,7 @@
         $("#ruleEditorHeading").innerHTML = "";
         $("#ruleEditorSubrulesField").hidden = true;
         $("#ruleEditorLogicField").hidden = true;
+        $("#ruleNegateField").hidden = true;
         $("#ruleReferenceField").hidden = true;
         $("#ruleAddTitle").textContent = "配置根规则";
         ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
@@ -1227,6 +1236,7 @@
         $("#inspectorAddPanel").hidden = true;
         fitMode = false;
         render({ preserveView: true });
+        markDraft();
         return node;
     }
 
@@ -1259,6 +1269,7 @@
         $("#inspectorAddPanel").hidden = true;
         fitMode = false;
         render({ preserveView: true });
+        markDraft();
         return node;
     }
 
@@ -1277,6 +1288,7 @@
         current.parent.children = current.parent.children.filter((child) => child.id !== current.node.id);
         selectedId = current.parent.id;
         render({ preserveView: true });
+        markDraft();
     }
 
     function toggleCollapse() {
@@ -1285,6 +1297,109 @@
         if (!found.node.children.length) return;
         found.node.collapsed = !found.node.collapsed;
         render({ preserveView: true });
+    }
+
+    function updateDocStatus() {
+        const textEl = $("#docStatusText");
+        const pill = $("#docStatus");
+        if (!textEl || !pill) return;
+        textEl.textContent = docStatus === "formal" ? "已生效" : "草稿";
+        pill.classList.toggle("status-formal", docStatus === "formal");
+    }
+
+    function markDraft() {
+        if (docStatus !== "draft") {
+            docStatus = "draft";
+            updateDocStatus();
+        }
+    }
+
+    function saveDraft() {
+        docStatus = "draft";
+        updateDocStatus();
+        const pill = $("#docStatus");
+        if (pill) {
+            pill.classList.remove("status-pulse");
+            void pill.offsetWidth;
+            pill.classList.add("status-pulse");
+        }
+    }
+
+    function collectViolations() {
+        const problems = [];
+        walk(tree, (node) => {
+            if (node.type !== "D") return true;
+            const decisions = node.children.filter((child) => child.relation === "decision");
+            const hasDefault = node.children.some((child) => child.relation === "default");
+            if (decisions.length < 1 || decisions.length + (hasDefault ? 1 : 0) < 2) {
+                problems.push({
+                    id: node.id,
+                    name: flowNodeDisplayName(node),
+                    reason: "分支节点至少需要两个结果（决策分支 + 可选默认分支）"
+                });
+            }
+            decisions.forEach((branch) => {
+                if (!branch.children.some((child) => child.relation === "action")) {
+                    problems.push({
+                        id: branch.id,
+                        name: flowNodeDisplayName(branch),
+                        reason: "决策分支未配置命中流程"
+                    });
+                }
+            });
+            return true;
+        });
+        return problems;
+    }
+
+    function openValidateDialog(problems) {
+        $("#validateSummary").textContent = `发现 ${problems.length} 处结构问题，修正后才能生效：`;
+        $("#validateList").innerHTML = problems.map((problem) => `
+            <li>
+                <button type="button" class="validate-item" data-locate="${escapeText(problem.id)}">
+                    <span class="validate-item-name">${escapeText(problem.name)}</span>
+                    <span class="validate-item-reason">${escapeText(problem.reason)}</span>
+                </button>
+            </li>`).join("");
+        const dialog = $("#validateDialog");
+        if (!dialog.open) dialog.showModal();
+    }
+
+    function promoteToFormal() {
+        const problems = collectViolations();
+        if (problems.length === 0) {
+            docStatus = "formal";
+            updateDocStatus();
+            return;
+        }
+        openValidateDialog(problems);
+    }
+
+    function revealNode(id) {
+        const path = [];
+        const found = (function locate(node) {
+            path.push(node);
+            if (node.id === id) return true;
+            for (const child of node.children) {
+                if (locate(child)) return true;
+            }
+            path.pop();
+            return false;
+        })(tree);
+        if (!found) return;
+        path.slice(0, -1).forEach((ancestor) => { ancestor.collapsed = false; });
+        fitMode = false;
+        render({ preserveView: true });
+        selectNode(id);
+        requestAnimationFrame(() => {
+            const shell = treeRoot.querySelector(`[data-node-id="${id}"]`);
+            if (!shell) return;
+            const shellRect = shell.getBoundingClientRect();
+            const viewRect = viewport.getBoundingClientRect();
+            panX += (viewRect.left + viewRect.width / 2) - (shellRect.left + shellRect.width / 2);
+            panY += (viewRect.top + viewRect.height / 2) - (shellRect.top + shellRect.height / 2);
+            applyTransform();
+        });
     }
 
     function applyTransform() {
@@ -1437,6 +1552,16 @@
     }
     $("#inspectorCollapse").addEventListener("click", () => setInspectorCollapsed(true));
     $("#inspectorExpand").addEventListener("click", () => setInspectorCollapsed(false));
+    $("#saveDraftButton").addEventListener("click", saveDraft);
+    $("#promoteButton").addEventListener("click", promoteToFormal);
+    $("#validateCloseButton").addEventListener("click", () => $("#validateDialog").close());
+    $("#validateDismissButton").addEventListener("click", () => $("#validateDialog").close());
+    $("#validateList").addEventListener("click", (event) => {
+        const item = event.target.closest("[data-locate]");
+        if (!item) return;
+        $("#validateDialog").close();
+        revealNode(item.dataset.locate);
+    });
     $("#deleteButton").addEventListener("click", deleteSelected);
     $("#editNodeButton").addEventListener("click", () => {
         const found = findNode(selectedId);
@@ -1517,8 +1642,16 @@
         if (event.target.closest("[data-rulelogic-confirm]")) { confirmRuleLogicEdit(); return; }
         if (event.target.closest("[data-rulelogic-cancel]")) { cancelRuleLogicEdit(); return; }
     });
+    $("#ruleNegateInput").addEventListener("change", (event) => {
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node) return;
+        node.negated = event.target.checked;
+        renderRuleTree();
+        render({ preserveView: true });
+    });
     ruleDialog.addEventListener("cancel", () => { ruleDialogCommitted = false; });
     ruleDialog.addEventListener("close", () => {
+        const committed = ruleDialogCommitted;
         if (!ruleDialogCommitted && ruleDialogSnapshot && ruleJudgeId) {
             const found = findNode(ruleJudgeId);
             if (found) found.node.children = ruleDialogSnapshot;
@@ -1529,6 +1662,7 @@
         ruleSelectedId = null;
         hideRulePopover();
         render({ preserveView: true });
+        if (committed) markDraft();
     });
 
     document.addEventListener("pointerdown", (event) => {
@@ -1727,6 +1861,7 @@
             inspectorEditingField = null;
             fitMode = false;
             render({ preserveView: true });
+            markDraft();
         }
     });
 
@@ -1751,4 +1886,5 @@
 
     new ResizeObserver(() => { if (fitMode) fitTree(); }).observe(viewport);
     render({ preserveView: false });
+    updateDocStatus();
 })();

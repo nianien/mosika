@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <title>Mousika 规则树编辑器</title>
-    <link rel="stylesheet" href="styles.css?v=20260729-167">
+    <link rel="stylesheet" href="styles.css?v=20260729-175">
 </head>
 <body>
 <main class="app-shell">
@@ -35,7 +35,9 @@
                 <div class="canvas-tools">
                     <button id="collapseAllButton" type="button">折叠全部</button>
                     <button id="expandAllButton" type="button">展开全部</button>
-                    <span class="status"><i></i> 本地草稿</span>
+                    <button id="saveDraftButton" type="button">保存草稿</button>
+                    <button id="promoteButton" class="primary" type="button">生效</button>
+                    <span class="status" id="docStatus"><i></i> <span id="docStatusText">草稿</span></span>
                 </div>
             </div>
             <div class="tree-viewport" id="treeViewport" tabindex="0" aria-label="可缩放规则树画布">
@@ -118,6 +120,20 @@
     </form>
 </dialog>
 
+<dialog id="validateDialog">
+    <div class="dialog-heading">
+        <div>
+            <h2>结构校验</h2>
+        </div>
+        <button class="icon-button" id="validateCloseButton" aria-label="关闭" type="button">×</button>
+    </div>
+    <p class="confirm-message" id="validateSummary"></p>
+    <ul class="validate-list" id="validateList"></ul>
+    <div class="dialog-actions">
+        <button id="validateDismissButton" type="button">关闭</button>
+    </div>
+</dialog>
+
 <dialog id="ruleDialog" class="rule-dialog">
     <div class="rule-dialog-shell">
         <header class="rule-dialog-header">
@@ -149,6 +165,15 @@
                 <div class="rule-editor-panel" id="ruleEditorPanel" hidden>
                     <div class="inspector-heading rule-editor-heading" id="ruleEditorHeading"></div>
                     <div class="detail-field" id="ruleEditorLogicField" data-field="rulelogic" hidden></div>
+                    <div class="detail-field rule-negate-field" id="ruleNegateField" hidden>
+                        <span class="detail-label">取反</span>
+                        <label class="rule-negate-row">
+                            <span class="switch">
+                                <input type="checkbox" id="ruleNegateInput">
+                                <span class="switch-track"></span>
+                            </span>
+                        </label>
+                    </div>
                     <div class="rule-subrules-field" id="ruleEditorSubrulesField">
                         <span class="detail-label" id="ruleEditorSubrulesLabel">规则</span>
                         <div class="rule-add-rows" id="ruleEditorSubrules"></div>
@@ -216,6 +241,6 @@
     </form>
 </dialog>
 
-<script src="app.js?v=20260729-167"></script>
+<script src="app.js?v=20260729-175"></script>
 </body>
 </html>

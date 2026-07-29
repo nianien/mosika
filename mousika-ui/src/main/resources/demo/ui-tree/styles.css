@@ -105,8 +105,15 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .canvas-titlebar div { display: flex; align-items: baseline; gap: 10px; }
 .canvas-titlebar strong { color: #33415d; font-size: 13px; }
-.status { display: flex; align-items: center; gap: 6px; }
-.status i { width: 7px; height: 7px; border-radius: 50%; background: #d88916; box-shadow: 0 0 0 3px #fbeccd; }
+.status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; margin-left: 6px;
+    border-radius: 999px;
+    background: #fff5df; color: #8a5a06;
+    font-size: 12px; font-weight: 500; line-height: 1;
+    transition: background .2s, color .2s;
+}
+.status i { width: 7px; height: 7px; border-radius: 50%; background: #f0a835; }
 
 .tree-viewport { position: relative; overflow: hidden; background: #fff; cursor: grab; touch-action: none; }
 .tree-viewport.dragging { cursor: grabbing; }
@@ -494,3 +501,45 @@ dialog.rule-dialog {
     background: #94a3b8;
     box-shadow: 0 6px 16px rgba(148,163,184,.3);
 }
+
+/* 文档状态：已生效 */
+.status.status-formal { background: #e6f6ed; color: #0f7a53; }
+.status.status-formal i { background: #22c07a; }
+@keyframes status-pulse-kf {
+    0% { box-shadow: 0 0 0 0 rgba(34,192,122,.55); }
+    60% { box-shadow: 0 0 0 8px rgba(34,192,122,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,192,122,0); }
+}
+.status.status-pulse { animation: status-pulse-kf .8s ease-out; }
+
+/* 结构校验问题清单 */
+.validate-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+.validate-item {
+    width: 100%; display: grid; gap: 3px; padding: 9px 11px; text-align: left;
+    border: 1px solid #f0d6a8; border-left: 3px solid #e6a23c; border-radius: 8px;
+    background: #fffaf0; cursor: pointer;
+}
+.validate-item:hover { background: #fff3dc; border-color: #e6a23c; }
+.validate-item-name { color: #30405e; font-size: 13px; font-weight: 600; }
+.validate-item-reason { color: #9a6a1a; font-size: 12px; }
+
+/* 取反（非）标记与开关 */
+.negate-badge {
+    position: absolute; top: -8px; right: -8px;
+    width: 18px; height: 18px; padding: 0;
+    border-radius: 50%; background: #e0575f; color: #fff;
+    font-size: 12px; font-weight: 800; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px #fff, 0 2px 4px rgba(224,87,95,.35);
+    margin: 0; z-index: 5; pointer-events: none;
+}
+.rule-negate-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.switch { position: relative; display: inline-flex; width: 36px; height: 20px; flex: 0 0 auto; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.switch-track { pointer-events: none; flex: 1; border-radius: 999px; background: #cdd6e4; transition: background .15s; }
+.switch-track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(20,40,80,.25); transition: left .15s;
+}
+.switch input:checked ~ .switch-track { background: #e0575f; }
+.switch input:checked ~ .switch-track::after { left: 18px; }
