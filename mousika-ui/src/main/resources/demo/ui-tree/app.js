@@ -293,8 +293,16 @@
         if (["S", "P"].includes(parent.type) && node.relation === "branch") {
             return parent.children.filter((child) => child.relation === "branch").length > 1;
         }
-        if (parent.type === "D" && node.relation === "decision") {
-            return parent.children.filter((child) => child.relation === "decision").length > 1;
+        if (parent.type === "D") {
+            const decisions = parent.children.filter((child) => child.relation === "decision").length;
+            const hasDefault = parent.children.some((child) => child.relation === "default");
+            if (node.relation === "decision") {
+                const remaining = decisions - 1;
+                return remaining >= 1 && remaining + (hasDefault ? 1 : 0) >= 2;
+            }
+            if (node.relation === "default") {
+                return decisions >= 2;
+            }
         }
         return true;
     }
@@ -626,6 +634,7 @@
 
     function canDeleteRule(found) {
         if (!found) return false;
+        if (found.parent?.type === "J") return false;
         if (found.parent?.type === "H" && found.parent.children.length <= 1) return false;
         return true;
     }
@@ -803,7 +812,9 @@
         $("#ruleEditorDeleteButton").disabled = !canDeleteRule(found);
         $("#ruleEditorDeleteButton").title = canDeleteRule(found)
             ? ""
-            : "组合规则至少需要保留两个子规则，不能直接删除";
+            : (found.parent?.type === "J"
+                ? "判断节点必须保留根规则，不能删除"
+                : "组合规则至少需要保留两个子规则，不能直接删除");
     }
 
     function enterRuleEditorEditMode() {
@@ -861,7 +872,8 @@
     }
 
     function updateRuleEditorDirtyState() {
-        $("#ruleEditorSaveButton").disabled = !ruleEditorHasUnsavedChanges();
+        const saveButton = $("#ruleEditorSaveButton");
+        if (saveButton) saveButton.disabled = !ruleEditorHasUnsavedChanges();
     }
 
     function addRuleEditorSubrule() {
@@ -1718,10 +1730,9 @@
         const node = currentEditingNode();
         if (!node) return;
         const idx = Number(select.dataset.subruleSelect);
-        const child = node.children[idx];
-        if (child && child.type === "R") {
-            child.expression = select.value;
-            syncDraftFromNode(node);
+        const target = node.type === "R" ? node : node.children[idx];
+        if (target && target.type === "R") {
+            target.expression = select.value;
             renderRuleTree();
             render({ preserveView: true });
         }

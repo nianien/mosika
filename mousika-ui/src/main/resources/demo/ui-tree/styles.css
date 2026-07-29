@@ -392,16 +392,6 @@ dialog.rule-dialog {
     padding: 7px 10px; border: 1px solid #e8edf4; border-radius: 7px; background: #f7f9fc;
     color: #2b3a54; font-size: 12px; font-weight: 500;
 }
-.rule-context-popover {
-    position: absolute; z-index: 20; width: min(300px, calc(100% - 24px)); max-height: calc(100% - 56px); overflow: auto;
-    padding: 14px; border: 1px solid #e1c783; border-radius: 11px; background: #fffaf0;
-    box-shadow: 0 16px 42px rgba(86,66,28,.18);
-}
-.rule-context-popover.menu-mode {
-    width: min(180px, calc(100% - 24px)); padding: 6px;
-    border-color: #d9e0eb; border-radius: 8px; background: #fff;
-    box-shadow: 0 12px 32px rgba(35,46,70,.18);
-}
 .rule-context-section { display: grid; gap: 11px; }
 .rule-add-heading { display: flex; align-items: center; justify-content: space-between; }
 .rule-add-heading strong { color: #765116; font-size: 12px; }
@@ -431,13 +421,6 @@ dialog.rule-dialog {
 }
 .rule-radio-group input:checked + span { color: #365bc0; border-color: #7894ef; background: #eef3ff; }
 .rule-radio-group input:focus-visible + span { outline: 2px solid #7894ef; outline-offset: 2px; }
-.rule-action-menu { display: grid; gap: 5px; }
-.rule-action-menu button {
-    width: 100%; min-height: 31px; padding: 0 9px; border: 0;
-    text-align: left; white-space: nowrap;
-}
-.rule-action-menu button:hover { color: #365bc0; background: #f0f4ff; }
-.rule-action-menu button.danger { margin-top: 3px; }
 
 @media (max-width: 1050px) {
     .toolbar button { padding: 0 8px; }
