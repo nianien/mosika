@@ -623,7 +623,6 @@
 
     function canDeleteRule(found) {
         if (!found) return false;
-        if (found.parent?.type === "L" && found.parent.children.length <= 2) return false;
         if (found.parent?.type === "H" && found.parent.children.length <= 1) return false;
         return true;
     }
@@ -664,56 +663,107 @@
         const active = ruleEditorEditing && ruleEditorDraftState;
         const name = active ? ruleEditorDraftState.name : (node.name?.trim() || "");
         const fallback = ruleNodeDisplayName(node);
-        const typeChip = `<span class="inspector-type">${escapeText(node.type === "R" ? "规则" : TYPES[node.type].name)}</span>`;
         if (active) {
-            container.innerHTML = `<div class="rule-heading-edit">
-                <input id="ruleAliasInput" maxlength="28" autocomplete="off" value="${escapeText(name)}" placeholder="${escapeText(fallback)}">
-            </div>
-            ${typeChip}`;
+            container.innerHTML = `<strong>节点属性</strong>`;
         } else {
-            container.innerHTML = `<div class="rule-heading-view">
-                <strong id="ruleEditorTitle">${escapeText(name || fallback)}</strong>
-            </div>
-            ${typeChip}`;
+            container.innerHTML = `<strong>节点属性</strong>`;
         }
     }
 
     function renderRuleEditorSubrules() {
-        const draft = ruleEditorDraftState;
-        const editing = ruleEditorEditing && draft;
         const container = $("#ruleEditorSubrules");
-        if (editing) {
-            container.innerHTML = draft.refs.map((ref, index) => {
-                if (ref.type !== "R") {
-                    return `<div class="rule-add-row rule-subrule-static">
-                        <span class="detail-value">${escapeText(subruleRowLabel(ref.node))}</span>
-                        <button type="button" data-subrule-remove="${index}" aria-label="删除规则 ${index + 1}" ${draft.refs.length <= 1 ? "disabled" : ""}>×</button>
-                    </div>`;
-                }
-                return `<div class="rule-add-row">
-                    <select data-subrule-select="${index}">
-                        ${RULE_DEFINITIONS.map((definition) => `<option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ref.ruleId ? "selected" : ""}>${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`).join("")}
-                    </select>
-                    <button type="button" data-subrule-remove="${index}" aria-label="删除规则 ${index + 1}" ${draft.refs.length <= 1 ? "disabled" : ""}>×</button>
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node) { container.innerHTML = ""; $("#ruleEditorAddRuleButton").hidden = true; renderRuleLogicField(); return; }
+        const refs = ruleNodeSubrules(node);
+        const canReorder = node.type === "L";
+        container.innerHTML = refs.map((child, index) => {
+            const lastIndex = refs.length - 1;
+            const activeClass = child.id === highlightedRuleRowId ? " rule-row-active" : "";
+            const moveButtons = canReorder ? `
+                <button type="button" data-subrule-up="${index}" aria-label="上移" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
+                <button type="button" data-subrule-down="${index}" aria-label="下移" title="下移" ${index === lastIndex ? "disabled" : ""}>↓</button>
+            ` : "";
+            if (child.type !== "R") {
+                return `<div class="rule-add-row rule-subrule-static${activeClass}">
+                    <span class="detail-value">${escapeText(subruleRowLabel(child))}</span>
+                    ${moveButtons}
                 </div>`;
-            }).join("");
-        } else {
-            const node = findRuleNode(ruleSelectedId)?.node;
-            const subrules = node ? ruleNodeSubrules(node) : [];
-            container.innerHTML = subrules.map((child) => `
-                <div class="rule-subrule-view"><span class="detail-value">${escapeText(subruleRowLabel(child))}</span></div>
-            `).join("");
+            }
+            return `<div class="rule-add-row${activeClass}">
+                <select data-subrule-select="${index}">
+                    ${RULE_DEFINITIONS.map((definition) => `<option value="${escapeText(definition.ruleId)}" ${definition.ruleId === child.expression ? "selected" : ""}>${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`).join("")}
+                </select>
+                ${moveButtons}
+            </div>`;
+        }).join("");
+        $("#ruleEditorAddRuleButton").hidden = !["L", "H"].includes(node.type);
+        renderRuleLogicField();
+    }
+
+    let ruleLogicEditing = false;
+    let highlightedRuleRowId = null;
+
+    function renderRuleLogicField() {
+        const container = $("#ruleEditorLogicField");
+        if (!container) return;
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node || node.type === "H") { container.hidden = true; return; }
+        container.hidden = false;
+        // 原子节点与逻辑节点不可互换，节点类型仅在“逻辑与/逻辑或”之间切换
+        if (node.type === "R") {
+            ruleLogicEditing = false;
+            container.className = "detail-field";
+            container.innerHTML = `<span class="detail-label">节点类型</span>
+                <div class="field-row"><span class="detail-value">原子节点</span></div>`;
+            return;
         }
-        const count = editing ? draft.refs.length : (findRuleNode(ruleSelectedId)?.node ? ruleNodeSubrules(findRuleNode(ruleSelectedId).node).length : 0);
-        const selectedNode = editing
-            ? findRuleNode(ruleEditorDraftNodeId)?.node
-            : findRuleNode(ruleSelectedId)?.node;
-        const showsLogic = count >= 2 && selectedNode?.type !== "H";
-        $("#ruleEditorAddRuleButton").hidden = !editing;
-        $("#ruleEditorLogicField").hidden = !showsLogic;
+        const label = node.expression === "||" ? "逻辑或" : "逻辑与";
+        const canEdit = !ruleEditorEditing; // 编辑规则(改子规则)期间不并行改类型
+        container.className = "detail-field" + (canEdit ? " editable" : "") + (ruleLogicEditing ? " field-editing" : "");
+        const pencil = `<button class="field-edit" type="button" data-rulelogic-edit aria-label="编辑" title="编辑">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
+        </button>`;
+        const confirmCancel = `<div class="field-edit-actions">
+            <button class="field-confirm" type="button" data-rulelogic-confirm aria-label="确认" title="确认"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></button>
+            <button class="field-cancel" type="button" data-rulelogic-cancel aria-label="取消" title="取消"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>`;
+        container.innerHTML = `<span class="detail-label">节点类型</span>
+            <div class="field-row">
+                <span class="detail-value">${label}</span>
+                ${(canEdit && !ruleLogicEditing) ? pencil : ""}
+                <select class="field-control" id="ruleLogicSelect">
+                    <option value="&&" ${node.expression !== "||" ? "selected" : ""}>逻辑与</option>
+                    <option value="||" ${node.expression === "||" ? "selected" : ""}>逻辑或</option>
+                </select>
+                ${ruleLogicEditing ? confirmCancel : ""}
+            </div>`;
+    }
+
+    function beginRuleLogicEdit() {
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node || node.type !== "L" || ruleEditorEditing) return;
+        ruleLogicEditing = true;
+        renderRuleLogicField();
+    }
+
+    function confirmRuleLogicEdit() {
+        const found = findRuleNode(ruleSelectedId);
+        if (!found || found.node.type !== "L") { ruleLogicEditing = false; renderRuleLogicField(); return; }
+        found.node.expression = $("#ruleLogicSelect")?.value === "||" ? "||" : "&&";
+        ruleLogicEditing = false;
+        renderRuleLogicField();
+        renderRuleTree();
+        render({ preserveView: true });
+    }
+
+    function cancelRuleLogicEdit() {
+        ruleLogicEditing = false;
+        renderRuleLogicField();
     }
 
     function updateRuleEditor() {
+        ruleLogicEditing = false;
+        highlightedRuleRowId = null;
         const found = findRuleNode(ruleSelectedId);
         const empty = $("#ruleEditorEmpty");
         const panel = $("#ruleEditorPanel");
@@ -738,20 +788,15 @@
         $("#ruleReferenceField").hidden = !isHits;
         $("#ruleNodeExpression").value = isHits ? (node.expression || "") : "";
         $("#ruleNodeExpression").readOnly = true;
-        if (["&&", "||"].includes(node.expression)) {
-            document.querySelector(`input[name="ruleEditorLogic"][value="${node.expression === "||" ? "||" : "&&"}"]`).checked = true;
-        }
         $("#ruleEditorSubrulesField").hidden = false;
         renderRuleEditorSubrules();
-        $("#ruleEditorEditActions").hidden = true;
-        $("#ruleEditorSaveButton").disabled = true;
-        $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = true; });
+        $("#ruleEditorEditActions")?.setAttribute("hidden", "");
+        $("#ruleEditorSaveButton") && ($("#ruleEditorSaveButton").disabled = true);
+        const toggleBtn = $("#ruleEditorEditToggleButton");
+        if (toggleBtn) toggleBtn.textContent = "编辑规则";
         $("#ruleAddPanel").hidden = true;
-        $("#ruleEditorViewActions").hidden = false;
+        $("#ruleEditorViewActions")?.removeAttribute("hidden");
         $("#ruleEditorFooter").hidden = false;
-        const canInsertSibling = ["L", "H"].includes(found.parent?.type);
-        $("#ruleViewBefore").hidden = !canInsertSibling;
-        $("#ruleViewAfter").hidden = !canInsertSibling;
         $("#ruleEditorDeleteButton").disabled = !canDeleteRule(found);
         $("#ruleEditorDeleteButton").title = canDeleteRule(found)
             ? ""
@@ -774,12 +819,12 @@
         };
         renderRuleEditorHeading(node);
         $("#ruleNodeExpression").readOnly = node.type !== "H";
-        document.querySelector(`input[name="ruleEditorLogic"][value="${ruleEditorDraftState.logic === "||" ? "||" : "&&"}"]`).checked = true;
-        $("#ruleEditorLogicField").querySelectorAll("input").forEach((input) => { input.disabled = false; });
         renderRuleEditorSubrules();
-        $("#ruleEditorEditActions").hidden = false;
-        $("#ruleEditorViewActions").hidden = true;
-        $("#ruleEditorFooter").hidden = true;
+        $("#ruleEditorEditActions")?.setAttribute("hidden", "");
+        const toggleBtn = $("#ruleEditorEditToggleButton");
+        if (toggleBtn) toggleBtn.textContent = "完成编辑";
+        $("#ruleEditorViewActions")?.removeAttribute("hidden");
+        $("#ruleEditorFooter").hidden = false;
         $("#ruleAddPanel").hidden = true;
         updateRuleEditorDirtyState();
     }
@@ -791,9 +836,8 @@
             const index = Number(select.dataset.subruleSelect);
             if (draft.refs[index]?.type === "R") draft.refs[index].ruleId = select.value;
         });
-        const checkedLogic = document.querySelector('input[name="ruleEditorLogic"]:checked');
-        draft.logic = checkedLogic ? checkedLogic.value : "&&";
-        draft.name = $("#ruleAliasInput")?.value.trim() || "";
+        const aliasInput = $("#ruleAliasInput");
+        if (aliasInput) draft.name = aliasInput.value.trim();
         if ($("#ruleNodeExpression").readOnly === false) draft.hitsExpr = $("#ruleNodeExpression").value.trim();
     }
 
@@ -825,13 +869,118 @@
         updateRuleEditorDirtyState();
     }
 
+    function currentEditingNode() {
+        return findRuleNode(ruleSelectedId)?.node || null;
+    }
+
+    function syncDraftFromNode() { /* draft removed; no-op */ }
+
     function removeRuleEditorSubrule(index) {
-        const draft = ruleEditorDraftState;
-        if (!draft || draft.refs.length <= 1 || index < 0 || index >= draft.refs.length) return;
-        readRuleEditorDraft();
-        draft.refs.splice(index, 1);
+        const node = currentEditingNode();
+        if (!node || index < 0 || index >= node.children.length) return;
+        if (node.type === "L" && node.children.length <= 2) {
+            // 与/或 组合删到只剩 1 条：整体退化为幸存子规则
+            const survivor = node.children[index === 0 ? 1 : 0];
+            const grand = findRuleNode(node.id);
+            const grandparent = grand ? grand.parent : currentRuleJudge();
+            const idx = grandparent.children.findIndex((c) => c.id === node.id);
+            if (idx >= 0) grandparent.children.splice(idx, 1, survivor);
+            survivor.relation = "rule";
+            ruleSelectedId = survivor.id;
+            renderRuleTree();
+            updateRuleEditor();
+            render({ preserveView: true });
+            return;
+        }
+        node.children.splice(index, 1);
+        syncDraftFromNode(node);
+        renderRuleTree();
         renderRuleEditorSubrules();
-        updateRuleEditorDirtyState();
+        render({ preserveView: true });
+    }
+
+    function moveRuleEditorSubrule(index, direction) {
+        const node = currentEditingNode();
+        if (!node) return;
+        const target = index + direction;
+        if (index < 0 || index >= node.children.length || target < 0 || target >= node.children.length) return;
+        [node.children[index], node.children[target]] = [node.children[target], node.children[index]];
+        highlightedRuleRowId = node.children[target].id;
+        renderRuleTree();
+        renderRuleEditorSubrules();
+        render({ preserveView: true });
+        requestAnimationFrame(() => {
+            const same = direction < 0 ? `[data-subrule-up="${target}"]` : `[data-subrule-down="${target}"]`;
+            const other = direction < 0 ? `[data-subrule-down="${target}"]` : `[data-subrule-up="${target}"]`;
+            const sameBtn = document.querySelector(`#ruleEditorSubrules ${same}`);
+            const otherBtn = document.querySelector(`#ruleEditorSubrules ${other}`);
+            const pick = sameBtn && !sameBtn.disabled ? sameBtn : (otherBtn && !otherBtn.disabled ? otherBtn : null);
+            pick?.focus();
+        });
+    }
+
+    // ---- Composite builder (inline within L editor) ----
+    let ruleCompositeRuleIds = [];
+
+    function openCompositeBuilder() {
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node || !["L", "H"].includes(node.type)) return;
+        ruleCompositeRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
+        document.querySelector('input[name="ruleCompositeLogic"][value="&&"]').checked = true;
+        renderCompositeRows();
+        document.getElementById("ruleAddDialog").showModal();
+    }
+
+    function renderCompositeRows() {
+        const container = $("#ruleCompositeRows");
+        container.innerHTML = ruleCompositeRuleIds.map((ruleId, index) => `
+            <div class="rule-add-row">
+                <select data-composite-select="${index}">
+                    ${RULE_DEFINITIONS.map((d) => `<option value="${escapeText(d.ruleId)}" ${d.ruleId === ruleId ? "selected" : ""}>${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("")}
+                </select>
+                <button type="button" data-composite-remove="${index}" aria-label="删除" ${ruleCompositeRuleIds.length <= 1 ? "disabled" : ""}>×</button>
+            </div>
+        `).join("");
+        $("#ruleCompositeLogicField").hidden = ruleCompositeRuleIds.length < 2;
+    }
+
+    function appendCompositeRow() {
+        const unused = RULE_DEFINITIONS.find((d) => !ruleCompositeRuleIds.includes(d.ruleId));
+        ruleCompositeRuleIds.push(unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "");
+        renderCompositeRows();
+    }
+
+    function removeCompositeRow(index) {
+        if (ruleCompositeRuleIds.length <= 1 || index < 0 || index >= ruleCompositeRuleIds.length) return;
+        ruleCompositeRuleIds.splice(index, 1);
+        renderCompositeRows();
+    }
+
+    function cancelCompositeBuilder() {
+        ruleCompositeRuleIds = [];
+        document.getElementById("ruleAddDialog").close();
+    }
+
+    function confirmCompositeBuilder() {
+        const node = findRuleNode(ruleSelectedId)?.node;
+        if (!node || ruleCompositeRuleIds.length < 1) return;
+        $("#ruleCompositeRows").querySelectorAll("[data-composite-select]").forEach((select) => {
+            ruleCompositeRuleIds[Number(select.dataset.compositeSelect)] = select.value;
+        });
+        let newNode;
+        if (ruleCompositeRuleIds.length === 1) {
+            newNode = createAtomicRule(ruleCompositeRuleIds[0]);
+        } else {
+            const logic = document.querySelector('input[name="ruleCompositeLogic"]:checked')?.value || "&&";
+            const children = ruleCompositeRuleIds.map((ruleId) => createAtomicRule(ruleId));
+            newNode = { id: `n${nextId++}`, type: "L", name: "", expression: logic, relation: "rule", children };
+        }
+        node.children.push(newNode);
+        document.getElementById("ruleAddDialog").close();
+        ruleCompositeRuleIds = [];
+        renderRuleTree();
+        renderRuleEditorSubrules();
+        render({ preserveView: true });
     }
 
     function saveRuleEditorChanges({ refresh = true } = {}) {
@@ -925,7 +1074,6 @@
 
     function confirmDiscardRuleEditorChanges() {
         if (!ruleEditorEditing) return true;
-        if (ruleEditorHasUnsavedChanges() && !window.confirm("放弃未保存的修改？")) return false;
         cancelRuleEditorChanges();
         return true;
     }
@@ -939,10 +1087,15 @@
         updateRuleEditor();
     }
 
+    let ruleDialogSnapshot = null;
+    let ruleDialogCommitted = false;
+
     function openRuleDialog(judgeId, { edit = false } = {}) {
         const found = findNode(judgeId);
         if (!found || found.node.type !== "J") return;
         ruleJudgeId = judgeId;
+        ruleDialogSnapshot = JSON.parse(JSON.stringify(found.node.children));
+        ruleDialogCommitted = false;
         ruleSelectedId = judgeParts(found.node).rule?.id || null;
         closeRuleDialogAfterEdit = edit;
         hideRulePopover();
@@ -1050,8 +1203,8 @@
 
         ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
         document.querySelector('input[name="ruleAddLogic"][value="&&"]').checked = true;
-        $("#ruleEditorViewActions").hidden = true;
-        $("#ruleEditorEditActions").hidden = true;
+        $("#ruleEditorViewActions")?.setAttribute("hidden", "");
+        $("#ruleEditorEditActions")?.setAttribute("hidden", "");
         $("#ruleEditorFooter").hidden = true;
         $("#ruleAddPanel").hidden = false;
         renderRuleAddRows(0);
@@ -1117,8 +1270,20 @@
         const message = descendants ? `删除「${name}」及其 ${descendants} 个子规则？` : `删除「${name}」？`;
         if (!(await openConfirm(message, { title: "确认删除", confirmLabel: "删除" }))) return;
         hideRulePopover();
-        found.parent.children = found.parent.children.filter((child) => child.id !== found.node.id);
-        ruleSelectedId = ["L", "H"].includes(found.parent.type) ? found.parent.id : null;
+        const parent = found.parent;
+        parent.children = parent.children.filter((child) => child.id !== found.node.id);
+        if (parent.type === "L" && parent.children.length === 1) {
+            // 与/或 组合只剩一条子规则时，自动退化为该子规则
+            const survivor = parent.children[0];
+            const grand = findRuleNode(parent.id);
+            const grandparent = grand ? grand.parent : currentRuleJudge();
+            const index = grandparent.children.findIndex((child) => child.id === parent.id);
+            if (index >= 0) grandparent.children.splice(index, 1, survivor);
+            survivor.relation = "rule";
+            ruleSelectedId = survivor.id;
+        } else {
+            ruleSelectedId = ["L", "H"].includes(parent.type) ? parent.id : null;
+        }
         renderRuleDialog();
         render({ preserveView: true });
     }
@@ -1368,6 +1533,12 @@
         const action = event.target.closest("[data-action]")?.dataset.action;
         if (action === "collapse") toggleCollapse();
     });
+    treeRoot.addEventListener("dblclick", (event) => {
+        const shell = event.target.closest(".node-shell");
+        if (!shell) return;
+        const node = findNode(shell.dataset.nodeId)?.node;
+        if (node?.type === "J") openRuleDialog(node.id);
+    });
 
     treeRoot.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && event.target.matches(".node-shell")) {
@@ -1503,15 +1674,12 @@
     $("#inspectorHeading").addEventListener("keydown", inspectorFieldKeydown);
 
     $("#ruleDialogCloseButton").addEventListener("click", () => {
-        if (confirmDiscardRuleEditorChanges()) ruleDialog.close();
+        ruleDialogCommitted = true;
+        ruleDialog.close();
     });
-    $("#ruleEditorViewActions").addEventListener("click", (event) => {
-        const action = event.target.closest("[data-rule-action]")?.dataset.ruleAction;
-        if (!action) return;
-        if (action === "edit") { enterRuleEditorEditMode(); return; }
-        if (!confirmDiscardRuleEditorChanges()) return;
-        if (action === "before") startRuleAdd("before");
-        else if (action === "after") startRuleAdd("after");
+    $("#ruleDialogCancelButton").addEventListener("click", () => {
+        ruleDialogCommitted = false;
+        ruleDialog.close();
     });
     $("#ruleEditorDeleteButton").addEventListener("click", () => {
         if (!confirmDiscardRuleEditorChanges()) return;
@@ -1530,25 +1698,56 @@
         const button = event.target.closest("[data-rule-add-remove]");
         if (button) removeRuleAddRow(Number(button.dataset.ruleAddRemove));
     });
-    $("#ruleEditorAddRuleButton").addEventListener("click", addRuleEditorSubrule);
+    $("#ruleEditorAddRuleButton").addEventListener("click", openCompositeBuilder);
+    $("#ruleCompositeAddRow").addEventListener("click", appendCompositeRow);
+    $("#ruleCompositeRows").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-composite-remove]");
+        if (button) removeCompositeRow(Number(button.dataset.compositeRemove));
+    });
+    $("#ruleCompositeCancelButton")?.addEventListener("click", cancelCompositeBuilder);
+    document.getElementById("ruleAddDialog").addEventListener("close", () => { ruleCompositeRuleIds = []; });
+    $("#ruleCompositeConfirmButton").addEventListener("click", confirmCompositeBuilder);
     $("#ruleEditorSubrules").addEventListener("change", (event) => {
-        if (event.target.dataset.subruleSelect !== undefined) updateRuleEditorDirtyState();
+        const select = event.target.closest("[data-subrule-select]");
+        if (!select) return;
+        const node = currentEditingNode();
+        if (!node) return;
+        const idx = Number(select.dataset.subruleSelect);
+        const child = node.children[idx];
+        if (child && child.type === "R") {
+            child.expression = select.value;
+            syncDraftFromNode(node);
+            renderRuleTree();
+            render({ preserveView: true });
+        }
     });
     $("#ruleEditorSubrules").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-subrule-remove]");
-        if (button) removeRuleEditorSubrule(Number(button.dataset.subruleRemove));
+        const removeBtn = event.target.closest("[data-subrule-remove]");
+        if (removeBtn) { removeRuleEditorSubrule(Number(removeBtn.dataset.subruleRemove)); return; }
+        const upBtn = event.target.closest("[data-subrule-up]");
+        if (upBtn) { moveRuleEditorSubrule(Number(upBtn.dataset.subruleUp), -1); return; }
+        const downBtn = event.target.closest("[data-subrule-down]");
+        if (downBtn) { moveRuleEditorSubrule(Number(downBtn.dataset.subruleDown), 1); return; }
     });
-    $("#ruleEditorLogicField").addEventListener("change", updateRuleEditorDirtyState);
-    $("#ruleEditorCancelButton").addEventListener("click", finishRuleEditorCancel);
-    $("#ruleEditorSaveButton").addEventListener("click", finishRuleEditorSave);
+    $("#ruleEditorLogicField").addEventListener("click", (event) => {
+        if (event.target.closest("[data-rulelogic-edit]")) { beginRuleLogicEdit(); return; }
+        if (event.target.closest("[data-rulelogic-confirm]")) { confirmRuleLogicEdit(); return; }
+        if (event.target.closest("[data-rulelogic-cancel]")) { cancelRuleLogicEdit(); return; }
+    });
+    $("#ruleEditorCancelButton")?.addEventListener("click", finishRuleEditorCancel);
+    $("#ruleEditorSaveButton")?.addEventListener("click", finishRuleEditorSave);
     $("#ruleEditorHeading").addEventListener("input", (event) => {
         if (event.target.id === "ruleAliasInput") updateRuleEditorDirtyState();
     });
     $("#ruleNodeExpression").addEventListener("input", updateRuleEditorDirtyState);
-    ruleDialog.addEventListener("cancel", (event) => {
-        if (!confirmDiscardRuleEditorChanges()) event.preventDefault();
-    });
+    ruleDialog.addEventListener("cancel", () => { ruleDialogCommitted = false; });
     ruleDialog.addEventListener("close", () => {
+        if (!ruleDialogCommitted && ruleDialogSnapshot && ruleJudgeId) {
+            const found = findNode(ruleJudgeId);
+            if (found) found.node.children = ruleDialogSnapshot;
+        }
+        ruleDialogSnapshot = null;
+        ruleDialogCommitted = false;
         ruleEditorEditing = false;
         ruleEditorDraftNodeId = null;
         ruleEditorDraftState = null;

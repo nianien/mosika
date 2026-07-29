@@ -144,18 +144,20 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .node-shell:hover::after { border-color: rgba(91,124,226,.3); }
 .node-shell:focus-visible::after { border-color: #6e8aea; }
 .node-shell[aria-selected="true"]::after { border-color: var(--blue); }
-.rule-dialog .node-shell:focus-visible::after { border-color: #d79a31; }
-.rule-dialog .node-shell[aria-selected="true"]::after { border-color: #d79a31; }
 
-/* circular nodes hug their shape with a round ring instead of the rounded-rect halo */
+/* circular nodes: selected/hover just boldens the inset ring (no external outline ring) */
 .node-shell:has(.node-card.root)::after,
-.node-shell:has(.node-card.structure)::after { content: none; }
-.node-shell:has(.node-card.root):hover .node-card,
-.node-shell:has(.node-card.structure):hover .node-card { outline: 2px solid rgba(91,124,226,.3); outline-offset: 3px; }
-.node-shell:has(.node-card.root):focus-visible .node-card,
-.node-shell:has(.node-card.structure):focus-visible .node-card { outline: 2px solid #6e8aea; outline-offset: 3px; }
+.node-shell:has(.node-card.structure)::after,
+.node-shell:has(.node-card.condition)::after { content: none; }
+.node-shell:has(.node-card.root):hover .node-card { box-shadow: inset 0 0 0 2px #91a8eb, 0 4px 10px rgba(69,90,143,.13); }
+.node-shell:has(.node-card.structure):hover .node-card { box-shadow: inset 0 0 0 1.5px #7e9ae8, 0 2px 5px rgba(69,90,143,.07); }
 .node-shell[aria-selected="true"]:has(.node-card.root) .node-card,
-.node-shell[aria-selected="true"]:has(.node-card.structure) .node-card { outline: 2px solid var(--blue); outline-offset: 3px; }
+.node-shell:has(.node-card.root):focus-visible .node-card { box-shadow: inset 0 0 0 2.5px var(--blue), 0 4px 10px rgba(69,90,143,.13); }
+.node-shell[aria-selected="true"]:has(.node-card.structure) .node-card,
+.node-shell:has(.node-card.structure):focus-visible .node-card { box-shadow: inset 0 0 0 2.5px var(--blue), 0 2px 5px rgba(69,90,143,.07); }
+/* hexagon nodes: selected just thickens the border (same color, bolder stroke) */
+.node-shell[aria-selected="true"]:has(.node-card.condition) .node-card.condition::before,
+.node-shell:has(.node-card.condition):focus-visible .node-card.condition::before { inset: 2.5px; }
 
 .node-card {
     position: relative; display: grid; place-items: center; text-align: center;
@@ -319,6 +321,7 @@ select:disabled { opacity: 1; color: #7d899b; background: #f5f7fa; }
 .form-note { margin: 0; color: #9aa4b4; font-size: 10px; line-height: 1.55; }
 
 dialog { width: min(420px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 13px; box-shadow: 0 24px 70px rgba(25,37,63,.26); }
+dialog:focus, dialog:focus-visible { outline: none; }
 dialog::backdrop { background: rgba(24,34,55,.42); backdrop-filter: blur(2px); }
 dialog form { display: grid; gap: 15px; padding: 19px; }
 .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; }
@@ -412,8 +415,11 @@ dialog.rule-dialog {
 .rule-extend-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .rule-add-fields { display: grid; gap: 11px; }
 .rule-add-rows { display: grid; gap: 8px; }
-.rule-add-row { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: end; gap: 6px; }
-.rule-add-row > button { min-width: 30px; width: 30px; padding: 0; color: #c94d55; }
+.rule-add-row { display: flex; align-items: center; gap: 6px; }
+.rule-add-row > select, .rule-add-row > .detail-value { flex: 1; min-width: 0; }
+.rule-add-row > button { flex: 0 0 auto; min-width: 30px; width: 30px; padding: 0; }
+.rule-add-row > button[data-subrule-remove],
+.rule-add-row > button[data-composite-remove] { color: #c94d55; }
 .rule-add-row-button { border-style: dashed; color: #526fd0; background: #fff; }
 .rule-logic-field { margin: 0; padding: 0; border: 0; }
 .rule-logic-field legend { margin-bottom: 6px; color: #68758a; font-size: 11px; font-weight: 600; }
@@ -456,3 +462,8 @@ dialog.rule-dialog {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; }
 }
+.rule-composite-builder { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border: 1px solid #d8e0ec; border-radius: 10px; background: #f7f9fc; }
+#ruleAddDialog { width: min(380px, calc(100vw - 40px)); }
+.rule-add-form { display: grid; gap: 12px; padding: 19px; }
+.rule-dialog-header-actions { display: flex; align-items: center; gap: 8px; }
+.rule-add-row.rule-row-active { background: #eef3ff; border-radius: 8px; box-shadow: 0 0 0 4px #eef3ff; }
