@@ -1638,7 +1638,7 @@
     zoomInput.addEventListener("blur", applyZoomInput);
     $("#fitButton").addEventListener("click", fitTree);
     $("#collapseAllButton").addEventListener("click", () => {
-        walk(tree, (node) => { if (!["J", "ROOT"].includes(node.type) && node.children.length) node.collapsed = true; });
+        walk(tree, (node) => { if (node.type !== "J" && node.children.length) node.collapsed = true; });
         render({ preserveView: true });
     });
     $("#expandAllButton").addEventListener("click", () => {

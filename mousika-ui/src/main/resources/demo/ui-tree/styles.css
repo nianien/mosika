@@ -466,3 +466,32 @@ dialog.rule-dialog {
 .rule-add-form { display: grid; gap: 12px; padding: 19px; }
 .rule-dialog-header-actions { display: flex; align-items: center; gap: 8px; }
 .rule-add-row.rule-row-active { background: #eef3ff; border-radius: 8px; box-shadow: 0 0 0 4px #eef3ff; }
+
+/* ===== 正式配色：柑橘薄荷（青碧结构 / 柠黄规则 / 苹果绿动作）===== */
+:root { --line: #9dd6db; }
+.node-card.structure, .node-card.root { color:#0e7f96; background:#d6f6fb; box-shadow: inset 0 0 0 1.6px #3fd8ee, 0 2px 6px rgba(30,60,110,.10); }
+.node-card.structure.node-type-s,.node-card.structure.node-type-p,.node-card.structure.node-type-d,.node-card.structure.node-type-l { color:#0e7f96; background:#e3fafd; box-shadow: inset 0 0 0 1.2px #6ee2f0, 0 1px 4px rgba(30,60,110,.08); }
+.node-card.root { color:#0b6274; background:#c5f0f8; box-shadow: inset 0 0 0 1.6px #22d3ee, 0 3px 8px rgba(30,60,110,.14); }
+.node-card.condition { color:#8a6d0e; background:#f2d34e; filter: drop-shadow(0 3px 5px rgba(150,120,20,.14)); }
+.node-card.condition::before { background: linear-gradient(180deg,#fffdf0,#fdf6d5); }
+.node-card.action { color:#1f7a43; background:#dcf9e4; box-shadow: inset 0 0 0 1.6px #7ee39a, 0 2px 6px rgba(15,100,75,.10); }
+.node-fold-toggle { border-color:#c3d0da; color:#5a6b7a; }
+
+/* ===== 统一焦点/选中效果：只加粗自身同色描边（对齐判断节点，去蓝色/矩形框）===== */
+.node-shell:has(.node-card.action)::after { content: none; }
+/* 结构（串/并/分）*/
+.node-shell:has(.node-card.structure):hover .node-card,
+.node-shell:has(.node-card.structure):focus-visible .node-card,
+.node-shell[aria-selected="true"]:has(.node-card.structure) .node-card { box-shadow: inset 0 0 0 2.6px #22d3ee, 0 2px 6px rgba(30,60,110,.12); }
+/* 根（开始）*/
+.node-shell:has(.node-card.root):hover .node-card,
+.node-shell:has(.node-card.root):focus-visible .node-card,
+.node-shell[aria-selected="true"]:has(.node-card.root) .node-card { box-shadow: inset 0 0 0 2.8px #0891b2, 0 3px 8px rgba(30,60,110,.16); }
+/* 动作（业务操作）*/
+.node-shell:has(.node-card.action):hover .node-card,
+.node-shell:has(.node-card.action):focus-visible .node-card,
+.node-shell[aria-selected="true"]:has(.node-card.action) .node-card { box-shadow: inset 0 0 0 2.6px #34c46f, 0 2px 6px rgba(15,100,75,.12); }
+/* 判断（六边形）：悬停也加粗，与其余一致（同色）*/
+.node-shell:has(.node-card.condition):hover .node-card.condition::before,
+.node-shell:has(.node-card.condition):focus-visible .node-card.condition::before,
+.node-shell[aria-selected="true"]:has(.node-card.condition) .node-card.condition::before { inset: 2.6px; }
