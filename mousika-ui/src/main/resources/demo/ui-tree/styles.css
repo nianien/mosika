@@ -124,12 +124,12 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .tree-children > .tree-branch::before { right: 50%; }
 .tree-children > .tree-branch::after { left: 50%; border-left: 1.5px solid var(--line); }
-.tree-children > .tree-branch:first-child::before { border-top: 0; }
-.tree-children > .tree-branch:first-child::after { border-radius: 8px 0 0 0; }
-.tree-children > .tree-branch:last-child::after { border-top: 0; border-left: 0; }
-.tree-children > .tree-branch:last-child::before { border-right: 1.5px solid var(--line); border-radius: 0 8px 0 0; }
-.tree-children > .tree-branch:only-child::before { border: 0; }
-.tree-children > .tree-branch:only-child::after { border-top: 0; border-left: 1.5px solid var(--line); border-radius: 0; }
+.tree-children > .tree-branch:first-of-type::before { border-top: 0; }
+.tree-children > .tree-branch:first-of-type::after { border-radius: 8px 0 0 0; }
+.tree-children > .tree-branch:last-of-type::after { border-top: 0; border-left: 0; }
+.tree-children > .tree-branch:last-of-type::before { border-right: 1.5px solid var(--line); border-radius: 0 8px 0 0; }
+.tree-children > .tree-branch:only-of-type::before { border: 0; }
+.tree-children > .tree-branch:only-of-type::after { border-top: 0; border-left: 1.5px solid var(--line); border-radius: 0; }
 .node-shell { position: relative; z-index: 2; display: grid; justify-items: center; cursor: pointer; outline: none; }
 .node-shell.has-fold-toggle { padding-bottom: 16px; }
 .node-shell.has-fold-toggle::before {
@@ -362,10 +362,10 @@ dialog.rule-dialog {
 }
 .rule-children > .rule-branch::before { bottom: 50%; }
 .rule-children > .rule-branch::after { top: 50%; border-top: 1.5px solid var(--line); }
-.rule-children > .rule-branch:first-child::before { border-left: 0; }
-.rule-children > .rule-branch:last-child::after { border-left: 0; }
-.rule-children > .rule-branch:only-child::before { border-left: 0; }
-.rule-children > .rule-branch:only-child::after { border-left: 0; }
+.rule-children > .rule-branch:first-of-type::before { border-left: 0; }
+.rule-children > .rule-branch:last-of-type::after { border-left: 0; }
+.rule-children > .rule-branch:only-of-type::before { border-left: 0; }
+.rule-children > .rule-branch:only-of-type::after { border-left: 0; }
 .rule-dialog .node-expression { display: block; max-width: 170px; margin-top: 2px; font: 10px ui-monospace, monospace; }
 .rule-dialog .node-card.structure .node-expression { display: none; }
 .rule-editor { min-width: 0; overflow: auto; padding: 18px; border-left: 1px solid var(--border); background: #fff; }
@@ -495,3 +495,30 @@ dialog.rule-dialog {
 .node-shell:has(.node-card.condition):hover .node-card.condition::before,
 .node-shell:has(.node-card.condition):focus-visible .node-card.condition::before,
 .node-shell[aria-selected="true"]:has(.node-card.condition) .node-card.condition::before { inset: 2.6px; }
+
+/* 同父兄弟拖拽重排 */
+.node-shell[data-reorderable] { cursor: grab; }
+.reorder-grabbing, .reorder-grabbing .node-shell { cursor: grabbing !important; }
+.tree-branch.reorder-source > .node-shell,
+.rule-branch.reorder-source > .node-shell { opacity: .4; }
+.reorder-slot {
+    position: absolute; z-index: 8; display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box; padding: 0 10px; max-width: 200px;
+    border: 2px dashed #22d3ee; border-radius: 12px;
+    background: rgba(34,211,238,.12); color: #0e7490;
+    font-size: 12px; font-weight: 600; line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 0 0 3px rgba(34,211,238,.14);
+    pointer-events: none;
+}
+.reorder-chip {
+    position: fixed; z-index: 9999; pointer-events: none;
+    padding: 4px 10px; border-radius: 8px;
+    background: #0891b2; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.2;
+    max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 6px 16px rgba(8,145,178,.35);
+}
+.reorder-chip.reorder-chip-muted {
+    background: #94a3b8;
+    box-shadow: 0 6px 16px rgba(148,163,184,.3);
+}

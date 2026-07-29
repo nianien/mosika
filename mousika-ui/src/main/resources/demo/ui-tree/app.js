@@ -322,15 +322,17 @@
         return `${low}…${high}`;
     }
 
-    function renderBranch(node) {
+    function renderBranch(node, parent = null) {
         const type = TYPES[node.type] || TYPES.A;
+        const reorderable = Boolean(parent
+            && parent.children.filter((sibling) => sibling.relation === node.relation).length >= 2);
         const expression = node.expression && type.kind !== "structure" && type.kind !== "root"
             ? `<span class="node-expression">${escapeText(node.expression)}</span>` : "";
         const { flows } = node.type === "J" ? judgeParts(node) : { flows: [] };
         const collapsed = Boolean(node.type !== "J" && node.collapsed && node.children.length);
         const visibleChildren = node.type === "J" ? flows : (collapsed ? [] : node.children);
         const children = visibleChildren.length
-            ? `<div class="tree-children">${visibleChildren.map((child) => renderBranch(child)).join("")}</div>` : "";
+            ? `<div class="tree-children">${visibleChildren.map((child) => renderBranch(child, node)).join("")}</div>` : "";
         const collapsedBadge = collapsed ? `<span class="collapsed-count" title="${node.children.length} 个分支">${node.children.length}</span>` : "";
         const title = node.type === "J"
             ? ruleDisplayName(node)
@@ -345,7 +347,7 @@
                 : (flowNodeName(node) ? `${type.name} · ${flowNodeName(node)}` : type.name));
         const canCollapse = node.type !== "J" && Boolean(node.children.length);
         const nodeShell = `
-            <div class="node-shell${canCollapse ? " has-fold-toggle" : ""}" data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
+            <div class="node-shell${canCollapse ? " has-fold-toggle" : ""}"${reorderable ? ' data-reorderable="1"' : ""} data-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${selectedId === node.id}" aria-expanded="${!collapsed}">
                     <div class="node-card ${cardKind}" title="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
@@ -604,6 +606,7 @@
 
     function renderRuleBranch(node, parent = null) {
         const type = TYPES[node.type] || TYPES.R;
+        const reorderable = Boolean(parent && ["L", "H"].includes(parent.type) && parent.children.length >= 2);
         const expression = node.expression
             ? `<span class="node-expression">${escapeText(node.expression)}</span>` : "";
         const children = node.children.length
@@ -611,7 +614,7 @@
         const title = type.kind === "structure" ? compactStructureLabel(node, type) : ruleNodeDisplayName(node);
         return `
             <div class="rule-branch" data-rule-branch-id="${node.id}">
-                <div class="node-shell" data-rule-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${ruleSelectedId === node.id}">
+                <div class="node-shell"${reorderable ? ' data-reorderable="1"' : ""} data-rule-node-id="${node.id}" tabindex="0" role="treeitem" aria-selected="${ruleSelectedId === node.id}">
                     <div class="node-card ${type.kind} node-type-${node.type.toLowerCase()}" aria-label="${escapeText(`${type.name} · ${ruleNodeDisplayName(node)}`)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
@@ -1525,6 +1528,7 @@
     }
 
     treeRoot.addEventListener("click", (event) => {
+        if (reorderSuppress.flow) { reorderSuppress.flow = false; return; }
         const shell = event.target.closest(".node-shell");
         if (!shell) return;
         const nextId = shell.dataset.nodeId;
@@ -1550,6 +1554,7 @@
     });
 
     ruleTreeRoot.addEventListener("click", (event) => {
+        if (reorderSuppress.rule) { reorderSuppress.rule = false; return; }
         if (event.target.closest("#ruleAddRootButton")) {
             if (!confirmDiscardRuleEditorChanges()) return;
             startRuleAdd("root");
@@ -1777,6 +1782,204 @@
             deleteSelectedRule();
         }
         if (!editing && event.key === "0") fitTree();
+    });
+
+    const reorderSuppress = { flow: false, rule: false };
+
+    function createSiblingReorder(cfg) {
+        const cont = cfg.container;
+        const THRESHOLD = 5;
+        let st = null;
+
+        function groupMembers(parent, relation) {
+            return parent.children.filter((child) => child.relation === relation);
+        }
+
+        function startDrag() {
+            st.dragging = true;
+            const others = groupMembers(st.parent, st.relation).filter((n) => n.id !== st.id);
+            st.origIndex = groupMembers(st.parent, st.relation).findIndex((n) => n.id === st.id);
+            st.siblingEls = others
+                .map((n) => cont.querySelector(`[${cfg.branchAttr}="${n.id}"]`))
+                .filter(Boolean);
+            st.branchEl.classList.add("reorder-source");
+            cont.classList.add("reorder-grabbing");
+            const draggedCard = st.branchEl.querySelector(".node-card");
+            st.cardW = draggedCard ? draggedCard.offsetWidth : 96;
+            st.cardH = draggedCard ? draggedCard.offsetHeight : 40;
+            const label = (cfg.labelOf ? cfg.labelOf(st.node) : "") || "节点";
+            st.slot = document.createElement("span");
+            st.slot.className = "reorder-slot";
+            st.slot.textContent = label;
+            st.container.appendChild(st.slot);
+            st.chip = document.createElement("div");
+            st.chip.className = "reorder-chip";
+            st.chip.textContent = label;
+            document.body.appendChild(st.chip);
+            try { cont.setPointerCapture(st.pointerId); } catch (_) { /* ignore */ }
+        }
+
+        function updateDrag(event) {
+            const els = st.siblingEls;
+            const pointer = cfg.axis === "x" ? event.clientX : event.clientY;
+            let k = els.length;
+            for (let i = 0; i < els.length; i++) {
+                const rect = els[i].getBoundingClientRect();
+                const mid = cfg.axis === "x" ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+                if (pointer < mid) { k = i; break; }
+            }
+            st.dropIndex = k;
+            const noop = (k === st.origIndex);
+            positionSlot(noop ? -1 : k);
+            if (st.chip) {
+                st.chip.style.left = `${event.clientX + 14}px`;
+                st.chip.style.top = `${event.clientY + 14}px`;
+                st.chip.classList.toggle("reorder-chip-muted", noop);
+            }
+        }
+
+        function positionSlot(k) {
+            const els = st.siblingEls;
+            const slot = st.slot;
+            if (!els.length || k < 0) { slot.style.display = "none"; return; }
+            slot.style.display = "flex";
+            slot.style.width = `${st.cardW}px`;
+            slot.style.height = `${st.cardH}px`;
+            const shell0 = els[0].querySelector(".node-shell");
+            const cardSize = (el, prop) => {
+                const card = el.querySelector(".node-card");
+                return card ? card[prop] : (prop === "offsetWidth" ? st.cardW : st.cardH);
+            };
+            if (cfg.axis === "x") {
+                // card is centered within its branch, so branch center ≈ card center
+                const cardCenter = (el) => el.offsetLeft + el.offsetWidth / 2;
+                const half = (el) => cardSize(el, "offsetWidth") / 2;
+                const rowTop = els[0].offsetTop + (shell0 ? shell0.offsetTop : 0);
+                let cx;
+                if (k <= 0) cx = cardCenter(els[0]) - half(els[0]) - st.cardW / 2 - 14;
+                else if (k >= els.length) {
+                    const last = els[els.length - 1];
+                    cx = cardCenter(last) + half(last) + st.cardW / 2 + 14;
+                } else cx = ((cardCenter(els[k - 1]) + half(els[k - 1])) + (cardCenter(els[k]) - half(els[k]))) / 2;
+                slot.style.left = `${cx - st.cardW / 2}px`;
+                slot.style.top = `${rowTop}px`;
+            } else {
+                const cardCenter = (el) => el.offsetTop + el.offsetHeight / 2;
+                const half = (el) => cardSize(el, "offsetHeight") / 2;
+                const rowLeft = els[0].offsetLeft + (shell0 ? shell0.offsetLeft : 0);
+                let cy;
+                if (k <= 0) cy = cardCenter(els[0]) - half(els[0]) - st.cardH / 2 - 10;
+                else if (k >= els.length) {
+                    const last = els[els.length - 1];
+                    cy = cardCenter(last) + half(last) + st.cardH / 2 + 10;
+                } else cy = ((cardCenter(els[k - 1]) + half(els[k - 1])) + (cardCenter(els[k]) - half(els[k]))) / 2;
+                slot.style.left = `${rowLeft}px`;
+                slot.style.top = `${cy - st.cardH / 2}px`;
+            }
+        }
+
+        function commit(ref) {
+            const group = groupMembers(ref.parent, ref.relation);
+            const dragged = group.find((n) => n.id === ref.id);
+            const others = group.filter((n) => n.id !== ref.id);
+            if (!dragged) return;
+            const k = Math.max(0, Math.min(ref.dropIndex ?? others.length, others.length));
+            const order = [...others.slice(0, k), dragged, ...others.slice(k)];
+            let qi = 0;
+            ref.parent.children = ref.parent.children.map((child) =>
+                child.relation === ref.relation ? order[qi++] : child);
+        }
+
+        function finish(doCommit) {
+            if (!st) return;
+            const ref = st;
+            st = null;
+            if (ref.slot) ref.slot.remove();
+            if (ref.chip) ref.chip.remove();
+            ref.branchEl.classList.remove("reorder-source");
+            cont.classList.remove("reorder-grabbing");
+            try { cont.releasePointerCapture(ref.pointerId); } catch (_) { /* ignore */ }
+            if (ref.dragging) reorderSuppress[cfg.key] = true;
+            if (ref.dragging && doCommit && ref.dropIndex != null && ref.dropIndex !== ref.origIndex) {
+                commit(ref);
+                cfg.afterCommit(ref);
+            }
+        }
+
+        cont.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+            reorderSuppress[cfg.key] = false;
+            if (cfg.canStart && !cfg.canStart()) return;
+            if (event.target.closest("button, select, input, [data-action]")) return;
+            const shell = event.target.closest(".node-shell");
+            if (!shell || !shell.dataset.reorderable) return;
+            const id = shell.dataset[cfg.shellIdKey];
+            const entry = cfg.findEntry(id);
+            if (!entry || !entry.parent) return;
+            const branchEl = cont.querySelector(`[${cfg.branchAttr}="${id}"]`);
+            if (!branchEl || !branchEl.parentElement) return;
+            st = {
+                id, node: entry.node, parent: entry.parent, relation: entry.node.relation,
+                startX: event.clientX, startY: event.clientY, pointerId: event.pointerId,
+                branchEl, container: branchEl.parentElement,
+                dragging: false, dropIndex: null, siblingEls: [],
+                slot: null, chip: null, cardW: 0, cardH: 0
+            };
+        });
+        cont.addEventListener("pointermove", (event) => {
+            if (!st || event.pointerId !== st.pointerId) return;
+            if (!st.dragging) {
+                if (Math.hypot(event.clientX - st.startX, event.clientY - st.startY) < THRESHOLD) return;
+                startDrag();
+            }
+            updateDrag(event);
+        });
+        cont.addEventListener("pointerup", () => finish(true));
+        cont.addEventListener("pointercancel", () => finish(false));
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && st && st.dragging) finish(false);
+        });
+    }
+
+    createSiblingReorder({
+        container: treeRoot,
+        key: "flow",
+        axis: "x",
+        branchAttr: "data-branch-id",
+        shellIdKey: "nodeId",
+        findEntry: (id) => findNode(id),
+        labelOf: (node) => {
+            const type = TYPES[node.type] || TYPES.A;
+            if (node.type === "J") return ruleDisplayName(node);
+            if (type.kind === "structure" || type.kind === "root") return compactStructureLabel(node, type);
+            return flowNodeDisplayName(node);
+        },
+        afterCommit: (ref) => {
+            selectedId = ref.id;
+            inspectorEditingField = null;
+            fitMode = false;
+            render({ preserveView: true });
+        }
+    });
+
+    createSiblingReorder({
+        container: ruleTreeRoot,
+        key: "rule",
+        axis: "y",
+        branchAttr: "data-rule-branch-id",
+        shellIdKey: "ruleNodeId",
+        canStart: () => !ruleEditorEditing,
+        findEntry: (id) => findRuleNode(id),
+        labelOf: (node) => {
+            const type = TYPES[node.type] || TYPES.R;
+            return type.kind === "structure" ? compactStructureLabel(node, type) : ruleNodeDisplayName(node);
+        },
+        afterCommit: (ref) => {
+            ruleSelectedId = ref.id;
+            renderRuleTree();
+            updateRuleEditor();
+            render({ preserveView: true });
+        }
     });
 
     new ResizeObserver(() => { if (fitMode) fitTree(); }).observe(viewport);
