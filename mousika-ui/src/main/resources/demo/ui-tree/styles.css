@@ -3,7 +3,7 @@
     font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     color: #17223b;
     background: #eef2f8;
-    --line: #8fa0ba;
+    --line: #6f82a0;
     --blue: #5b7ce2;
     --blue-soft: #eaf0ff;
     --green: #2c9b78;
@@ -63,13 +63,12 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .brand-mark {
     width: 34px; height: 34px; display: grid; place-items: center;
-    border-radius: 9px; color: #fff; font-weight: 800;
-    background: linear-gradient(145deg, #6d86ed, #495fd4);
-    box-shadow: 0 5px 12px rgba(80,102,209,.25);
+    border-radius: 9px; color: #ffffff; font-weight: 800;
+    background: linear-gradient(145deg, #6d8bf5, #4f6bed);
+    box-shadow: 0 5px 12px rgba(79,107,237,.3);
 }
 .brand div { display: grid; gap: 1px; }
 .brand strong { font-size: 14px; }
-.brand span { color: #7d899d; font-size: 11px; }
 
 .toolbar { display: flex; align-items: center; gap: 6px; }
 .toolbar button { white-space: nowrap; }
@@ -107,7 +106,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .canvas-titlebar div { display: flex; align-items: baseline; gap: 10px; }
 .canvas-titlebar strong { color: #33415d; font-size: 13px; }
 .status { display: flex; align-items: center; gap: 6px; }
-.status i { width: 7px; height: 7px; border-radius: 50%; background: #44ad85; box-shadow: 0 0 0 3px #dff5ec; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: #d88916; box-shadow: 0 0 0 3px #fbeccd; }
 
 .tree-viewport { position: relative; overflow: hidden; background: #fff; cursor: grab; touch-action: none; }
 .tree-viewport.dragging { cursor: grabbing; }
@@ -206,8 +205,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .node-card:hover { filter: brightness(.995) saturate(1.04); }
 .node-card.condition:hover { filter: brightness(.995) saturate(1.04) drop-shadow(0 3px 5px rgba(153,101,17,.17)); }
-.node-title { position: relative; z-index: 1; display: block; max-width: 148px; font-weight: 700; font-size: 11px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.structure .node-title, .root .node-title { max-width: 32px; font-size: 10px; white-space: normal; }
+.node-title { position: relative; z-index: 1; display: block; max-width: 148px; font-weight: 700; font-size: 12px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.structure .node-title, .root .node-title { max-width: 32px; font-size: 11px; white-space: normal; }
 .node-expression { position: relative; z-index: 1; display: none; }
 .condition .node-expression { color: #9e782f; }
 .action .node-expression { color: #4d8b77; }
@@ -367,7 +366,7 @@ dialog.rule-dialog {
 .rule-children > .rule-branch:last-child::after { border-left: 0; }
 .rule-children > .rule-branch:only-child::before { border-left: 0; }
 .rule-children > .rule-branch:only-child::after { border-left: 0; }
-.rule-dialog .node-expression { display: block; max-width: 170px; margin-top: 2px; font: 9px ui-monospace, monospace; }
+.rule-dialog .node-expression { display: block; max-width: 170px; margin-top: 2px; font: 10px ui-monospace, monospace; }
 .rule-dialog .node-card.structure .node-expression { display: none; }
 .rule-editor { min-width: 0; overflow: auto; padding: 18px; border-left: 1px solid var(--border); background: #fff; }
 .rule-editor-panel { margin-top: 16px; }
