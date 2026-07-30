@@ -26,6 +26,9 @@
         desc: `业务操作${index + 1}`,
         useType: 0
     }));
+    // 定义表为静态常量，建一次 id→定义 的 Map 供 O(1) 查询（接入大批量后端定义时避免 O(n) 扫描）。
+    const RULE_DEFINITION_BY_ID = new Map(RULE_DEFINITIONS.map((d) => [d.ruleId, d]));
+    const ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
 
     // 与 src/main/resources/img/ui-tree.png 逐节点对应。
     const sampleTree = () => ({
@@ -1019,11 +1022,11 @@
     }
 
     function ruleDefinitionById(ruleId) {
-        return RULE_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
+        return RULE_DEFINITION_BY_ID.get(ruleId) || null;
     }
 
     function actionDefinitionById(ruleId) {
-        return ACTION_DEFINITIONS.find((definition) => definition.ruleId === ruleId) || null;
+        return ACTION_DEFINITION_BY_ID.get(ruleId) || null;
     }
 
     function createAtomicRule(ruleId, name = "") {
