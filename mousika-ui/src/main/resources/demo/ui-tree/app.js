@@ -120,6 +120,9 @@
         default: { types: FLOW_TYPES }
     };
 
+    // 编辑器安全预算（非 DSL 语义限制）：防止病态深/大输入导致递归栈溢出与超大布局。
+    const TREE_LIMITS = { maxDepth: 128, maxNodes: 2000 };
+
     const $ = (selector) => document.querySelector(selector);
     const treeRoot = $("#treeRoot");
     const viewport = $("#treeViewport");
@@ -240,6 +243,75 @@
                 + flows.reduce((sum, child) => sum + countModalRuleNodes(child), 0);
         }
         return node.children.reduce((sum, child) => sum + countModalRuleNodes(child), 0);
+    }
+
+    // 迭代式（显式栈）预检：覆盖 Flow 与内嵌 Rule 的统一 children；校验器本身不递归，避免自身栈溢出。
+    function inspectTree(root) {
+        const seen = new Set();
+        let nodes = 0, maxDepth = 0, deepest = null, dup = null;
+        const stack = [[root, 1]];
+        while (stack.length) {
+            const [node, depth] = stack.pop();
+            if (!node) continue;
+            if (seen.has(node)) { dup = node; continue; }
+            seen.add(node);
+            nodes++;
+            if (depth > maxDepth) { maxDepth = depth; deepest = node; }
+            const kids = node.children;
+            if (kids) for (let i = 0; i < kids.length; i++) stack.push([kids[i], depth + 1]);
+        }
+        return { nodes, depth: maxDepth, deepest, dup };
+    }
+
+    // 深度与节点数分别统计、分别报错；同时检测重复/循环引用。
+    function assertTreeWithinLimits(root, label = "规则树") {
+        const { nodes, depth, deepest, dup } = inspectTree(root);
+        if (dup) throw new Error(`${label}存在重复或循环引用的节点（id=${dup.id || "?"}），已拒绝加载`);
+        if (depth > TREE_LIMITS.maxDepth) {
+            throw new Error(`${label}嵌套深度 ${depth} 超过上限 ${TREE_LIMITS.maxDepth}（最深节点 id=${deepest?.id || "?"}）`);
+        }
+        if (nodes > TREE_LIMITS.maxNodes) {
+            throw new Error(`${label}节点总数 ${nodes} 超过上限 ${TREE_LIMITS.maxNodes}`);
+        }
+        return { nodes, depth };
+    }
+
+    // 导入边界：校验通过才整体替换，失败即抛出、绝不部分加载。
+    function loadTree(root, { bypassLimits = false } = {}) {
+        if (!bypassLimits) assertTreeWithinLimits(root, "导入的树");
+        tree = root;
+        selectedId = null;
+        ruleSelectedId = null;
+        ruleJudgeId = null;
+        inspectorEditingField = null;
+        docStatus = "draft";
+        updateDocStatus();
+        render({ preserveView: false });
+    }
+
+    // 迭代求某节点在当前树中的深度（root=1），找不到返回 -1。
+    function depthOf(targetId) {
+        const stack = [[tree, 1]];
+        while (stack.length) {
+            const [node, depth] = stack.pop();
+            if (node.id === targetId) return depth;
+            for (let i = 0; i < node.children.length; i++) stack.push([node.children[i], depth + 1]);
+        }
+        return -1;
+    }
+
+    // 结构变更提交前的预检：返回可读的拦截原因，或 null 表示放行。
+    function limitBlockReason(parentNode, addedRoot) {
+        const cur = inspectTree(tree);
+        const add = inspectTree(addedRoot);
+        if (cur.nodes + add.nodes > TREE_LIMITS.maxNodes) {
+            return `节点总数将达 ${cur.nodes + add.nodes}，超过编辑器上限 ${TREE_LIMITS.maxNodes}`;
+        }
+        const parentDepth = parentNode ? depthOf(parentNode.id) : 0;
+        if (parentDepth > 0 && parentDepth + add.depth > TREE_LIMITS.maxDepth) {
+            return `插入后嵌套深度将达 ${parentDepth + add.depth}，超过编辑器上限 ${TREE_LIMITS.maxDepth}`;
+        }
+        return null;
     }
 
     function availableRelations(parent) {
@@ -903,6 +975,13 @@
             const children = ruleCompositeRuleIds.map((ruleId) => createAtomicRule(ruleId));
             newNode = { id: `n${nextId++}`, type: "L", name: "", expression: logic, relation: "rule", children };
         }
+        const blocked = limitBlockReason(node, newNode);
+        if (blocked) {
+            document.getElementById("ruleAddDialog").close();
+            ruleCompositeRuleIds = [];
+            openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
+            return;
+        }
         node.children.push(newNode);
         document.getElementById("ruleAddDialog").close();
         ruleCompositeRuleIds = [];
@@ -1042,6 +1121,8 @@
                 ruleAddRuleIds
             );
         if (!node) return;
+        const blocked = limitBlockReason(judge, node);
+        if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
         judge.children.unshift(node);
         ruleSelectedId = node.id;
         ruleAddRuleIds = [];
@@ -1209,6 +1290,8 @@
             if (!rule) return;
             node.children.push(rule);
         }
+        const blocked = limitBlockReason(parent, node);
+        if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
         parent.collapsed = false;
         const placement = $("#newNodePlacementField").hidden ? "last" : $("#newNodePlacement").value;
         const siblingIndexes = parent.children
@@ -1261,6 +1344,17 @@
         }
         const index = parent.children.indexOf(target);
         if (index < 0) return;
+        const added = inspectTree(node).nodes; // wrapper (+ 其规则)，此时尚未包含 target
+        const cur = inspectTree(tree).nodes;
+        if (cur + added > TREE_LIMITS.maxNodes) {
+            openConfirm(`节点总数将达 ${cur + added}，超过编辑器上限 ${TREE_LIMITS.maxNodes}`, { title: "超出编辑器上限", confirmLabel: "知道了" });
+            return;
+        }
+        const projectedDepth = depthOf(target.id) + inspectTree(target).depth; // 包裹后 target 子树整体下移一层
+        if (projectedDepth > TREE_LIMITS.maxDepth) {
+            openConfirm(`插入后嵌套深度将达 ${projectedDepth}，超过编辑器上限 ${TREE_LIMITS.maxDepth}`, { title: "超出编辑器上限", confirmLabel: "知道了" });
+            return;
+        }
         target.relation = childRelation;
         node.children.push(target);
         parent.children.splice(index, 1, node);
@@ -1887,4 +1981,38 @@
     new ResizeObserver(() => { if (fitMode) fitTree(); }).observe(viewport);
     render({ preserveView: false });
     updateDocStatus();
+
+    if (new URLSearchParams(location.search).has("bench")) {
+        window.__mousikaBench = {
+            sampleTree,
+            // 显式测试绕过入口：基准需要制造超限树时使用，跳过安全预算校验
+            setTree(newTree) { loadTree(newTree, { bypassLimits: true }); },
+            // 真实导入闸门（强制校验），供测试校验器本身
+            loadTree(newTree, opts) { loadTree(newTree, opts); },
+            limits: TREE_LIMITS,
+            assertWithinLimits(root) { return assertTreeWithinLimits(root); },
+            render(opts) { render(opts || { preserveView: true }); },
+            metrics() {
+                return {
+                    width: treeRoot.offsetWidth,
+                    height: treeRoot.offsetHeight,
+                    flowCount: countFlowNodes(tree),
+                    ruleCount: countModalRuleNodes(tree)
+                };
+            },
+            findNode,
+            snapshotChildren(judgeId) {
+                const found = findNode(judgeId);
+                return found ? JSON.parse(JSON.stringify(found.node.children)) : null;
+            },
+            openRuleDialog(judgeId) { openRuleDialog(judgeId); },
+            closeRuleDialog() { if (ruleDialog.open) ruleDialog.close(); },
+            renderRuleTree() { renderRuleTree(); },
+            ruleTreeRoot() { return ruleTreeRoot; },
+            fitTree() { fitTree(); },
+            getTree() { return tree; },
+            treeRoot() { return treeRoot; },
+            viewport() { return viewport; }
+        };
+    }
 })();
