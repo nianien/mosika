@@ -1,32 +1,25 @@
 package com.skyfalling.mousika.suite;
 
 import com.skyfalling.mousika.eval.node.RuleNode;
-import com.skyfalling.mousika.suite.SceneDefinition.SceneConfig;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
- * 规则场景
+ * 以树结构实现的规则流
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Data
 @AllArgsConstructor
-public class RuleScene {
+public class RuleFlow {
 
     /**
-     * 场景ID
+     * 规则流ID
      */
     private String id;
 
     /**
-     * 场景配置信息
+     * 规则流根节点
      */
-    private SceneConfig config;
-    /**
-     * 规则节点
-     */
-    private RuleNode ruleNode;
-
-
+    private RuleNode root;
 }

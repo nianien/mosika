@@ -6,6 +6,9 @@
     --line: #6f82a0;
     --blue: #5b7ce2;
     --blue-soft: #eaf0ff;
+    --primary: #0f9d8a;
+    --primary-strong: #0c8676;
+    --primary-soft: #e6f6f2;
     --green: #2c9b78;
     --green-soft: #e9f8f2;
     --amber: #d88916;
@@ -37,12 +40,12 @@ button {
 
 button:hover { border-color: #aebbd0; background: #f7f9fc; }
 button:focus-visible, input:focus-visible, select:focus-visible, .tree-viewport:focus-visible {
-    outline: 2px solid #7894ef;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
 
-button.primary { color: #fff; border-color: var(--blue); background: var(--blue); }
-button.primary:hover { background: #4a6bd3; }
+button.primary { color: #fff; border-color: var(--primary); background: var(--primary); }
+button.primary:hover { background: var(--primary-strong); }
 button.danger { color: #c94d55; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -64,8 +67,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .brand-mark {
     width: 34px; height: 34px; display: grid; place-items: center;
     border-radius: 9px; color: #ffffff; font-weight: 800;
-    background: linear-gradient(145deg, #6d8bf5, #4f6bed);
-    box-shadow: 0 5px 12px rgba(79,107,237,.3);
+    background: linear-gradient(145deg, #2fc0a6, var(--primary));
+    box-shadow: 0 5px 12px rgba(15,157,138,.3);
 }
 .brand div { display: grid; gap: 1px; }
 .brand strong { font-size: 14px; }
@@ -301,8 +304,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
     background: #fff; cursor: pointer;
 }
 .field-confirm svg, .field-cancel svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.field-confirm { color: #fff; border-color: var(--blue); background: var(--blue); }
-.field-confirm:hover { background: #4a6bd3; }
+.field-confirm { color: #fff; border-color: var(--primary); background: var(--primary); }
+.field-confirm:hover { background: var(--primary-strong); }
 .field-cancel { color: #7d899b; }
 .field-cancel:hover { color: #c94d55; border-color: #e6a9af; background: #fdf2f3; }
 .rule-editor-heading { gap: 10px; }
@@ -320,8 +323,14 @@ select:disabled { opacity: 1; color: #7d899b; background: #f5f7fa; }
 .inspector-actions button { min-height: 32px; height: 32px; border-radius: 7px; font-size: 13px; }
 .inspector-actions #editNodeButton { height: 32px; }
 .flow-node-actions { display: contents; }
-.flow-operation { border-color: var(--blue); color: var(--blue); }
-.flow-operation:hover { background: #eef3ff; }
+.flow-operation { border-color: var(--primary); color: var(--primary); }
+.flow-operation:hover { background: var(--primary-soft); }
+/* 主操作：添加后续/分支节点——填充强调 */
+.flow-operation.add-op { background: var(--primary); border-color: var(--primary); color: #fff; }
+.flow-operation.add-op:hover { background: var(--primary-strong); }
+/* 次操作：前插节点（结构性、易误点）——虚线弱化 + 顶部间距分隔 */
+.flow-operation.insert-op { margin-top: 10px; border-style: dashed; border-color: #ccd2dc; color: #7b869c; background: #fff; }
+.flow-operation.insert-op:hover { background: #f5f6f9; color: #5b6982; border-color: #aeb6c4; }
 .flow-operation.wide,
 .inspector-actions #editNodeButton { grid-column: 1; }
 .form-note { margin: 0; color: #9aa4b4; font-size: 10px; line-height: 1.55; }
@@ -336,6 +345,39 @@ dialog form { display: grid; gap: 15px; padding: 19px; }
 .icon-button { min-width: 30px; width: 30px; padding: 0; font-size: 20px; }
 .confirm-message { margin: 0; color: #5f6d82; font-size: 12px; line-height: 1.65; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 3px; }
+
+/* 画布节点右键上下文菜单 */
+.context-menu {
+    position: fixed; z-index: 60; min-width: 160px; padding: 6px;
+    background: #fff; border: 1px solid #e4e9f1; border-radius: 11px;
+    box-shadow: 0 14px 40px rgba(25,37,63,.18);
+}
+.context-menu .ctx-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; min-height: 34px; border: 0; border-radius: 7px;
+    background: transparent; color: #31405d; font-size: 13px; font-weight: 500;
+    text-align: left; cursor: pointer;
+}
+.context-menu .ctx-item:hover { background: #f2f5fa; }
+.context-menu .ctx-item svg { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.context-menu .ctx-item.hot { color: #0c7d6e; }
+.context-menu .ctx-item.hot:hover { background: var(--primary-soft); }
+.context-menu .ctx-item.danger { color: #c94d55; }
+.context-menu .ctx-item.danger:hover { background: #fdf2f3; }
+.context-menu .ctx-item:disabled { color: #b7c0cd; cursor: not-allowed; background: transparent; }
+.context-menu .ctx-sep { height: 1px; margin: 5px 4px; background: #eef1f6; }
+
+/* 「配置节点」弹窗：更舒展的排版 */
+.node-config-form { gap: 18px; padding: 22px 24px 20px; }
+.node-config-form .dialog-heading { padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
+.node-config-form .dialog-heading h2 { font-size: 18px; letter-spacing: .2px; }
+.node-config-form .detail-field { gap: 8px; }
+.node-config-form .detail-label { color: #56617a; font-size: 12px; font-weight: 600; letter-spacing: .2px; }
+.node-config-form select { height: 42px; padding: 0 12px; border-color: #dbe2ee; border-radius: 9px; font-size: 13px; color: #263550; }
+.node-config-form select:hover { border-color: #c3cedd; }
+.node-config-form .form-note { font-size: 11px; color: #8a94a6; }
+.node-config-form .dialog-actions { margin-top: 4px; padding-top: 16px; border-top: 1px solid #eef1f6; gap: 10px; }
+.node-config-form .dialog-actions button { min-width: 74px; height: 38px; border-radius: 9px; font-size: 13px; }
 
 dialog.rule-dialog {
     width: min(1080px, calc(100vw - 40px)); height: min(720px, calc(100vh - 40px)); max-width: none; max-height: none;
@@ -401,6 +443,7 @@ dialog.rule-dialog {
 }
 .rule-add-rows { display: grid; gap: 8px; }
 .rule-add-row { display: flex; align-items: center; gap: 6px; }
+.rule-add-row > label { flex: 1; min-width: 0; }
 .rule-add-row > select, .rule-add-row > .detail-value { flex: 1; min-width: 0; }
 .rule-add-row > button { flex: 0 0 auto; min-width: 30px; width: 30px; padding: 0; }
 .rule-add-row > button[data-subrule-remove],
@@ -526,11 +569,11 @@ dialog.rule-dialog {
 /* 取反（非）标记与开关 */
 .negate-badge {
     position: absolute; top: -8px; right: -8px;
-    width: 18px; height: 18px; padding: 0;
-    border-radius: 50%; background: #e0575f; color: #fff;
-    font-size: 12px; font-weight: 800; line-height: 1;
+    min-width: 20px; height: 20px; padding: 0 4px;
+    border-radius: 4px; background: #7c5cbf; color: #fff;
+    font-size: 10px; font-weight: 800; line-height: 20px;
     display: inline-flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 0 2px #fff, 0 2px 4px rgba(224,87,95,.35);
+    box-shadow: 0 2px 4px rgba(124,92,191,.35);
     margin: 0; z-index: 5; pointer-events: none;
 }
 .rule-negate-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
@@ -543,3 +586,30 @@ dialog.rule-dialog {
 }
 .switch input:checked ~ .switch-track { background: #e0575f; }
 .switch input:checked ~ .switch-track::after { left: 18px; }
+
+/* ===== 待配置占位节点（编辑期空槽，灰色虚线，点击就地配置）===== */
+/* 圆角与六边形占位统一用内联 SVG 描边（同一 stroke-width / dasharray + non-scaling-stroke），保证虚线完全一致 */
+.node-card.placeholder {
+    min-width: 128px; height: 40px; padding: 6px 16px; overflow: visible;
+    border: 0; border-radius: 0; box-shadow: none;
+    color: #667085; font-weight: 600;
+    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%2040'%20preserveAspectRatio='none'%3E%3Crect%20x='2'%20y='2'%20width='124'%20height='36'%20rx='9'%20ry='9'%20fill='%23f6f7f9'%20stroke='%23b7bfcc'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+}
+.node-shell:has(.node-card.placeholder):hover .node-card.placeholder,
+.node-shell[aria-selected="true"] .node-card.placeholder {
+    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%2040'%20preserveAspectRatio='none'%3E%3Crect%20x='2'%20y='2'%20width='124'%20height='36'%20rx='9'%20ry='9'%20fill='%23eef0f4'%20stroke='%2397a1b1'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+}
+.node-shell:has(.node-card.placeholder)::after { content: none; }
+
+/* 决策条件占位：六边形（虚线描边，与圆角占位完全一致），暗示该槽固定为“条件” */
+.node-card.placeholder.placeholder-hex {
+    min-width: 132px; height: 44px; padding: 6px 22px; overflow: visible;
+    border: 0; border-radius: 0; box-shadow: none; color: #667085;
+    clip-path: none;
+    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20132%2044'%20preserveAspectRatio='none'%3E%3Cpolygon%20points='14.5,2%20117.5,2%20130,22%20117.5,42%2014.5,42%202,22'%20fill='%23f6f7f9'%20stroke='%23b7bfcc'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20stroke-linejoin='round'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+}
+.node-card.placeholder.placeholder-hex::before { content: none; }
+.node-shell:has(.node-card.placeholder.placeholder-hex):hover .node-card.placeholder.placeholder-hex,
+.node-shell[aria-selected="true"] .node-card.placeholder.placeholder-hex {
+    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20132%2044'%20preserveAspectRatio='none'%3E%3Cpolygon%20points='14.5,2%20117.5,2%20130,22%20117.5,42%2014.5,42%202,22'%20fill='%23eef0f4'%20stroke='%2397a1b1'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20stroke-linejoin='round'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+}

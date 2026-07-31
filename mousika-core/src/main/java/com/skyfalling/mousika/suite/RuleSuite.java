@@ -8,7 +8,7 @@ import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.eval.parser.NodeGenerator;
 import com.skyfalling.mousika.eval.result.NodeResult;
-import com.skyfalling.mousika.exception.NoSceneException;
+import com.skyfalling.mousika.exception.NoRuleFlowException;
 import lombok.Getter;
 
 import java.util.*;
@@ -16,7 +16,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 规则套件,针对每个规则场景应用所关联规则集合
+ * 规则套件，负责装配规则、UDF和规则流
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -27,9 +27,9 @@ public class RuleSuite {
      */
     private final RuleEvaluator ruleEvaluator;
     /**
-     * 场景列表
+     * 规则流列表
      */
-    private final Map<String, RuleScene> scenes;
+    private final Map<String, RuleFlow> flows;
 
 
     private final RuleContext ruleContext = null;
@@ -51,23 +51,24 @@ public class RuleSuite {
      *
      * @param ruleDefinitions  规则定义
      * @param udfDefinitions   udf定义
-     * @param sceneDefinitions 场景定义
+     * @param flowDefinitions  规则流定义
      */
-    public RuleSuite(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions, List<SceneDefinition> sceneDefinitions) {
+    public RuleSuite(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions,
+                     List<RuleFlowDefinition> flowDefinitions) {
         this.ruleEvaluator = create(ruleDefinitions, udfDefinitions);
-        this.scenes = sceneDefinitions.stream().map(SceneDefinition::build)
-                .collect(Collectors.toMap(RuleScene::getId, Function.identity(), (v1, v2) -> v2));
+        this.flows = flowDefinitions.stream().map(RuleFlowDefinition::compile)
+                .collect(Collectors.toMap(RuleFlow::getId, Function.identity(), (v1, v2) -> v2));
         current = this;
     }
 
     /**
-     * 获取规则场景
+     * 获取规则流
      *
-     * @param sceneKey 场景key
-     * @return
+     * @param flowId 规则流ID
+     * @return 规则流
      */
-    public RuleScene getRuleScene(String sceneKey) {
-        return scenes.get(sceneKey);
+    public RuleFlow getRuleFlow(String flowId) {
+        return flows.get(flowId);
     }
 
     /**
@@ -83,35 +84,35 @@ public class RuleSuite {
 
 
     /**
-     * 校验场景
+     * 执行规则流
      *
-     * @param sceneId 场景ID
-     * @param target  用于规则计算的对象
-     * @return
+     * @param flowId 规则流ID
+     * @param target 用于规则计算的对象
+     * @return 规则流执行结果
      */
-    public NodeResult evalScene(String sceneId, Object target) {
-        RuleScene ruleScene = scenes.get(String.valueOf(sceneId));
-        if (ruleScene == null) {
-            throw new NoSceneException(sceneId, "no scene defined:" + sceneId);
+    public NodeResult evalFlow(String flowId, Object target) {
+        RuleFlow ruleFlow = flows.get(flowId);
+        if (ruleFlow == null) {
+            throw new NoRuleFlowException(flowId, "no rule flow defined:" + flowId);
         }
-        return this.ruleEvaluator.eval(ruleScene.getRuleNode(), target);
+        return this.ruleEvaluator.eval(ruleFlow.getRoot(), target);
     }
 
 
     /**
-     * 校验场景
+     * 执行规则流
      *
-     * @param sceneId 场景ID
+     * @param flowId  规则流ID
      * @param target  用于规则计算的对象
      * @param context 附加上下文信息
-     * @return
+     * @return 规则流执行结果
      */
-    public NodeResult evalScene(String sceneId, Object target, Map<String, Object> context) {
-        RuleScene ruleScene = scenes.get(String.valueOf(sceneId));
-        if (ruleScene == null) {
-            throw new NoSceneException(sceneId, "no scene defined:" + sceneId);
+    public NodeResult evalFlow(String flowId, Object target, Map<String, Object> context) {
+        RuleFlow ruleFlow = flows.get(flowId);
+        if (ruleFlow == null) {
+            throw new NoRuleFlowException(flowId, "no rule flow defined:" + flowId);
         }
-        return this.ruleEvaluator.eval(ruleScene.getRuleNode(), target, context);
+        return this.ruleEvaluator.eval(ruleFlow.getRoot(), target, context);
     }
 
     /**

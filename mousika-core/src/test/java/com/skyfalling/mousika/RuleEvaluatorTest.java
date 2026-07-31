@@ -8,8 +8,8 @@ import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.result.NodeResult;
 import com.skyfalling.mousika.mock.SimpleRuleLoader;
 import com.skyfalling.mousika.suite.RuleEvaluator;
+import com.skyfalling.mousika.suite.RuleFlowDefinition;
 import com.skyfalling.mousika.suite.RuleSuite;
-import com.skyfalling.mousika.suite.SceneDefinition;
 import com.skyfalling.mousika.udf.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -88,10 +88,10 @@ public class RuleEvaluatorTest {
                             "RuleResult(expr=101,result=false,desc='jack的年龄(17)小于18岁')]), " +
                             "RuleResult(expr=!102,result=true,subRules=[" +
                             "RuleResult(expr=102,result=false,desc='jack的年龄小于18')])]), " +
-                            "RuleResult(expr=105,result=false,desc='调用场景2')])])])"
+                            "RuleResult(expr=105,result=false,desc='调用规则流2')])])])"
             }, delimiter = '#'
     )
-    public void testRuleScene1(String expr1, String expr2, String expected) {
+    public void testRuleFlowCall(String expr1, String expr2, String expected) {
 
         User root = new User("jack", 17);
         SimpleRuleLoader simpleRuleLoader = new SimpleRuleLoader(
@@ -104,20 +104,20 @@ public class RuleEvaluatorTest {
                         new RuleDefinition("104",
                                 "var udf= Java.type('" + AdultValidateUdf.class.getName()
                                         + "'); new udf(18).apply($.name,$.age,$$)", "用户【{$.name}】的年龄不满{$$.minAge}岁"),
-                        new RuleDefinition("105", "sceneCall('sc2',$,$$)", "调用场景2"),
-                        new RuleDefinition("106", "sceneCall('sc2',$,$$)", "用户【{$.name}】不是管理员用户【{$$.admin}】")
+                        new RuleDefinition("105", "flowCall('flow2',$,$$)", "调用规则流2"),
+                        new RuleDefinition("106", "flowCall('flow2',$,$$)", "用户【{$.name}】不是管理员用户【{$$.admin}】")
                 ),
                 Arrays.asList(
                         new UdfDefinition("isAdult", new AdultValidateUdf(18)),
                         new UdfDefinition("isAdmin", new SystemAdminUdf("system")),
-                        new UdfDefinition("sceneCall", new EvalSceneUdf())
+                        new UdfDefinition("flowCall", new EvalFlowUdf())
                 ), Arrays.asList(
-                new SceneDefinition("sc1", "", "c1?" + expr1 + ":c2?" + expr2),
-                new SceneDefinition("sc2", "", "102")
+                new RuleFlowDefinition("flow1", "c1?" + expr1 + ":c2?" + expr2),
+                new RuleFlowDefinition("flow2", "102")
         ));
 
         RuleSuite suite = simpleRuleLoader.loadSuite();
-        String res1 = suite.evalScene("sc1", root).toString();
+        String res1 = suite.evalFlow("flow1", root).toString();
         System.out.println(res1);
         assertEquals(expected, res1);
     }
@@ -138,7 +138,7 @@ public class RuleEvaluatorTest {
                             "RuleResult(expr=104,result=false,desc='用户【jack】的年龄不满18岁')])])])])"
             }, delimiter = '#'
     )
-    public void testRuleScene(String expr1, String expr2, String expected) {
+    public void testRuleExpression(String expr1, String expr2, String expected) {
 
         User root = new User("jack", 17);
         SimpleRuleLoader simpleRuleLoader = new SimpleRuleLoader(

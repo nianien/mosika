@@ -12,7 +12,7 @@ import java.util.List;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-public interface RuleLoader extends SceneLoader {
+public interface RuleLoader {
     /**
      * 加载规则列表
      */
@@ -23,9 +23,11 @@ public interface RuleLoader extends SceneLoader {
      */
     List<UdfDefinition> loadUdfs();
 
-    @Override
-    default List<SceneDefinition> loadScenes() {
-        return Collections.EMPTY_LIST;
+    /**
+     * 加载规则流定义
+     */
+    default List<RuleFlowDefinition> loadFlows() {
+        return Collections.emptyList();
     }
 
 
@@ -38,7 +40,7 @@ public interface RuleLoader extends SceneLoader {
     default RuleSuite loadSuite() {
         List<RuleDefinition> ruleDefinitions = new ArrayList<>(this.loadRules());
         List<UdfDefinition> udfDefinitions = new ArrayList<>(this.loadUdfs());
-        return new RuleSuite(ruleDefinitions, udfDefinitions, loadScenes());
+        return new RuleSuite(ruleDefinitions, udfDefinitions, loadFlows());
     }
 
 

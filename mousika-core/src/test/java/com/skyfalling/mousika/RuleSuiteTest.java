@@ -1,6 +1,8 @@
 package com.skyfalling.mousika;
 
 import com.skyfalling.mousika.engine.RuleDefinition;
+import com.skyfalling.mousika.exception.NoRuleFlowException;
+import com.skyfalling.mousika.suite.RuleFlowDefinition;
 import com.skyfalling.mousika.suite.RuleSuite;
 import org.junit.jupiter.api.Test;
 
@@ -10,13 +12,33 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuleSuiteTest {
+
+    @Test
+    void compilesAndEvaluatesNamedRuleFlow() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition("ready", "true", "ready")),
+                List.of(),
+                List.of(new RuleFlowDefinition("flow", "ready"))
+        );
+
+        assertEquals("ready", suite.getRuleFlow("flow").getRoot().expr());
+        assertEquals(true, suite.evalFlow("flow", new Object()).getResult());
+
+        NoRuleFlowException exception = assertThrows(
+                NoRuleFlowException.class,
+                () -> suite.evalFlow("missing", new Object())
+        );
+        assertEquals("missing", exception.getFlowId());
+    }
 
     @Test
     void publishesCurrentAfterConstruction() throws InterruptedException {
@@ -66,7 +88,7 @@ class RuleSuiteTest {
         assertNull(failure.get());
         assertNotNull(constructed.get());
         assertNotNull(constructed.get().getRuleEvaluator());
-        assertNotNull(constructed.get().getScenes());
+        assertNotNull(constructed.get().getFlows());
         assertSame(constructed.get(), RuleSuite.get());
     }
 }

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原子规则库 · Mousika 规则编排</title>
+<style>
+:root{
+  color-scheme:light;
+  font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  color:#123038;background:#edf4f3;
+  --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
+  --cyan:#0891b2;--cyan-soft:#e3fafd;
+  --green:#1f7a43;--green-soft:#dcf9e4;
+  --lemon:#8a6d0e;--lemon-soft:#fdf6d5;
+  --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+.app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr)}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
+.brandwrap{display:flex;align-items:center}
+.brand{display:flex;align-items:center;gap:11px}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
+.brand b{font-size:15px}.brand small{display:block;color:#6f8b86;font-size:11.5px;margin-top:1px}
+.tabs{display:flex;gap:6px;margin-left:26px}
+.tab{height:32px;padding:0 14px;border-radius:8px;font-size:13px;color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
+.tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
+.top-right{display:flex;align-items:center;gap:12px}
+.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.search input{border:none;outline:none;font-size:13px;width:200px;background:transparent;color:#123038}
+.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:13px;cursor:pointer}
+.btn:hover{border-color:#a9d3cc;background:#f5faf9}
+.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
+.btn.primary:hover{background:var(--teal-d)}
+.btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;cursor:pointer}
+.btn.link.danger{color:#c9504f}
+.main{overflow:auto;padding:22px 26px}
+.page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.page-head .sub{color:#6f8b86;font-size:13px;margin-left:10px;font-weight:400}
+.filters{display:flex;gap:8px}
+.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:12.5px;display:flex;align-items:center;cursor:pointer}
+.chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
+.panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
+table{width:100%;border-collapse:collapse;font-size:13.2px}
+thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:12.5px;background:#f4faf9;border-bottom:1px solid var(--border)}
+tbody td{padding:14px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#f7fcfb}
+.name{font-weight:600;font-size:13.8px}
+.name .id{color:#9fb4af;font-weight:400;font-size:11.5px;margin-left:7px}
+.rowdesc{color:#71887f;font-size:12.2px;margin-top:3px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.expr{font-family:"JetBrains Mono",Menlo,Consolas,monospace;font-size:12px;color:#0b6274;background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:6px;padding:4px 9px;display:inline-block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px}
+.tag.atom{color:var(--green);background:var(--green-soft)}
+.tag.table{color:var(--lemon);background:var(--lemon-soft)}
+.tag.cond{color:var(--green);background:var(--green-soft)}
+.tag.action{color:var(--cyan);background:var(--cyan-soft)}
+.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px}
+.pill.on{color:var(--green);background:var(--green-soft)}.pill.off{color:var(--grey);background:var(--grey-soft)}
+.refbadge{display:inline-flex;align-items:center;gap:5px;color:#3f5f58}
+.refbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
+.refbadge.zero{color:#a7c0ba}.refbadge.zero .dot{background:#cdddd8}
+.actions{display:flex;gap:4px;justify-content:flex-end}
+.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:13.5px}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.show{opacity:.95}
+dialog{border:none;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(460px,92vw)}
+dialog::backdrop{background:rgba(18,48,56,.3)}
+.dlg-head{padding:18px 22px 6px;font-size:16px;font-weight:700}
+.dlg-body{padding:12px 22px;display:flex;flex-direction:column;gap:14px}
+.dlg-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:10px}
+.field label{display:block;font-size:12.5px;color:#5c766f;margin-bottom:7px;font-weight:600}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13.5px;color:#123038;background:#fff;font-family:inherit}
+.field textarea{min-height:64px;resize:vertical;font-family:"JetBrains Mono",Menlo,Consolas,monospace}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brandwrap">
+      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>原子规则库 / Rule Definitions</small></div></div>
+      <div class="tabs"><a class="tab" href="/">业务场景</a><a class="tab on" href="/rules">原子规则库</a></div>
+    </div>
+    <div class="top-right">
+      <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
+      <button class="btn primary" id="newRuleBtn">＋ 新建规则</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="page-head">
+      <div><span style="font-size:19px;font-weight:700">原子规则库</span><span class="sub" id="subCount">场景画布「引用规则」下拉即从这里读取</span></div>
+      <div class="filters" id="filters">
+        <div class="chip on" data-f="">全部</div>
+        <div class="chip" data-f="condition">条件规则</div>
+        <div class="chip" data-f="action">动作规则</div>
+        <div class="chip" data-f="off">已停用</div>
+      </div>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:24%">规则名称 / 描述</th><th style="width:28%">表达式</th><th>类型</th><th>被引用</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="6"><div class="loading">加载中…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<dialog id="ruleDlg">
+  <div class="dlg-head" id="dlgTitle">新建规则</div>
+  <div class="dlg-body">
+    <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
+    <div class="field"><label>描述</label><input id="fDesc" placeholder="一句话说明"></div>
+    <div class="field"><label>分类</label><select id="fKind"><option value="condition">条件规则（用于判断/条件节点）</option><option value="action">动作规则（用于动作节点）</option></select></div>
+    <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script src="/ui/treenode.js?v=20260731-3"></script>
+<script src="/ui/api.js?v=20260731-3"></script>
+<script>
+(() => {
+  "use strict";
+  const T = window.MousikaTree, Api = window.MousikaApi;
+  const $ = (s) => document.querySelector(s);
+  let filter = "";  // "" | atom | table | off
+  let keyword = "";
+  let rules = [];
+  let refCount = new Map(); // ruleId(String) -> 引用场景数
+  let editing = null;
+
+  const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
+  const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+
+  async function loadRefCounts() {
+    refCount = new Map();
+    try {
+      const page = await Api.listFlows({ status: 1, pageSize: 500 });
+      (page.items || []).forEach((f) => {
+        try {
+          const seen = new Set();
+          T.visit(T.deserialize(f.ruleTree), (n) => { if (["R", "A", "C"].includes(n.type) && n.expr) seen.add(n.expr); });
+          seen.forEach((rid) => refCount.set(rid, (refCount.get(rid) || 0) + 1));
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  async function loadRules() {
+    $("#rows").innerHTML = `<tr><td colspan="6"><div class="loading">加载中…</div></td></tr>`;
+    const params = { keyword, pageSize: 200 };
+    if (filter === "condition") { params.ruleKind = "condition"; params.status = 1; }
+    else if (filter === "action") { params.ruleKind = "action"; params.status = 1; }
+    else if (filter === "off") params.status = 0;
+    else params.status = 1;
+    try {
+      const page = await Api.listRules(params);
+      rules = page.items || [];
+      $("#subCount").textContent = `场景画布「引用规则」下拉即从这里读取 · 共 ${page.total} 条`;
+      renderRows();
+    } catch (e) {
+      $("#rows").innerHTML = `<tr><td colspan="6"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
+    }
+  }
+
+  function renderRows() {
+    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="6"><div class="empty">暂无规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
+    $("#rows").innerHTML = rules.map((r) => {
+      const live = r.status === 1;
+      const dim = live ? "" : ' style="opacity:.62"';
+      const cnt = refCount.get(String(r.id)) || 0;
+      const isAction = r.ruleKind === "action";
+      const typeTag = isAction ? `<span class="tag action">动作规则</span>` : `<span class="tag cond">条件规则</span>`;
+      const ops = live
+        ? `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link danger" data-toggle="${r.id}" data-to="0">停用</button>`
+        : `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link" data-toggle="${r.id}" data-to="1">启用</button>`;
+      return `<tr${dim}>
+        <td><div class="name">${esc(r.name)}<span class="id">#${r.id}</span></div><div class="rowdesc">${esc(r.description || "—")}</div></td>
+        <td><span class="expr">${esc(r.expression)}</span></td>
+        <td>${typeTag}</td>
+        <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 场景</span></td>
+        <td><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span></td>
+        <td><div class="actions">${ops}</div></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function openDialog(rule) {
+    editing = rule || null;
+    $("#dlgTitle").textContent = rule ? "编辑规则" : "新建规则";
+    $("#fName").value = rule ? (rule.name || "") : "";
+    $("#fDesc").value = rule ? (rule.description || "") : "";
+    $("#fKind").value = rule ? (rule.ruleKind === "action" ? "action" : "condition") : "condition";
+    $("#fExpr").value = rule ? (rule.expression || "") : "";
+    $("#ruleDlg").showModal();
+    requestAnimationFrame(() => $("#fName").focus());
+  }
+
+  async function saveRule() {
+    const name = $("#fName").value.trim();
+    const expression = $("#fExpr").value.trim();
+    if (!name) { toast("规则名称不能为空"); return; }
+    if (!expression) { toast("表达式不能为空"); return; }
+    const body = { name, description: $("#fDesc").value.trim(), expression, ruleKind: $("#fKind").value, useType: editing ? (editing.useType ?? 0) : 0, status: 1 };
+    try {
+      if (editing) { body.id = editing.id; body.version = editing.version; await Api.updateRule(editing.id, body); }
+      else { await Api.createRule(body); }
+      $("#ruleDlg").close();
+      toast("已保存");
+      await refresh();
+    } catch (e) { toast("保存失败：" + e.message); }
+  }
+
+  async function toggleRule(id, to) {
+    const r = rules.find((x) => x.id === id); if (!r) return;
+    try {
+      if (to === 0) await Api.disableRule(id);
+      else await Api.updateRule(id, { id, name: r.name, description: r.description, expression: r.expression, ruleKind: r.ruleKind, useType: r.useType, status: 1, version: r.version });
+      toast(to === 0 ? "已停用" : "已启用");
+      refresh();
+    } catch (e) { toast("操作失败：" + e.message); }
+  }
+
+  async function refresh() { await loadRefCounts(); await loadRules(); }
+
+  $("#rows").addEventListener("click", (e) => {
+    const ed = e.target.closest("[data-edit]"); if (ed) { const r = rules.find((x) => x.id === Number(ed.dataset.edit)); return openDialog(r); }
+    const t = e.target.closest("[data-toggle]"); if (t) return toggleRule(Number(t.dataset.toggle), Number(t.dataset.to));
+  });
+  $("#filters").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip"); if (!chip) return;
+    document.querySelectorAll("#filters .chip").forEach((c) => c.classList.remove("on"));
+    chip.classList.add("on"); filter = chip.dataset.f; loadRules();
+  });
+  let searchTimer;
+  $("#searchInput").addEventListener("input", (e) => { keyword = e.target.value.trim(); clearTimeout(searchTimer); searchTimer = setTimeout(loadRules, 250); });
+  $("#newRuleBtn").addEventListener("click", () => openDialog(null));
+  $("#dlgCancel").addEventListener("click", () => $("#ruleDlg").close());
+  $("#dlgSave").addEventListener("click", saveRule);
+
+  refresh();
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,46 @@ mvn clean test
 
 规则中的 JavaScript 由 GraalJS Polyglot 执行。普通 JDK 21 可以正常运行；高频 JavaScript 场景建议使用支持 GraalJS 优化运行时的 GraalVM。
 
+## RuleFlow：命名规则编排
+
+`RuleFlow` 是内核中的命名规则编排实体，对外提供 Flow 能力，内部以 `RuleNode` 树表达串行、并行、条件和决策等执行结构：
+
+```text
+RuleFlowDefinition(id, dsl)
+          │ compile
+          ▼
+RuleFlow(id, RuleNode root)
+          │ evalFlow
+          ▼
+NodeResult
+```
+
+- `RuleFlowDefinition` 是声明态，只保存规则流 ID 和 DSL。
+- `RuleFlow` 是运行态，保存规则流 ID 和编译后的根节点。
+- `RuleLoader.loadFlows()` 加载规则流定义，`RuleSuite` 在完成规则和 UDF 装配后统一编译并管理规则流。
+- `RuleSuite.getRuleFlow()` 获取命名规则流；`evalFlow()` 执行规则流，并保持现有 `NodeResult` 结果契约。
+
+```java
+RuleFlowDefinition flow = new RuleFlowDefinition(
+        "flow1",
+        "a->(b=>c)->d"
+);
+
+RuleSuite suite = new RuleSuite(
+        ruleDefinitions,
+        udfDefinitions,
+        List.of(flow)
+);
+
+NodeResult result = suite.evalFlow("flow1", target);
+```
+
+注册 `EvalFlowUdf` 后，规则表达式可以通过 `sys.flow.eval(flowId, target, context)` 调用另一条规则流。该能力属于内核规则流之间的组合，不包含业务场景含义。
+
+业务系统如需按场景、产品或策略选择规则流，应在内核外维护业务标识到 `flowId` 的映射。`RuleFlow` 不保存业务配置，也不负责解释业务结果。
+
+这里的 Flow 不依赖传统流程图或通用 Graph 数据结构。`RuleFlow.root` 是递归组合树：并行子树完成即表示该局部作用域自然汇合，公共后续流程由外层串行节点表达，因此不需要多入边、隐式汇合点、环或 DAG。树是 Flow 的结构实现和作用域约束，Flow 是该实体对外提供的能力。
+
 ## 1. 串行执行
 
 ![img.png](mousika-ui/src/main/resources/img/serial.png)

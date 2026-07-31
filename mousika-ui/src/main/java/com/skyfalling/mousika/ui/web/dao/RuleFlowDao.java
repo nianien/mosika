@@ -1,0 +1,139 @@
+package com.skyfalling.mousika.ui.web.dao;
+
+import com.skyfalling.mousika.ui.web.entity.RuleFlowEntity;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
+
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * {@code rule_flow} 表的持久化访问对象。
+ *
+ * @author skyfalling {@literal <skyfalling@live.com>}
+ */
+@Repository
+@RequiredArgsConstructor
+public class RuleFlowDao {
+
+    private final JdbcTemplate jdbc;
+
+    private static final RowMapper<RuleFlowEntity> MAPPER = (rs, i) -> RuleFlowEntity.builder()
+            .id(rs.getLong("id"))
+            .name(rs.getString("name"))
+            .description(rs.getString("description"))
+            .ruleTree(rs.getString("rule_tree"))
+            .status(rs.getInt("status"))
+            .version(rs.getLong("version"))
+            .createdAt(rs.getString("created_at"))
+            .updatedAt(rs.getString("updated_at"))
+            .build();
+
+    public long insert(RuleFlowEntity e) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbc.update(conn -> {
+            PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO rule_flow (name, description, rule_tree, status, version) " +
+                            "VALUES (?, ?, ?, ?, 0)",
+                    Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, e.getName());
+            ps.setString(2, e.getDescription() == null ? "" : e.getDescription());
+            ps.setString(3, e.getRuleTree());
+            ps.setInt(4, e.getStatus() == null ? 1 : e.getStatus());
+            return ps;
+        }, keyHolder);
+        Number k = keyHolder.getKey();
+        if (k == null) {
+            throw new IllegalStateException("failed to obtain generated id");
+        }
+        return k.longValue();
+    }
+
+    public int update(RuleFlowEntity e) {
+        return jdbc.update(
+                "UPDATE rule_flow " +
+                        "SET name=?, description=?, rule_tree=?, status=?, " +
+                        "    version=version+1, updated_at=datetime('now') " +
+                        "WHERE id=? AND version=?",
+                e.getName(),
+                e.getDescription() == null ? "" : e.getDescription(),
+                e.getRuleTree(),
+                e.getStatus() == null ? 1 : e.getStatus(),
+                e.getId(),
+                e.getVersion());
+    }
+
+    public int disable(long id, long version) {
+        return jdbc.update(
+                "UPDATE rule_flow SET status=0, version=version+1, updated_at=datetime('now') " +
+                        "WHERE id=? AND version=?",
+                id, version);
+    }
+
+    public RuleFlowEntity findById(long id) {
+        List<RuleFlowEntity> list = jdbc.query(
+                "SELECT * FROM rule_flow WHERE id=?", MAPPER, id);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public List<RuleFlowEntity> list(Integer status, String keyword, int offset, int limit) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM rule_flow WHERE 1=1");
+        List<Object> args = new ArrayList<>();
+        if (status != null) {
+            sql.append(" AND status=?");
+            args.add(status);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (name LIKE ? OR description LIKE ?)");
+            String like = "%" + keyword + "%";
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        args.add(limit);
+        args.add(offset);
+        return jdbc.query(sql.toString(), MAPPER, args.toArray());
+    }
+
+    public int count(Integer status, String keyword) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM rule_flow WHERE 1=1");
+        List<Object> args = new ArrayList<>();
+        if (status != null) {
+            sql.append(" AND status=?");
+            args.add(status);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (name LIKE ? OR description LIKE ?)");
+            String like = "%" + keyword + "%";
+            args.add(like);
+            args.add(like);
+        }
+        Integer n = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
+        return n == null ? 0 : n;
+    }
+
+    public List<RuleFlowEntity> listActive() {
+        return jdbc.query(
+                "SELECT * FROM rule_flow WHERE status=1 ORDER BY id ASC",
+                MAPPER);
+    }
+
+    /** 一次拿仅存在的 id 集合，用于引用完整性校验。 */
+    public java.util.Set<Long> existingIds(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptySet();
+        }
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        return new java.util.HashSet<>(jdbc.query(
+                "SELECT id FROM rule_flow WHERE id IN (" + placeholders + ")",
+                (rs, i) -> rs.getLong(1),
+                ids.toArray()));
+    }
+}

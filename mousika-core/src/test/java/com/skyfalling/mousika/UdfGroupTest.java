@@ -111,18 +111,20 @@ public class UdfGroupTest {
     }
 
     @Test
-    public void testSaySceneCheck() {
+    public void testArgumentsCheck() {
         RuleEngine engine = RuleEngine.builder()
                 .ruleDefinitions(Arrays.asList(
-                        new RuleDefinition("1", "sys.checkScene(\"11\", 11, $$, {\"river\":\"ChangJiang\"})", "sys.checkScene")
+                        new RuleDefinition("1", "sys.checkArguments(\"11\", 11, $$, {\"river\":\"ChangJiang\"})",
+                                "sys.checkArguments")
                 ))
                 .udfDefinitions(Arrays.asList(
-                        new UdfDefinition("sys", "checkScene", new CheckSceneUdf())
+                        new UdfDefinition("sys", "checkArguments", new CheckArgumentsUdf())
                 )).build();
         String arg = "China";
         NodeResult result = new RuleEvaluator(engine).eval(NodeBuilder.build("1"), arg);
         System.out.println(result);
-        assertEquals("NodeResult(expr=1, result=success, details=[RuleResult(expr=1,result=success,desc='sys.checkScene')])",
+        assertEquals("NodeResult(expr=1, result=success, " +
+                        "details=[RuleResult(expr=1,result=success,desc='sys.checkArguments')])",
                 result.toString());
     }
 

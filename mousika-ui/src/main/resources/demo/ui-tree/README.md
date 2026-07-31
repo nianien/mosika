@@ -28,4 +28,4 @@
 - “适应画布”会在节点增删、折叠后重新计算可视区域。
 - 性能基准工具见 `bench/`（`bench/index.html` + `bench/run.mjs` + 说明）；`?bench=1` 仅在带该参数时暴露只读/测试用的 `window.__mousikaBench` 桥，正常打开 `index.html` 不启用、也不会运行基准。
 
-该页面只验证交互和递归布局，数据保存在浏览器内存中，使用统一的 `{type, relation, expression, children}` 结构，并不与后端真实 UI JSON（`next` / `action` / `branches` / `rule` / `rules` / `expr`、`HNode` 的 `minHits`+`maxHits` 等）双向映射，也不执行 “UI → JSON → UI → Rule” 往返校验；它是交互与布局原型，不改变 `mousika-ui` 作为树结构适配层的模块定位。
+该页面只验证交互和递归布局，数据保存在浏览器内存中，使用统一的 `{type, relation, expression, children}` 结构，并不与后端真实 UI JSON（`next` / `action` / `branches` / `rule` / `rules` / `expr`、`HNode` 的 `minHits`+`maxHits` 等）双向映射，也不执行 “UI → JSON → UI → Rule” 往返校验；它是交互与布局原型，不改变 `mousika-ui` 作为树结构适配层的模块定位。真实集成时，UI AST 经 `UINodeAdapter.toRule()` 单向编译得到的 `RuleNode` 可以作为内核 `RuleFlow.root`；`RuleFlow` 对外表达流程能力，底层仍保持当前树结构、子树作用域和执行语义。

@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: mousika-ui
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    # WAL 提升读并发；busy_timeout 缓解写锁；DB 文件默认落到项目独立的 ./data 目录
+    url: jdbc:sqlite:${mousika.db.path:./data/mousika.db}?journal_mode=WAL&busy_timeout=5000&foreign_keys=on
+    hikari:
+      # SQLite 单写模型，池设为 1 避免写锁竞争
+      maximum-pool-size: 1
+      minimum-idle: 1
+      pool-name: mousika-sqlite
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: false
+  jackson:
+    default-property-inclusion: non_null
+
+mousika:
+  db:
+    path: ./data/mousika.db
+
+logging:
+  level:
+    root: INFO
+    com.skyfalling.mousika: DEBUG

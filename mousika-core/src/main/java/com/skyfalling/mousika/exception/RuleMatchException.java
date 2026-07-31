@@ -10,18 +10,24 @@ import lombok.Getter;
  */
 @Getter
 public class RuleMatchException extends RuntimeException {
-    private String sceneId;
+    private final String ruleId;
 
     /**
-     *
+     * @param ruleId  规则ID
+     * @param message 异常信息
+     * @param e       原始异常
      */
-    public RuleMatchException(String sceneId, String message, Throwable e) {
+    public RuleMatchException(String ruleId, String message, Throwable e) {
         super(message, e);
-        this.sceneId = sceneId;
+        this.ruleId = ruleId;
     }
 
-    public RuleMatchException(String sceneId, String message) {
+    /**
+     * @param ruleId  规则ID
+     * @param message 异常信息
+     */
+    public RuleMatchException(String ruleId, String message) {
         super(message);
-        this.sceneId = sceneId;
+        this.ruleId = ruleId;
     }
 }

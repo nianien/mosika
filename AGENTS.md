@@ -8,6 +8,10 @@
 - `mousika-ui/` 不包含真正的页面或布局，只把内核语法树转换为前端容易序列化、递归遍历和渲染的数据结构。
 - 生产代码和测试分别位于各模块的 `src/main/java`、`src/test/java`；不要修改 `target/generated-sources/` 中的生成代码。
 
+内核使用 `RuleFlow` 承载一条完整的命名规则编排。`RuleFlowDefinition` 是由 `id` 和 `dsl` 组成的声明态，编译后得到由 `id` 和 `RuleNode root` 组成的运行态 `RuleFlow`；`RuleLoader.loadFlows()` 负责加载定义，`RuleSuite.getRuleFlow()` 和 `evalFlow()` 负责查找与执行。Flow 是对外能力，Tree 是其结构实现：串行、并行、条件和决策通过递归组合节点定义作用域，不使用多入边、隐式汇合、环或通用 DAG。
+
+业务场景、产品、策略等标识到 `flowId` 的映射属于内核外部。不得在 `RuleFlow`、`RuleFlowDefinition` 或 `RuleSuite` 中重新加入业务配置、结果解析类型或 `Scene` 抽象；规则流之间的内核级调用使用 `EvalFlowUdf` / `sys.flow.eval`。
+
 ## 核心设计理念
 
 `RuleNode` 及其组合节点是规则语义的唯一来源。`->` 表示串行，`=>` 表示并行，条件、逻辑组合和 `hits(min,max,...)` 均可递归嵌套；`_` 表示命中区间的一侧不设边界，例如 `hits(2,_,a,b,c)`。`∅` 只用于稳定表达 `SNode`、`PNode` 等结构，不参与业务计算。
