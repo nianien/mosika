@@ -205,7 +205,6 @@
             ? childEdges(node).filter((edge) => edge.relation === "action").map((edge) => edge.node)
             : [];
     }
-    function judgeParts(node) { return { rule: jrule(node), flows: jflows(node) }; }
 
     function countNodes(node) {
         return 1 + childNodes(node).reduce((sum, child) => sum + countNodes(child), 0);
@@ -1249,19 +1248,6 @@
         render({ preserveView: true });
     }
 
-    function populateNewNodeTypes() {
-        const types = RELATIONS[addRelation]?.types || [];
-        populateTypeSelect($("#newNodeType"), types);
-        $("#newNodeType").value = types.includes("A") ? "A" : types[0];
-        updateNewNodeFields();
-    }
-
-    function newNodeDefinitions(nodeType) {
-        if (nodeType === "J") return RULE_DEFINITIONS;
-        if (nodeType === "A") return ACTION_DEFINITIONS;
-        return [];
-    }
-
     function populateNewNodeDefinitions() {
         // 方案B：添加/插入/占位配置面板一律只选“节点类型”，引用规则改在节点上配置，
         // 故这里始终隐藏“引用规则”下拉，保证各类型的创建面板结构完全一致。
@@ -1271,20 +1257,6 @@
         select.disabled = true;
         select.required = false;
         select.innerHTML = "";
-    }
-
-    function populateNewNodeAnchors(parent) {
-        const positionable = ["branch", "decision"].includes(addRelation);
-        const children = positionable ? groupMembers(parent, addRelation) : [];
-        const placementField = $("#newNodePlacementField");
-        const placement = $("#newNodePlacement");
-        const anchor = $("#newNodeAnchor");
-        placementField.hidden = !(children.length > 0);
-        placement.value = "last";
-        anchor.innerHTML = children
-            .map((child, index) => `<option value="${escapeText(idOf(child))}">${index + 1}. ${escapeText(flowNodeDisplayName(child))}</option>`)
-            .join("");
-        updatePlacementVisibility();
     }
 
     function updatePlacementVisibility() {
@@ -1533,29 +1505,6 @@
         render({ preserveView: true });
         markDraft();
         requestAnimationFrame(() => openRuleDialog(idOf(j)));
-    }
-
-    function addNode() {
-        const found = selectedId ? findNode(selectedId) : null;
-        if (!found || !availableRelations(found.node).includes(addRelation)) return;
-        const parent = found.node;
-        const type = $("#newNodeType").value;
-        // 方案B：添加只选类型；动作/条件建成“待配置”，规则在节点上配。
-        const node = ["S", "P", "D"].includes(type) ? buildStructuralScaffold(type) : buildFlowNode(type);
-        if (!node) return;
-        const blocked = limitBlockReason(parent, node);
-        if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
-        setCollapsed(parent, false);
-        const placement = $("#newNodePlacementField").hidden ? "last" : $("#newNodePlacement").value;
-        const anchorId = $("#newNodeAnchor").value;
-        attachChild(parent, addRelation, node, placement, anchorId);
-        selectedId = idOf(node);
-        addRelation = null;
-        $("#inspectorAddPanel").hidden = true;
-        fitMode = false;
-        render({ preserveView: true });
-        markDraft();
-        return node;
     }
 
     function insertNodeBefore() {

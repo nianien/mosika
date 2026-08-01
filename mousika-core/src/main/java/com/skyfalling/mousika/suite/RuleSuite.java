@@ -3,7 +3,6 @@ package com.skyfalling.mousika.suite;
 import com.skyfalling.mousika.engine.RuleDefinition;
 import com.skyfalling.mousika.engine.RuleEngine;
 import com.skyfalling.mousika.engine.UdfDefinition;
-import com.skyfalling.mousika.eval.context.RuleContext;
 import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.eval.parser.NodeGenerator;
@@ -30,9 +29,6 @@ public class RuleSuite {
      * 规则流列表
      */
     private final Map<String, RuleFlow> flows;
-
-
-    private final RuleContext ruleContext = null;
 
 
     private static volatile RuleSuite current;
