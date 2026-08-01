@@ -184,6 +184,15 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-foot"><button class="btn" id="statusCancel">取消</button><button class="btn primary" id="statusConfirm">确认</button></div>
 </dialog>
 
+<dialog id="errDlg" aria-labelledby="errDlgTitle" aria-describedby="errDlgMessage">
+  <div class="dlg-head" id="errDlgTitle">操作未完成</div>
+  <div class="dlg-body">
+    <p class="confirm-message" id="errDlgMessage"></p>
+    <p class="confirm-note" id="errDlgDetail" hidden></p>
+  </div>
+  <div class="dlg-foot"><button class="btn primary" id="errDlgClose">知道了</button></div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script src="/ui/api.js?v=20260802-1"></script>
@@ -208,6 +217,37 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
   const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+
+  // 把后端英文技术错误映射为可读中文；返回 {msg, detail}。detail 为原始信息（仅在有助于排查时展示）。
+  function friendlyError(raw) {
+    const m = String(raw || "");
+    if (m.includes("rule kind does not match")) {
+      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「条件规则」、动作位置只能引用「动作规则」。请打开画布检查并调整后再生效。", detail: m };
+    }
+    if (m.includes("unknown or disabled rule")) {
+      return { msg: "引用了不存在或已停用的规则，请先到「原子规则库」启用相关规则后再重试。", detail: m };
+    }
+    if (m.includes("must use numeric") || m.includes("built-in reference")) {
+      return { msg: "存在不受支持的规则引用，请打开画布检查引用后再生效。", detail: m };
+    }
+    if (m.includes("structural validation") || m.includes("compile failed") || m.includes("ruleTree")) {
+      return { msg: "规则流结构校验未通过，请打开画布修正后再生效。", detail: m };
+    }
+    if (m.includes("updated by others") || m.includes("version")) {
+      return { msg: "该规则流已被其他操作修改，请刷新页面后重试。", detail: "" };
+    }
+    return { msg: m || "操作未完成，请稍后重试。", detail: "" };
+  }
+
+  function showError(raw, title) {
+    const { msg, detail } = friendlyError(raw);
+    $("#errDlgTitle").textContent = title || "操作未完成";
+    $("#errDlgMessage").textContent = msg;
+    const d = $("#errDlgDetail");
+    if (detail && detail !== msg) { d.textContent = detail; d.hidden = false; } else { d.hidden = true; }
+    const dlg = $("#errDlg");
+    if (!dlg.open) dlg.showModal();
+  }
 
   async function loadRuleNames() {
     try {
@@ -334,7 +374,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       closeDrawer(true);
       await loadFlows();
       if (openAfter) openCanvas(id);
-    } catch (e) { toast("保存失败：" + e.message); }
+    } catch (e) { showError(e.message, "保存失败"); }
     finally {
       drawerSaving = false;
       $("#dwSave").disabled = false; $("#dwOpen").disabled = false;
@@ -393,7 +433,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       // 清除请求态后再重绘，避免新生成的开关继承旧请求的 pending 状态。
       pendingFlowIds.delete(id);
       await loadFlows();
-    } catch (e) { toast("操作失败：" + e.message); }
+    } catch (e) { showError(e.message, action === "disable" ? "停用失败" : "生效失败"); }
     finally {
       pendingFlowIds.delete(id);
       if (button.isConnected) {
@@ -417,7 +457,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       });
       $("#newDlg").close();
       openCanvas(created.id);
-    } catch (e) { toast("创建失败：" + e.message); }
+    } catch (e) { showError(e.message, "创建失败"); }
   }
 
   // events
@@ -445,6 +485,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#newCreate").addEventListener("click", createFlow);
   $("#statusCancel").addEventListener("click", closeStatusDialog);
   $("#statusConfirm").addEventListener("click", confirmStatusChange);
+  $("#errDlgClose").addEventListener("click", () => $("#errDlg").close());
   $("#statusDlg").addEventListener("cancel", () => {
     const target = statusDialogTarget;
     statusDialogTarget = null;
