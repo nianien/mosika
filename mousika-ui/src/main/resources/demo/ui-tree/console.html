@@ -51,6 +51,7 @@ tbody tr:hover{background:#f7fcfb}
 .rowdesc{color:#71887f;font-size:12.3px;margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px;white-space:nowrap}
 .pill.live{color:var(--green);background:var(--green-soft)}
+.pill.draft{color:#b5852a;background:#fbf1d9}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
 .num{font-variant-numeric:tabular-nums;color:#3f5f58}
 .time{color:#8aa39d;font-variant-numeric:tabular-nums}
@@ -111,7 +112,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       <div class="filters" id="filters">
         <div class="chip on" data-status="">全部</div>
         <div class="chip" data-status="1">已生效</div>
-        <div class="chip" data-status="0">已停用</div>
+        <div class="chip" data-status="0">草稿</div>
+        <div class="chip" data-status="2">已停用</div>
       </div>
     </div>
     <div class="panel">
@@ -127,8 +129,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dw-head"><h2>场景详情 <span class="pill live" id="dwStatusPill">已生效</span></h2><button class="x" id="dwClose">✕</button></div>
     <div class="dw-body">
       <div class="field"><label>场景名称</label><input id="dwName" maxlength="60"></div>
-      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">名称与描述保存后立即生效，不影响已编排的规则流程结构。</div></div>
-      <div class="field"><label>状态</label><div class="statusseg"><div class="seg on" data-seg="1">已生效</div><div class="seg" data-seg="0">停用</div></div></div>
+      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响规则流程结构与状态；状态通过列表的「生效 / 停用」变更。</div></div>
       <div>
         <div class="sec-title">概览</div>
         <div class="metarow">
@@ -204,18 +205,28 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }
   }
 
+  const STATUS_META = {
+    0: { label: "草稿", cls: "draft" },
+    1: { label: "已生效", cls: "live" },
+    2: { label: "已停用", cls: "off" }
+  };
+
   function renderRows() {
     if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
     $("#rows").innerHTML = flows.map((f) => {
       const a = analyze(f.ruleTree);
-      const live = f.status === 1;
-      const dim = live ? "" : ' style="opacity:.62"';
-      const ops = live
-        ? `<button class="open" data-open="${f.id}">打开画布</button><button class="btn link" data-detail="${f.id}">详情</button><button class="btn link danger" data-toggle="${f.id}" data-to="0">停用</button>`
-        : `<button class="open" data-open="${f.id}">打开画布</button><button class="btn link" data-detail="${f.id}">详情</button><button class="btn link" data-toggle="${f.id}" data-to="1">启用</button>`;
+      const meta = STATUS_META[f.status] || STATUS_META[0];
+      const dim = f.status === 1 ? "" : ' style="opacity:.62"';
+      const openBtn = `<button class="open" data-open="${f.id}">打开画布</button><button class="btn link" data-detail="${f.id}">详情</button>`;
+      const publishBtn = `<button class="btn link" data-action="publish" data-id="${f.id}">生效</button>`;
+      const disableBtn = `<button class="btn link danger" data-action="disable" data-id="${f.id}">停用</button>`;
+      let ops;
+      if (f.status === 1) ops = openBtn + disableBtn;
+      else if (f.status === 2) ops = openBtn + publishBtn;
+      else ops = openBtn + publishBtn + disableBtn;
       return `<tr${dim}>
         <td><div class="name">${esc(f.name)}<span class="id">#${f.id}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
-        <td><span class="pill ${live ? "live" : "off"}">${live ? "已生效" : "已停用"}</span></td>
+        <td><span class="pill ${meta.cls}">${meta.label}</span></td>
         <td class="num">${a.ids.length}</td>
         <td class="time">${esc((f.updatedAt || "").slice(5, 16))}</td>
         <td><div class="actions">${ops}</div></td>
@@ -245,8 +256,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function closeDrawer() { $("#scrim").classList.remove("show"); $("#drawer").classList.remove("show"); current = null; }
   function setDrawerStatus(v) {
     drawerStatus = v;
-    document.querySelectorAll("#drawer .seg").forEach((s) => s.classList.toggle("on", Number(s.dataset.seg) === v));
-    const pill = $("#dwStatusPill"); pill.textContent = v === 1 ? "已生效" : "已停用"; pill.className = "pill " + (v === 1 ? "live" : "off");
+    const meta = STATUS_META[v] || STATUS_META[0];
+    const pill = $("#dwStatusPill"); pill.textContent = meta.label; pill.className = "pill " + meta.cls;
   }
 
   async function saveDrawer(openAfter) {
@@ -254,9 +265,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const name = $("#dwName").value.trim();
     if (!name) { toast("场景名称不能为空"); return; }
     try {
-      const updated = await Api.updateFlow(current.id, {
-        id: current.id, name, description: $("#dwDesc").value.trim(),
-        ruleTree: current.ruleTree, status: drawerStatus, version: current.version
+      await Api.updateFlowMeta(current.id, {
+        name, description: $("#dwDesc").value.trim(), version: current.version
       });
       toast("已保存");
       const id = current.id;
@@ -266,12 +276,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     } catch (e) { toast("保存失败：" + e.message); }
   }
 
-  async function toggleStatus(id, to) {
+  async function doAction(id, action) {
     const f = flows.find((x) => x.id === id); if (!f) return;
     try {
-      if (to === 0) { await Api.disableFlow(id, f.version); }
-      else { await Api.updateFlow(id, { id, name: f.name, description: f.description, ruleTree: f.ruleTree, status: 1, version: f.version }); }
-      toast(to === 0 ? "已停用" : "已启用");
+      if (action === "disable") {
+        await Api.disableFlow(id, f.version);
+        toast("已停用");
+      } else if (action === "publish") {
+        await Api.publishFlow(id, { id, name: f.name, description: f.description, ruleTree: f.ruleTree, version: f.version });
+        toast("已生效");
+      }
       loadFlows();
     } catch (e) { toast("操作失败：" + e.message); }
   }
@@ -282,7 +296,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     try {
       const created = await Api.createFlow({
         name, description: $("#newDesc").value.trim(),
-        ruleTree: JSON.stringify({ type: "T", expr: "", next: { type: "A", expr: "∅" } }), status: 1
+        ruleTree: JSON.stringify({ type: "T", expr: "", next: { type: "A", expr: "∅" } })
       });
       $("#newDlg").close();
       openCanvas(created.id);
@@ -293,7 +307,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#rows").addEventListener("click", (e) => {
     const o = e.target.closest("[data-open]"); if (o) return openCanvas(Number(o.dataset.open));
     const d = e.target.closest("[data-detail]"); if (d) return openDrawer(Number(d.dataset.detail));
-    const t = e.target.closest("[data-toggle]"); if (t) return toggleStatus(Number(t.dataset.toggle), Number(t.dataset.to));
+    const t = e.target.closest("[data-action]"); if (t) return doAction(Number(t.dataset.id), t.dataset.action);
   });
   $("#filters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
@@ -307,7 +321,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#scrim").addEventListener("click", closeDrawer);
   $("#dwSave").addEventListener("click", () => saveDrawer(false));
   $("#dwOpen").addEventListener("click", () => saveDrawer(true));
-  document.querySelectorAll("#drawer .seg").forEach((s) => s.addEventListener("click", () => setDrawerStatus(Number(s.dataset.seg))));
   $("#newFlowBtn").addEventListener("click", () => { $("#newName").value = ""; $("#newDesc").value = ""; $("#newDlg").showModal(); requestAnimationFrame(() => $("#newName").focus()); });
   $("#newCancel").addEventListener("click", () => $("#newDlg").close());
   $("#newCreate").addEventListener("click", createFlow);

@@ -28,7 +28,21 @@ public class RuleFlowController {
     @PutMapping("/{id}")
     public ApiResponse<RuleFlowEntity> update(@PathVariable long id,
                                               @RequestBody RuleFlowEntity req) {
-        return ApiResponse.ok(service.update(id, req));
+        return ApiResponse.ok(service.saveDraft(id, req));
+    }
+
+    /** 生效：全量校验+编译并发布进运行态。 */
+    @PostMapping("/{id}/publish")
+    public ApiResponse<RuleFlowEntity> publish(@PathVariable long id,
+                                               @RequestBody RuleFlowEntity req) {
+        return ApiResponse.ok(service.publish(id, req));
+    }
+
+    /** 仅编辑名称/描述（不改树与状态）。 */
+    @PutMapping("/{id}/meta")
+    public ApiResponse<RuleFlowEntity> updateMeta(@PathVariable long id,
+                                                  @RequestBody RuleFlowEntity req) {
+        return ApiResponse.ok(service.updateMeta(id, req));
     }
 
     @DeleteMapping("/{id}")

@@ -62,4 +62,24 @@ public final class RuleTreeCompiler {
         Set<String> collected = new LinkedHashSet<>(tree.collect());
         return new CompileResult(tree.toJson(), ruleNode.expr(), collected);
     }
+
+    /**
+     * 草稿保存用的宽松规范化：仅要求 JSON 可反序列化为 {@link TreeNode}（防止存入垃圾），
+     * 返回规范 JSON，但不做结构校验、不编译。无法解析则抛 {@link IllegalArgumentException}。
+     */
+    public static String canonicalizeLenient(String treeJson) {
+        if (treeJson == null || treeJson.isBlank()) {
+            throw new IllegalArgumentException("ruleTree cannot be blank");
+        }
+        TreeNode tree;
+        try {
+            tree = JsonUtils.toBean(treeJson, TreeNode.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("ruleTree is not a valid TreeNode JSON: " + e.getMessage(), e);
+        }
+        if (tree == null) {
+            throw new IllegalArgumentException("ruleTree deserialized to null");
+        }
+        return tree.toJson();
+    }
 }

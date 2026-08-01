@@ -84,19 +84,14 @@ public class RuleSuiteManager {
     /**
      * 全量重建 RuleSuite：读所有启用中的规则与规则流，构造 {@link RuleDefinition}
      * 与 {@link RuleFlowDefinition} 传给 {@link RuleSuite} 构造函数。
+     * <p>
+     * 弹性：整体构建失败（例如手工改库引入坏表达式）时记录错误并保留上一份可用快照，
+     * 不将 {@link #current} 置空，避免单条坏数据污染整个运行态。
      */
     public void refresh() {
         refreshLock.lock();
         try {
-            List<RuleDefinition> ruleDefs = new ArrayList<>();
-            for (RuleDefinitionEntity e : ruleDao.listActive()) {
-                RuleDefinition rd = new RuleDefinition(
-                        String.valueOf(e.getId()),
-                        e.getExpression(),
-                        e.getDescription() == null ? "" : e.getDescription());
-                rd.setUseType(e.getUseType() == null ? 0 : e.getUseType());
-                ruleDefs.add(rd);
-            }
+            List<RuleDefinition> ruleDefs = toRuleDefs(ruleDao.listActive());
 
             List<RuleFlowDefinition> flowDefs = new ArrayList<>();
             for (RuleFlowEntity f : flowDao.listActive()) {
@@ -115,8 +110,40 @@ public class RuleSuiteManager {
             this.current = next;
             log.info("RuleSuite refreshed: {} rules, {} flows, {} udfs",
                     ruleDefs.size(), flowDefs.size(), udfDefs.size());
+        } catch (Exception e) {
+            // 保留上一份快照；不置空 current，避免坏数据把运行态打空。
+            log.error("refresh RuleSuite failed, keep previous snapshot", e);
         } finally {
             refreshLock.unlock();
+        }
+    }
+
+    private List<RuleDefinition> toRuleDefs(java.util.Collection<RuleDefinitionEntity> entities) {
+        List<RuleDefinition> ruleDefs = new ArrayList<>();
+        for (RuleDefinitionEntity e : entities) {
+            RuleDefinition rd = new RuleDefinition(
+                    String.valueOf(e.getId()),
+                    e.getExpression(),
+                    e.getDescription() == null ? "" : e.getDescription());
+            rd.setUseType(e.getUseType() == null ? 0 : e.getUseType());
+            ruleDefs.add(rd);
+        }
+        return ruleDefs;
+    }
+
+    /**
+     * 预编译校验：用给定的（预期启用）规则集合尝试构造一份候选 RuleSuite，
+     * 构造失败即抛 {@link BusinessException}(400)，供规则写库前确认“新 RuleSuite 可构造”。
+     */
+    public void assertRulesBuildable(java.util.Collection<RuleDefinitionEntity> activeRules) {
+        try {
+            new RuleSuite(toRuleDefs(activeRules), defaultUdfs(), new ArrayList<>());
+        } catch (Exception e) {
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            throw new BusinessException(400, "rule expression compile failed: " + root.getMessage());
         }
     }
 

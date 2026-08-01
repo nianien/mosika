@@ -109,7 +109,11 @@
     };
 
     // ---- 语义树 + 旁路编辑器状态（选中/折叠/临时 id 不进语义树）----
-    let tree = sampleTree();
+    // 真实流程（带 flowId）初始为空白根，等待后端加载替换，避免把内置演示假数据当成真实流程闪现；
+    // 独立演示 / bench 才用 sampleTree。
+    const emptyTree = () => ({ type: "T", expr: "", next: null });
+    let tree = resolveFlowId() ? emptyTree() : sampleTree();
+    let flowLoadFailed = false;
     let idSeq = 0;
     const idMap = new WeakMap();
     const collapsedIds = new Set();
@@ -1627,7 +1631,7 @@
         const textEl = $("#docStatusText");
         const pill = $("#docStatus");
         if (!textEl || !pill) return;
-        textEl.textContent = docStatus === "formal" ? "已生效" : "草稿";
+        textEl.textContent = docStatus === "formal" ? "已生效" : docStatus === "disabled" ? "已停用" : "草稿";
         pill.classList.toggle("status-formal", docStatus === "formal");
     }
 
@@ -1642,8 +1646,9 @@
 
     function setSaveBusy(busy) {
         const a = $("#saveDraftButton"), b = $("#promoteButton");
-        if (a) a.disabled = busy;
-        if (b) b.disabled = busy;
+        const off = busy || flowLoadFailed;
+        if (a) a.disabled = off;
+        if (b) b.disabled = off;
     }
 
     // 存在待配置占位时拦截保存/生效（占位无后端表示，无法序列化）。返回 true 表示已拦截。
@@ -1656,7 +1661,8 @@
         return false;
     }
 
-    // 保存到后端：过滤瞬时态后 serialize(tree) → PUT /api/flows/{id}；成功后按 makeFormal 更新胶囊。
+    // 保存到后端：过滤瞬时态后 serialize(tree) → 草稿走 PUT /api/flows/{id}，生效走 POST /publish；
+    // 不再由前端传 status（后端按端点决定草稿/生效，PUT 不能发布）。
     async function saveToBackend(makeFormal) {
         if (savingFlow) return true;
         if (placeholderGate()) return false;
@@ -1669,15 +1675,18 @@
         try {
             const payload = {
                 id: flowMeta.id, name: flowMeta.name, description: flowMeta.description,
-                ruleTree: JSON.stringify(T.serialize(tree)), status: 1, version: flowMeta.version
+                ruleTree: JSON.stringify(T.serialize(tree)), version: flowMeta.version
             };
-            const updated = await window.MousikaApi.updateFlow(flowMeta.id, payload);
+            const updated = makeFormal
+                ? await window.MousikaApi.publishFlow(flowMeta.id, payload)
+                : await window.MousikaApi.updateFlow(flowMeta.id, payload);
             if (updated) { flowMeta.version = updated.version; flowMeta.name = updated.name; flowMeta.description = updated.description; }
             docStatus = makeFormal ? "formal" : "draft";
             updateDocStatus(); pulseStatus();
             return true;
         } catch (e) {
-            openConfirm(`保存失败：${e.message}`, { title: "保存失败", confirmLabel: "知道了" });
+            openConfirm(`${makeFormal ? "生效" : "保存"}失败：${e.message}`,
+                { title: makeFormal ? "生效失败" : "保存失败", confirmLabel: "知道了" });
             return false;
         } finally {
             savingFlow = false; setSaveBusy(false);
@@ -1690,16 +1699,25 @@
         const problems = [];
         walk(tree, (node) => {
             if (node.type !== "D") return true;
-            // 与后端一致的最低要求：决策节点至少要有一个结果（一条决策分支或默认分支）。
-            // 后端允许「仅默认分支」「仅条件分支」「决策分支无命中流程」，故这些不再判为不完整。
+            // 与后端 TreeVisitor 契约一致：分支节点至少两个结果（决策分支+默认分支合计≥2），
+            // 且每条决策分支都必须配置命中后的后续动作。
             const decisions = node.branches.length;
             const hasDefault = !!node.action;
-            if (decisions === 0 && !hasDefault) {
+            const outcomes = decisions + (hasDefault ? 1 : 0);
+            if (outcomes < 2) {
                 problems.push({
                     id: idOf(node), name: flowNodeDisplayName(node),
-                    reason: "分支节点至少需要一个结果（决策分支或默认分支）"
+                    reason: "分支节点至少需要两个结果（决策分支与默认分支合计 ≥ 2）"
                 });
             }
+            node.branches.forEach((branch) => {
+                if (!branch.action) {
+                    problems.push({
+                        id: idOf(branch), name: flowNodeDisplayName(branch),
+                        reason: "决策分支必须配置命中后的后续动作"
+                    });
+                }
+            });
             return true;
         });
         return problems;
@@ -2338,9 +2356,15 @@
             if (titleEl) titleEl.textContent = flow.name || "流程画布";
             document.title = `${flow.name || "规则流程"} · Mousika`;
             loadTree(flow.ruleTree);
-            docStatus = "formal"; updateDocStatus();
+            docStatus = flow.status === 1 ? "formal" : flow.status === 2 ? "disabled" : "draft";
+            updateDocStatus();
         } catch (e) {
             console.error("加载规则流程失败", e);
+            // 只读错误态：禁用保存/生效，避免把空白画布当成真实流程覆盖后端。
+            flowLoadFailed = true;
+            setSaveBusy(false);
+            const titleEl = document.querySelector(".canvas-titlebar strong");
+            if (titleEl) titleEl.textContent = "加载失败";
             openConfirm(`加载规则流程失败：${e.message}`, { title: "加载失败", confirmLabel: "知道了" });
         }
     })();

@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS rule_flow (
     name        TEXT    NOT NULL,
     description TEXT    NOT NULL DEFAULT '',
     rule_tree   TEXT    NOT NULL,
-    status      INTEGER NOT NULL DEFAULT 1,
+    -- 0=draft 草稿（不校验、不进运行态）/ 1=published 已生效（编译发布进 RuleSuite）/ 2=disabled 已停用
+    -- 新建流程默认草稿；老库 status=0 原语义为“停用”，由 DbMigrator 依 PRAGMA user_version 一次性迁移为 2。
+    status      INTEGER NOT NULL DEFAULT 0,
     version     INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))

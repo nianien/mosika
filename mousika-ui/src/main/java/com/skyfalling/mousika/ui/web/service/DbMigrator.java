@@ -38,6 +38,25 @@ public class DbMigrator {
         } catch (Exception e) {
             log.warn("DbMigrator: 创建 rule_kind 索引失败（可忽略）：{}", e.getMessage());
         }
+        migrateFlowStatusSemantics();
+    }
+
+    /**
+     * rule_flow.status 语义升级：旧库 0=停用/1=启用；新语义 0=草稿/1=已生效/2=已停用。
+     * 用 {@code PRAGMA user_version} 保证只执行一次，避免把新草稿（也用 status=0）误当停用。
+     */
+    private void migrateFlowStatusSemantics() {
+        try {
+            Integer v = jdbc.queryForObject("PRAGMA user_version", Integer.class);
+            int userVersion = v == null ? 0 : v;
+            if (userVersion < 1) {
+                int moved = jdbc.update("UPDATE rule_flow SET status=2 WHERE status=0");
+                jdbc.execute("PRAGMA user_version = 1");
+                log.info("DbMigrator: 迁移 rule_flow 旧停用状态(0→2) 共 {} 行，user_version→1", moved);
+            }
+        } catch (Exception e) {
+            log.warn("DbMigrator: rule_flow 状态语义迁移异常（可忽略若已迁移）：{}", e.getMessage());
+        }
     }
 
     private void addColumnIfMissing(String table, String column, String alterSql) {

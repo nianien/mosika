@@ -33,28 +33,77 @@ public class RuleFlowService {
     private final FlowRuleRefDao refDao;
     private final RuleSuiteManager suiteManager;
 
+    /** rule_flow.status 取值。 */
+    public static final int DRAFT = 0;
+    public static final int PUBLISHED = 1;
+    public static final int DISABLED = 2;
+
+    /** 新建：始终落为草稿（不校验语义、不进运行态）。 */
     @Transactional
     public RuleFlowEntity create(RuleFlowEntity req) {
         basicCheck(req);
-        CompileResult compiled = RuleTreeCompiler.compile(req.getRuleTree());
-        Set<Long> refIds = verifyReferences(compiled.getReferenced());
-        req.setRuleTree(compiled.getCanonicalJson());
+        req.setRuleTree(RuleTreeCompiler.canonicalizeLenient(req.getRuleTree()));
+        req.setStatus(DRAFT);
         long id = flowDao.insert(req);
-        refDao.replaceForFlow(id, refIds);
-        suiteManager.refreshAsyncAfterCommit();
+        refDao.replaceForFlow(id, java.util.Collections.emptySet());
         return flowDao.findById(id);
     }
 
+    /**
+     * 保存草稿：不做结构/编译校验，仅规范化 JSON；强制 status=草稿（PUT 无法发布）。
+     * 若原为已生效，转草稿后从运行态移除（refresh 只装载 published）。
+     */
     @Transactional
-    public RuleFlowEntity update(long id, RuleFlowEntity req) {
+    public RuleFlowEntity saveDraft(long id, RuleFlowEntity req) {
         RuleFlowEntity existing = requireFlow(id);
         if (req.getVersion() == null) {
             throw new IllegalArgumentException("version is required for update (expected " + existing.getVersion() + ")");
         }
         basicCheck(req);
+        req.setId(id);
+        req.setStatus(DRAFT);
+        req.setRuleTree(RuleTreeCompiler.canonicalizeLenient(req.getRuleTree()));
+        int rows = flowDao.update(req);
+        if (rows == 0) {
+            throw new BusinessException(409, "flow updated by others, please retry (expected version=" + req.getVersion() + ")");
+        }
+        // 草稿不进运行态：清空引用（活跃引用检查按 status=1 过滤，草稿本就不计入）。
+        refDao.replaceForFlow(id, java.util.Collections.emptySet());
+        suiteManager.refreshAsyncAfterCommit();
+        return flowDao.findById(id);
+    }
+
+    /** 仅编辑元数据（名称/描述），不改树与状态、不触发运行态刷新。 */
+    @Transactional
+    public RuleFlowEntity updateMeta(long id, RuleFlowEntity req) {
+        RuleFlowEntity existing = requireFlow(id);
+        if (req.getVersion() == null) {
+            throw new IllegalArgumentException("version is required for update (expected " + existing.getVersion() + ")");
+        }
+        if (req.getName() == null || req.getName().isBlank()) {
+            throw new IllegalArgumentException("flow name is required");
+        }
+        int rows = flowDao.updateMeta(id, req.getName(), req.getDescription(), req.getVersion());
+        if (rows == 0) {
+            throw new BusinessException(409, "flow updated by others, please retry (expected version=" + req.getVersion() + ")");
+        }
+        return flowDao.findById(id);
+    }
+
+    /**
+     * 生效：全量校验+编译，通过后以规范 JSON 落库、status=已生效、重建引用并发布进 RuleSuite。
+     */
+    @Transactional
+    public RuleFlowEntity publish(long id, RuleFlowEntity req) {
+        RuleFlowEntity existing = requireFlow(id);
+        if (req.getVersion() == null) {
+            throw new IllegalArgumentException("version is required for publish (expected " + existing.getVersion() + ")");
+        }
+        basicCheck(req);
         CompileResult compiled = RuleTreeCompiler.compile(req.getRuleTree());
         Set<Long> refIds = verifyReferences(compiled.getReferenced());
         req.setId(id);
+        req.setStatus(PUBLISHED);
         req.setRuleTree(compiled.getCanonicalJson());
         int rows = flowDao.update(req);
         if (rows == 0) {

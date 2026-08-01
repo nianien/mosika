@@ -29,6 +29,10 @@ public class RuleDefinitionService {
     @Transactional
     public RuleDefinitionEntity create(RuleDefinitionEntity req) {
         validate(req);
+        // 阻断1：预编译校验——把本次新增并入当前启用集合，确认新 RuleSuite 可构造再落库。
+        java.util.List<RuleDefinitionEntity> prospective = new java.util.ArrayList<>(ruleDao.listActive());
+        prospective.add(req);
+        suiteManager.assertRulesBuildable(prospective);
         long id = ruleDao.insert(req);
         suiteManager.refreshAsyncAfterCommit();
         return ruleDao.findById(id);
@@ -41,10 +45,34 @@ public class RuleDefinitionService {
             throw new IllegalArgumentException("version is required for update (expected " + existing.getVersion() + ")");
         }
         req.setId(id);
+        // status 只能经由启用/停用专用路径变更，PUT 不得携带 status 绕过引用检查。
+        req.setStatus(existing.getStatus());
         validate(req);
+        // 阻断1：把本次变更并入当前启用集合（按 id 替换），确认可构造再提交。
+        java.util.List<RuleDefinitionEntity> prospective = new java.util.ArrayList<>(ruleDao.listActive());
+        prospective.removeIf(r -> r.getId() != null && r.getId() == id);
+        prospective.add(req);
+        suiteManager.assertRulesBuildable(prospective);
         int rows = ruleDao.update(req);
         if (rows == 0) {
             throw new BusinessException(409, "rule updated by others, please retry (expected version=" + req.getVersion() + ")");
+        }
+        suiteManager.refreshAsyncAfterCommit();
+        return ruleDao.findById(id);
+    }
+
+    @Transactional
+    public RuleDefinitionEntity enable(long id, Long expectedVersion) {
+        RuleDefinitionEntity existing = requireRule(id);
+        long version = expectedVersion != null ? expectedVersion : existing.getVersion();
+        // 启用前确认表达式可编译，避免坏规则进入运行态。
+        java.util.List<RuleDefinitionEntity> prospective = new java.util.ArrayList<>(ruleDao.listActive());
+        prospective.removeIf(r -> r.getId() != null && r.getId() == id);
+        prospective.add(existing);
+        suiteManager.assertRulesBuildable(prospective);
+        int rows = ruleDao.enable(id, version);
+        if (rows == 0) {
+            throw new BusinessException(409, "rule updated by others, please retry");
         }
         suiteManager.refreshAsyncAfterCommit();
         return ruleDao.findById(id);

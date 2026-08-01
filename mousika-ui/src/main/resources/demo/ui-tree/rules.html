@@ -218,7 +218,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const r = rules.find((x) => x.id === id); if (!r) return;
     try {
       if (to === 0) await Api.disableRule(id, r.version);
-      else await Api.updateRule(id, { id, name: r.name, description: r.description, expression: r.expression, ruleKind: r.ruleKind, useType: r.useType, status: 1, version: r.version });
+      else await Api.enableRule(id, r.version);
       toast(to === 0 ? "已停用" : "已启用");
       refresh();
     } catch (e) { toast("操作失败：" + e.message); }

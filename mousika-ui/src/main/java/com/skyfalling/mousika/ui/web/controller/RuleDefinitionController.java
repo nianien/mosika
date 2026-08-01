@@ -38,6 +38,13 @@ public class RuleDefinitionController {
         return ApiResponse.ok();
     }
 
+    /** 重新启用（编译校验通过后置为启用）。 */
+    @PostMapping("/{id}/enable")
+    public ApiResponse<RuleDefinitionEntity> enable(@PathVariable long id,
+                                                    @RequestParam(required = false) Long version) {
+        return ApiResponse.ok(service.enable(id, version));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<RuleDefinitionEntity> get(@PathVariable long id) {
         RuleDefinitionEntity e = service.findById(id);

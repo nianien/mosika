@@ -94,6 +94,16 @@ public class RuleDefinitionDao {
                 id, version);
     }
 
+    /**
+     * 重新启用。
+     */
+    public int enable(long id, long version) {
+        return jdbc.update(
+                "UPDATE rule_definition SET status=1, version=version+1, updated_at=datetime('now') " +
+                        "WHERE id=? AND version=?",
+                id, version);
+    }
+
     public RuleDefinitionEntity findById(long id) {
         List<RuleDefinitionEntity> list = jdbc.query(
                 "SELECT * FROM rule_definition WHERE id=?", MAPPER, id);

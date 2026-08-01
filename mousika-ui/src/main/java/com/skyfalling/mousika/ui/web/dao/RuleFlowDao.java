@@ -46,7 +46,7 @@ public class RuleFlowDao {
             ps.setString(1, e.getName());
             ps.setString(2, e.getDescription() == null ? "" : e.getDescription());
             ps.setString(3, e.getRuleTree());
-            ps.setInt(4, e.getStatus() == null ? 1 : e.getStatus());
+            ps.setInt(4, e.getStatus() == null ? 0 : e.getStatus());
             return ps;
         }, keyHolder);
         Number k = keyHolder.getKey();
@@ -70,9 +70,21 @@ public class RuleFlowDao {
                 e.getVersion());
     }
 
+    /** 仅更新名称/描述（不动 rule_tree 与 status），供详情抽屉的元数据编辑使用。 */
+    public int updateMeta(long id, String name, String description, long version) {
+        return jdbc.update(
+                "UPDATE rule_flow SET name=?, description=?, version=version+1, updated_at=datetime('now') " +
+                        "WHERE id=? AND version=?",
+                name,
+                description == null ? "" : description,
+                id,
+                version);
+    }
+
+    /** 停用（新语义 status=2；0 现表示草稿）。 */
     public int disable(long id, long version) {
         return jdbc.update(
-                "UPDATE rule_flow SET status=0, version=version+1, updated_at=datetime('now') " +
+                "UPDATE rule_flow SET status=2, version=version+1, updated_at=datetime('now') " +
                         "WHERE id=? AND version=?",
                 id, version);
     }
