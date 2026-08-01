@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS rule_definition (
     rule_kind   TEXT    NOT NULL DEFAULT 'condition',  -- condition 条件规则 / action 动作规则
     status      INTEGER NOT NULL DEFAULT 1,
     version     INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_rule_definition_status   ON rule_definition(status);
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS rule_flow (
     -- 新建流程默认草稿；老库 status=0 原语义为“停用”，由 DbMigrator 依 PRAGMA user_version 一次性迁移为 2。
     status      INTEGER NOT NULL DEFAULT 0,
     version     INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_rule_flow_status ON rule_flow(status);

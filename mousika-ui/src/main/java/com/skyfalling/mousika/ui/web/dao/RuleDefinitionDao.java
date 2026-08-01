@@ -47,8 +47,8 @@ public class RuleDefinitionDao {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(conn -> {
             PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO rule_definition (name, description, expression, use_type, rule_kind, status, version) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, 0)",
+                    "INSERT INTO rule_definition (name, description, expression, use_type, rule_kind, status, version, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
                     Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, e.getName());
             ps.setString(2, e.getDescription() == null ? "" : e.getDescription());
@@ -72,7 +72,7 @@ public class RuleDefinitionDao {
         return jdbc.update(
                 "UPDATE rule_definition " +
                         "SET name=?, description=?, expression=?, use_type=?, rule_kind=?, status=?, " +
-                        "    version=version+1, updated_at=datetime('now') " +
+                        "    version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 e.getName(),
                 e.getDescription() == null ? "" : e.getDescription(),
@@ -89,7 +89,7 @@ public class RuleDefinitionDao {
      */
     public int disable(long id, long version) {
         return jdbc.update(
-                "UPDATE rule_definition SET status=0, version=version+1, updated_at=datetime('now') " +
+                "UPDATE rule_definition SET status=0, version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 id, version);
     }
@@ -99,7 +99,7 @@ public class RuleDefinitionDao {
      */
     public int enable(long id, long version) {
         return jdbc.update(
-                "UPDATE rule_definition SET status=1, version=version+1, updated_at=datetime('now') " +
+                "UPDATE rule_definition SET status=1, version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 id, version);
     }

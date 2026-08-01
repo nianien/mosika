@@ -98,6 +98,11 @@ public class RuleDefinitionService {
         return ruleDao.findById(id);
     }
 
+    /** 每条规则被多少个已生效流程引用（来自 flow_rule_ref，不下载全部流程树）。 */
+    public java.util.Map<Long, Integer> refCounts() {
+        return refDao.refCountsByActiveFlow();
+    }
+
     public java.util.Map<String, Object> page(Integer status, Integer useType, String ruleKind,
                                                String keyword, int pageNumber, int pageSize) {
         int p = Math.max(pageNumber, 1);

@@ -138,14 +138,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function loadRefCounts() {
     refCount = new Map();
     try {
-      const page = await Api.listFlows({ status: 1, pageSize: 500 });
-      (page.items || []).forEach((f) => {
-        try {
-          const seen = new Set();
-          T.visit(T.deserialize(f.ruleTree), (n) => { if (["R", "A", "C"].includes(n.type) && n.expr) seen.add(n.expr); });
-          seen.forEach((rid) => refCount.set(rid, (refCount.get(rid) || 0) + 1));
-        } catch (_) {}
-      });
+      const counts = await Api.getRuleRefCounts(); // { ruleId: 引用的已生效流程数 }
+      Object.entries(counts || {}).forEach(([rid, n]) => refCount.set(String(rid), n));
     } catch (_) {}
   }
 

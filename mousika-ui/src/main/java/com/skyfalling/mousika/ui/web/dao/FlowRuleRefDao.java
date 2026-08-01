@@ -6,9 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,10 +39,6 @@ public class FlowRuleRefDao {
         jdbc.batchUpdate("INSERT OR IGNORE INTO flow_rule_ref (flow_id, rule_id) VALUES (?, ?)", batch);
     }
 
-    public void deleteByFlow(long flowId) {
-        jdbc.update("DELETE FROM flow_rule_ref WHERE flow_id=?", flowId);
-    }
-
     /** 反查：某条 rule 目前被哪些启用中的 flow 引用。 */
     public Set<Long> activeFlowsReferencing(long ruleId) {
         List<Long> ids = jdbc.query(
@@ -53,50 +50,20 @@ public class FlowRuleRefDao {
         return new HashSet<>(ids);
     }
 
-    public Set<Long> flowsReferencing(long ruleId) {
-        List<Long> ids = jdbc.query(
-                "SELECT flow_id FROM flow_rule_ref WHERE rule_id=?",
-                (rs, i) -> rs.getLong(1),
-                ruleId);
-        return new HashSet<>(ids);
-    }
-
-    public Set<Long> ruleIdsOfFlow(long flowId) {
-        List<Long> ids = jdbc.query(
-                "SELECT rule_id FROM flow_rule_ref WHERE flow_id=?",
-                (rs, i) -> rs.getLong(1),
-                flowId);
-        return new HashSet<>(ids);
-    }
-
-    public void clearAll() {
-        jdbc.update("DELETE FROM flow_rule_ref");
-    }
-
-    /** 用 (flowId, ruleIds) 批量重建引用表（全量刷新时使用）。 */
-    public void bulkReplace(java.util.Map<Long, ? extends Collection<Long>> flowRefs) {
-        clearAll();
-        if (flowRefs == null || flowRefs.isEmpty()) {
-            return;
-        }
-        List<Object[]> batch = new ArrayList<>();
-        for (var entry : flowRefs.entrySet()) {
-            Long flowId = entry.getKey();
-            if (entry.getValue() == null) {
-                continue;
-            }
-            for (Long rid : entry.getValue()) {
-                batch.add(new Object[]{flowId, rid});
-            }
-        }
-        if (!batch.isEmpty()) {
-            jdbc.batchUpdate("INSERT OR IGNORE INTO flow_rule_ref (flow_id, rule_id) VALUES (?, ?)", batch);
-        }
-    }
-
-    /** 用于工具方法：预留空实现避免未使用告警。 */
-    @SuppressWarnings("unused")
-    private static Collection<Long> empty() {
-        return Collections.emptyList();
+    /**
+     * 全量统计：每条 rule 被多少个“已生效(status=1)”的 flow 引用。
+     * 供原子规则库列表直接取引用数，避免下载并解析全部流程树。
+     */
+    public Map<Long, Integer> refCountsByActiveFlow() {
+        Map<Long, Integer> counts = new HashMap<>();
+        jdbc.query(
+                "SELECT r.rule_id, COUNT(*) AS c FROM flow_rule_ref r " +
+                        "JOIN rule_flow f ON f.id = r.flow_id " +
+                        "WHERE f.status=1 GROUP BY r.rule_id",
+                (rs, i) -> {
+                    counts.put(rs.getLong("rule_id"), rs.getInt("c"));
+                    return null;
+                });
+        return counts;
     }
 }

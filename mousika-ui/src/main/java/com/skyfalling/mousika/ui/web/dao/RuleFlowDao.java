@@ -11,7 +11,6 @@ import org.springframework.stereotype.Repository;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -40,8 +39,8 @@ public class RuleFlowDao {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(conn -> {
             PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO rule_flow (name, description, rule_tree, status, version) " +
-                            "VALUES (?, ?, ?, ?, 0)",
+                    "INSERT INTO rule_flow (name, description, rule_tree, status, version, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
                     Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, e.getName());
             ps.setString(2, e.getDescription() == null ? "" : e.getDescription());
@@ -60,7 +59,7 @@ public class RuleFlowDao {
         return jdbc.update(
                 "UPDATE rule_flow " +
                         "SET name=?, description=?, rule_tree=?, status=?, " +
-                        "    version=version+1, updated_at=datetime('now') " +
+                        "    version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 e.getName(),
                 e.getDescription() == null ? "" : e.getDescription(),
@@ -73,7 +72,7 @@ public class RuleFlowDao {
     /** 仅更新名称/描述（不动 rule_tree 与 status），供详情抽屉的元数据编辑使用。 */
     public int updateMeta(long id, String name, String description, long version) {
         return jdbc.update(
-                "UPDATE rule_flow SET name=?, description=?, version=version+1, updated_at=datetime('now') " +
+                "UPDATE rule_flow SET name=?, description=?, version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 name,
                 description == null ? "" : description,
@@ -84,7 +83,7 @@ public class RuleFlowDao {
     /** 停用（新语义 status=2；0 现表示草稿）。 */
     public int disable(long id, long version) {
         return jdbc.update(
-                "UPDATE rule_flow SET status=2, version=version+1, updated_at=datetime('now') " +
+                "UPDATE rule_flow SET status=2, version=version+1, updated_at=datetime('now','localtime') " +
                         "WHERE id=? AND version=?",
                 id, version);
     }
@@ -135,17 +134,5 @@ public class RuleFlowDao {
         return jdbc.query(
                 "SELECT * FROM rule_flow WHERE status=1 ORDER BY id ASC",
                 MAPPER);
-    }
-
-    /** 一次拿仅存在的 id 集合，用于引用完整性校验。 */
-    public java.util.Set<Long> existingIds(java.util.Collection<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return Collections.emptySet();
-        }
-        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
-        return new java.util.HashSet<>(jdbc.query(
-                "SELECT id FROM rule_flow WHERE id IN (" + placeholders + ")",
-                (rs, i) -> rs.getLong(1),
-                ids.toArray()));
     }
 }

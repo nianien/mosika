@@ -43,6 +43,7 @@
         validateFlow: (flow) => request("POST", "/flows/validate", flow),
         // rules
         listRules: (params) => request("GET", `/rules${qs(params)}`),
+        getRuleRefCounts: () => request("GET", "/rules/ref-counts"),
         getRule: (id) => request("GET", `/rules/${id}`),
         createRule: (rule) => request("POST", "/rules", rule),
         updateRule: (id, rule) => request("PUT", `/rules/${id}`, rule),

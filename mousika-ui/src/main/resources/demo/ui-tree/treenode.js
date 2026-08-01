@@ -177,7 +177,8 @@
                 break;
             case "J":
                 node.expr = "J";
-                node.rule = fromObject(o.rule || { type: "R", expr: "true" });
+                if (!o.rule) throw new Error("JNode 缺少 rule，拒绝反序列化（损坏数据不应被静默补成 true）");
+                node.rule = fromObject(o.rule);
                 if (o.action) node.action = fromObject(o.action);
                 break;
             case "S":

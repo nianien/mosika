@@ -45,6 +45,12 @@ public class RuleDefinitionController {
         return ApiResponse.ok(service.enable(id, version));
     }
 
+    /** 每条规则被多少个已生效流程引用（rule_id → count）。 */
+    @GetMapping("/ref-counts")
+    public ApiResponse<Map<Long, Integer>> refCounts() {
+        return ApiResponse.ok(service.refCounts());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<RuleDefinitionEntity> get(@PathVariable long id) {
         RuleDefinitionEntity e = service.findById(id);

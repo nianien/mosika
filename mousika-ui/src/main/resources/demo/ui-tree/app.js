@@ -2341,11 +2341,21 @@
         // 无 flowId = 独立演示，保留内置示例与演示规则定义，不触碰后端。
         if (!flowId) return;
         try {
-            const rulePage = await window.MousikaApi.listRules({ status: 1, pageSize: 500 });
-            if (rulePage && Array.isArray(rulePage.items)) {
-                applyRuleDefinitions(rulePage.items);
-                render({ preserveView: true });
+            // 后端分页上限 200；循环翻页取全量启用规则，避免 >200 条时下拉不完整。
+            const pageSize = 200;
+            let pageNumber = 1;
+            let all = [];
+            let total = Infinity;
+            while (all.length < total) {
+                const rulePage = await window.MousikaApi.listRules({ status: 1, pageNumber, pageSize });
+                if (!rulePage || !Array.isArray(rulePage.items)) break;
+                all = all.concat(rulePage.items);
+                total = typeof rulePage.total === "number" ? rulePage.total : all.length;
+                if (rulePage.items.length < pageSize) break;
+                pageNumber += 1;
             }
+            applyRuleDefinitions(all);
+            render({ preserveView: true });
         } catch (e) { console.error("加载规则定义失败", e); }
 
         try {
