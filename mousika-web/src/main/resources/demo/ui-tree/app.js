@@ -2303,6 +2303,8 @@
             flowMeta = { id: flow.id, name: flow.name, description: flow.description, version: flow.version };
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = flow.name || "流程画布";
+            const crumbEl = document.getElementById("flowCrumbName");
+            if (crumbEl) crumbEl.textContent = flow.name || "规则树编辑器";
             document.title = `${flow.name || "规则流程"} · Mousika`;
             loadTree(flow.ruleTree);
             docStatus = flow.status === 1 ? "formal" : flow.status === 2 ? "disabled" : "draft";
@@ -2316,6 +2318,8 @@
             showLoadError(`规则流程加载失败：${e.message}`);
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = "加载失败";
+            const crumbEl = document.getElementById("flowCrumbName");
+            if (crumbEl) crumbEl.textContent = "加载失败";
             openConfirm(`加载规则流程失败：${e.message}`, { title: "加载失败", confirmLabel: "知道了" });
         }
     })();

@@ -72,9 +72,15 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .brand div { display: flex; align-items: center; gap: 5px; }
 .brand strong { font-size: 14px; }
-.back-link { color: var(--primary-strong); font-size: 14px; font-weight: 650; text-decoration: none; }
-.back-link:hover { text-decoration: underline; }
-.back-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 3px; }
+.back-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border: 1px solid var(--primary); border-radius: 999px;
+    color: var(--primary-strong); font-size: 13px; font-weight: 650; text-decoration: none;
+    background: var(--primary-soft);
+}
+.back-link:hover { background: var(--primary); color: #fff; }
+.back-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 999px; }
+.crumb-sep { color: #b6c2cf; font-size: 13px; margin: 0 2px; }
 
 .toolbar { display: flex; align-items: center; gap: 6px; }
 .toolbar button { white-space: nowrap; }
