@@ -1,6 +1,8 @@
 package com.skyfalling.mousika.ui.tree;
 
 import com.skyfalling.mousika.eval.node.RuleNode;
+import com.skyfalling.mousika.eval.parser.NodeBuilder;
+import com.skyfalling.mousika.eval.parser.NodeGenerator;
 import com.skyfalling.mousika.ui.tree.node.TreeNode;
 import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import com.skyfalling.mousika.ui.tree.node.flow.ANode;
@@ -14,6 +16,7 @@ import com.skyfalling.mousika.ui.tree.node.rule.LNode;
 import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -112,6 +115,18 @@ public class TreeNodeTest {
         TreeNode redundantTree = tree(redundantDecision);
         assertThrows(IllegalStateException.class, redundantTree::validate);
         assertThrows(IllegalArgumentException.class, redundantTree::toRule);
+    }
+
+    @Test
+    public void testStructuralMinimumCardinality() {
+        assertThrows(IllegalStateException.class, tree(new SNode())::validate);
+        assertThrows(IllegalStateException.class, tree(new PNode())::validate);
+        assertThrows(IllegalStateException.class,
+                tree(j(LNode.and().addRule(r("r1")), null))::validate);
+
+        JNode missingRule = new JNode();
+        missingRule.setRule(null);
+        assertThrows(IllegalStateException.class, tree(missingRule)::validate);
     }
 
     @Test
@@ -244,6 +259,44 @@ public class TreeNodeTest {
         root.addBranch(decision);
 
         assertJsonAndRuleRoundTrip(tree(root));
+    }
+
+    @Test
+    public void testIterativeTreeSizeValidation() {
+        TreeNode deep = new TreeNode();
+        ANode current = assertInstanceOf(ANode.class, deep.getNext());
+        for (int i = 0; i < 128; i++) {
+            ANode next = a("a" + i);
+            current.setNext(next);
+            current = next;
+        }
+        assertThrows(IllegalStateException.class, () -> deep.validateSize(128, 2000));
+
+        TreeNode repeated = new TreeNode();
+        SNode serial = new SNode();
+        ANode shared = a("shared");
+        serial.addBranch(shared).addBranch(shared);
+        repeated.setNext(serial);
+        assertThrows(IllegalStateException.class, () -> repeated.validateSize(128, 2000));
+
+        TreeNode wide = new TreeNode();
+        SNode many = new SNode();
+        for (int i = 0; i < 20; i++) {
+            many.addBranch(a("a" + i));
+        }
+        wide.setNext(many);
+        wide.validateSize(128, 32);
+        assertThrows(IllegalStateException.class, () -> wide.validateSize(128, 16));
+    }
+
+    @Test
+    public void testUiCompilationIgnoresGlobalCompositeGenerator() {
+        NodeBuilder.setGenerator(NodeGenerator.create(Map.of("c1", "c2&&c3")));
+        try {
+            assertEquals("c1", tree(j(r("c1"), null)).toRule().expr());
+        } finally {
+            NodeBuilder.setGenerator(NodeGenerator.create());
+        }
     }
 
     private void assertTopLevelRule(RNode rule, String expression) {

@@ -11,14 +11,12 @@ import com.skyfalling.mousika.ui.tree.node.rule.HNode;
 import com.skyfalling.mousika.ui.tree.node.rule.LNode;
 import com.skyfalling.mousika.ui.tree.node.rule.RNode;
 import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * 处理UI树节点类型的序列化与反序列化,支持多态
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Slf4j
 public class NodeTypeResolver extends TypeIdResolverBase {
     @Override
     public String idFromValue(Object value) {
@@ -27,7 +25,6 @@ public class NodeTypeResolver extends TypeIdResolverBase {
 
     @Override
     public String idFromValueAndType(Object value, Class<?> suggestedType) {
-        log.info("suggestedType{}", suggestedType);
         return idFromValue(value);
     }
 

@@ -11,7 +11,6 @@ import com.skyfalling.mousika.eval.result.EvalResult;
 import com.skyfalling.mousika.eval.result.RuleResult;
 import com.skyfalling.mousika.exception.RuleEvalException;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +23,6 @@ import java.util.stream.Collectors;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Slf4j
 @Getter
 public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleContext {
 
@@ -78,19 +76,25 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         }
         EvalNode evalNode = new EvalNode(node);
         boolean isExprNode = node.getClass() == ExprNode.class;
-        currentEval.get().add(evalNode);
+        EvalNode parent = currentEval.get();
+        parent.add(evalNode);
         if (!isExprNode) {
-            evalNode.setParent(currentEval.get());
+            evalNode.setParent(parent);
             currentEval.set(evalNode);
         }
-        EvalResult result = node.eval(this);
-        if (!isExprNode) {
-            //缓存非叶子节点的执行结果
-            this.cache(node.expr(), result);
-            //复合节点执行完毕,回溯到父节点
-            currentEval.set(currentEval.get().getParent());
+        try {
+            EvalResult result = node.eval(this);
+            if (!isExprNode) {
+                //缓存非叶子节点的执行结果
+                this.cache(node.expr(), result);
+            }
+            return result;
+        } finally {
+            if (!isExprNode) {
+                // 异常路径也必须回溯，避免复用同一 visitor 时把后续节点挂到错误父节点。
+                currentEval.set(parent);
+            }
         }
-        return result;
     }
 
     /**
@@ -207,7 +211,5 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         evalCache.put(expr, result);
     }
 }
-
-
 
 

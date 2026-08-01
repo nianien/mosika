@@ -91,4 +91,63 @@ class RuleSuiteTest {
         assertNotNull(constructed.get().getFlows());
         assertSame(constructed.get(), RuleSuite.get());
     }
+
+    @Test
+    void validationDoesNotReplaceCurrentSuite() {
+        RuleSuite active = new RuleSuite(
+                List.of(new RuleDefinition("active", "true", "active")),
+                List.of(),
+                List.of(new RuleFlowDefinition("active-flow", "active"))
+        );
+
+        RuleSuite.validate(
+                List.of(new RuleDefinition("candidate", "false", "candidate")),
+                List.of(),
+                List.of(new RuleFlowDefinition("candidate-flow", "candidate"))
+        );
+
+        assertSame(active, RuleSuite.get());
+        assertNotNull(active.getRuleFlow("active-flow"));
+        assertNull(active.getRuleFlow("candidate-flow"));
+        assertEquals(true, active.evalFlow("active-flow", new Object()).getResult());
+    }
+
+    @Test
+    void ruleSuitesKeepCompositeRuleParsingIsolated() {
+        RuleDefinition activeComposite = new RuleDefinition("composite", "activeLeaf", "active composite");
+        activeComposite.setUseType(2);
+        RuleSuite active = new RuleSuite(
+                List.of(
+                        new RuleDefinition("activeLeaf", "true", "active leaf"),
+                        activeComposite),
+                List.of(),
+                List.of(new RuleFlowDefinition("flow", "composite"))
+        );
+
+        RuleDefinition candidateComposite = new RuleDefinition("composite", "candidateLeaf", "candidate composite");
+        candidateComposite.setUseType(2);
+        RuleSuite candidate = new RuleSuite(
+                List.of(
+                        new RuleDefinition("candidateLeaf", "false", "candidate leaf"),
+                        candidateComposite),
+                List.of(),
+                List.of(new RuleFlowDefinition("flow", "composite"))
+        );
+
+        assertEquals(true, active.evalFlow("flow", new Object()).getResult());
+        assertEquals(false, candidate.evalFlow("flow", new Object()).getResult());
+    }
+
+    @Test
+    void flowSnapshotIsUnmodifiableAndRejectsDuplicateIds() {
+        RuleSuite suite = new RuleSuite(List.of(), List.of(),
+                List.of(new RuleFlowDefinition("flow", "true")));
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> suite.getFlows().clear());
+        assertThrows(IllegalArgumentException.class,
+                () -> RuleSuite.validate(List.of(), List.of(), List.of(
+                        new RuleFlowDefinition("duplicate", "true"),
+                        new RuleFlowDefinition("duplicate", "false"))));
+    }
 }

@@ -6,12 +6,13 @@ import com.skyfalling.mousika.eval.RuleVisitor;
 import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.result.EvalResult;
 import com.skyfalling.mousika.eval.result.NodeResult;
-import lombok.extern.slf4j.Slf4j;
+import com.skyfalling.mousika.eval.parser.NodeBuilder;
+import com.skyfalling.mousika.eval.parser.NodeGenerator;
 
 import java.util.Collections;
 import java.util.Map;
-
-import static com.skyfalling.mousika.eval.parser.NodeBuilder.build;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 
 /**
@@ -20,7 +21,6 @@ import static com.skyfalling.mousika.eval.parser.NodeBuilder.build;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Slf4j
 public class RuleEvaluator {
 
     /**
@@ -28,11 +28,22 @@ public class RuleEvaluator {
      */
     private final RuleEngine ruleEngine;
 
+    /** 当前规则套件专属的节点生成器，避免复合规则解析配置跨套件串扰。 */
+    private final NodeGenerator nodeGenerator;
+
+    /** 当前规则套件专属的表达式解析缓存。 */
+    private final ConcurrentMap<String, RuleNode> nodeCache = new ConcurrentHashMap<>();
+
     /**
      * @param ruleEngine 规则执行引擎
      */
     public RuleEvaluator(RuleEngine ruleEngine) {
+        this(ruleEngine, NodeGenerator.create());
+    }
+
+    public RuleEvaluator(RuleEngine ruleEngine, NodeGenerator nodeGenerator) {
         this.ruleEngine = ruleEngine;
+        this.nodeGenerator = nodeGenerator;
     }
 
 
@@ -44,7 +55,11 @@ public class RuleEvaluator {
      * @return
      */
     public NodeResult eval(String ruleExpr, Object data) {
-        return eval(build(ruleExpr), data);
+        return eval(compile(ruleExpr), data);
+    }
+
+    RuleNode compile(String ruleExpr) {
+        return nodeCache.computeIfAbsent(ruleExpr, expr -> NodeBuilder.build(expr, nodeGenerator));
     }
 
     /**

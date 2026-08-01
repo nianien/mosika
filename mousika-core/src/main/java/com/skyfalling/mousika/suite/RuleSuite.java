@@ -4,15 +4,12 @@ import com.skyfalling.mousika.engine.RuleDefinition;
 import com.skyfalling.mousika.engine.RuleEngine;
 import com.skyfalling.mousika.engine.UdfDefinition;
 import com.skyfalling.mousika.eval.node.RuleNode;
-import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.eval.parser.NodeGenerator;
 import com.skyfalling.mousika.eval.result.NodeResult;
 import com.skyfalling.mousika.exception.NoRuleFlowException;
 import lombok.Getter;
 
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 规则套件，负责装配规则、UDF和规则流
@@ -51,10 +48,50 @@ public class RuleSuite {
      */
     public RuleSuite(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions,
                      List<RuleFlowDefinition> flowDefinitions) {
+        this(ruleDefinitions, udfDefinitions, flowDefinitions, true);
+    }
+
+    private RuleSuite(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions,
+                      List<RuleFlowDefinition> flowDefinitions, boolean publish) {
         this.ruleEvaluator = create(ruleDefinitions, udfDefinitions);
-        this.flows = flowDefinitions.stream().map(RuleFlowDefinition::compile)
-                .collect(Collectors.toMap(RuleFlow::getId, Function.identity(), (v1, v2) -> v2));
-        current = this;
+        Map<String, RuleFlow> compiledFlows = new LinkedHashMap<>();
+        for (RuleFlowDefinition definition : flowDefinitions) {
+            RuleFlow flow = new RuleFlow(definition.getId(), ruleEvaluator.compile(definition.getDsl()));
+            if (compiledFlows.putIfAbsent(flow.getId(), flow) != null) {
+                throw new IllegalArgumentException("duplicate rule flow id: " + flow.getId());
+            }
+        }
+        this.flows = Collections.unmodifiableMap(compiledFlows);
+        if (publish) {
+            current = this;
+        }
+    }
+
+    /**
+     * 只验证一组定义能否完整构造，不替换进程当前正在使用的规则套件。
+     *
+     * @param ruleDefinitions 规则定义
+     * @param udfDefinitions  UDF定义
+     * @param flowDefinitions 规则流定义
+     */
+    public static void validate(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions,
+                                List<RuleFlowDefinition> flowDefinitions) {
+        prepare(ruleDefinitions, udfDefinitions, flowDefinitions);
+    }
+
+    /**
+     * 构造候选套件但不替换当前运行快照，供持久化事务提交前完成全量预编译。
+     */
+    public static RuleSuite prepare(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions,
+                                    List<RuleFlowDefinition> flowDefinitions) {
+        return new RuleSuite(ruleDefinitions, udfDefinitions, flowDefinitions, false);
+    }
+
+    /**
+     * 原子发布一份已经完整构造的候选套件。
+     */
+    public static void publish(RuleSuite candidate) {
+        current = Objects.requireNonNull(candidate, "candidate RuleSuite cannot be null");
     }
 
     /**
@@ -133,14 +170,16 @@ public class RuleSuite {
     private RuleEvaluator create(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions) {
         Map<String, String> compositeRules = new HashMap<>();
         RuleEngine.RuleEngineBuilder ruleEngine = RuleEngine.builder();
-        Iterator<RuleDefinition> it = ruleDefinitions.iterator();
-        while (it.hasNext()) {
-            RuleDefinition ruleDefinition = it.next();
+        List<RuleDefinition> executableRules = new ArrayList<>();
+        List<UdfDefinition> executableUdfs = new ArrayList<>(udfDefinitions);
+        for (RuleDefinition original : ruleDefinitions) {
+            RuleDefinition ruleDefinition = new RuleDefinition(
+                    original.getRuleId(), original.getExpression(), original.getDesc(), original.getUseType());
             switch (ruleDefinition.getUseType()) {
                 case 1: //决策表
                     String udf = "udf_rule_table_$" + ruleDefinition.getRuleId();
                     //动态注册UDF
-                    udfDefinitions
+                    executableUdfs
                             .add(new UdfDefinition(udf, RuleTableUdf.fromJson(ruleDefinition.getExpression())));
                     //修改规则表达式
                     ruleDefinition.setExpression(udf + "($)");
@@ -150,10 +189,10 @@ public class RuleSuite {
                     break;
                 default:
             }
+            executableRules.add(ruleDefinition);
         }
-        ruleEngine.ruleDefinitions(ruleDefinitions);
-        ruleEngine.udfDefinitions(udfDefinitions);
-        NodeBuilder.setGenerator(NodeGenerator.create(compositeRules));
-        return new RuleEvaluator(ruleEngine.build());
+        ruleEngine.ruleDefinitions(executableRules);
+        ruleEngine.udfDefinitions(executableUdfs);
+        return new RuleEvaluator(ruleEngine.build(), NodeGenerator.create(compositeRules));
     }
 }

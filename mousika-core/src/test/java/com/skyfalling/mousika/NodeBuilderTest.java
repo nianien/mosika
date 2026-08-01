@@ -1,6 +1,8 @@
 package com.skyfalling.mousika;
 
 import com.skyfalling.mousika.eval.node.HitsNode;
+import com.skyfalling.mousika.eval.node.AndNode;
+import com.skyfalling.mousika.eval.node.ExprNode;
 import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.node.ParNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
@@ -96,6 +98,18 @@ public class NodeBuilderTest {
         assertEquals(3, node.getNodes().size());
         assertEquals("hits(2,_,1,a,3)", node.expr());
         assertEquals(node.expr(), build(node.expr()).expr());
+    }
+
+    @Test
+    public void parsedNodesCannotPolluteLaterBuilds() {
+        AndNode parsed = assertInstanceOf(AndNode.class, build("a&&b"));
+        RuleNode extended = parsed.and(new ExprNode("c"));
+
+        assertEquals("a&&b&&c", extended.expr());
+        assertEquals("a&&b", parsed.expr());
+        assertEquals("a&&b", build("a&&b").expr());
+        assertThrows(UnsupportedOperationException.class,
+                () -> parsed.getNodes().add(new ExprNode("d")));
     }
 
 

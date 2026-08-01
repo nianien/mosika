@@ -1,14 +1,15 @@
 package com.skyfalling.mousika.ui.tree;
 
-import com.google.common.base.Preconditions;
 import com.skyfalling.mousika.eval.node.*;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
+import com.skyfalling.mousika.eval.parser.NodeGenerator;
 import com.skyfalling.mousika.ui.tree.node.define.FlowNode;
 import com.skyfalling.mousika.ui.tree.node.flow.*;
 import com.skyfalling.mousika.utils.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +24,8 @@ import java.util.stream.Collectors;
  */
 public class UINodeAdapter {
 
+    /** UI AST 只保留规则 ID 结构，不展开任何进程级复合规则配置。 */
+    private static final NodeGenerator UI_NODE_GENERATOR = NodeGenerator.create();
 
     /**
      * 将流程节点编译为内核规则节点。
@@ -31,7 +34,7 @@ public class UINodeAdapter {
      * @return 仅包含执行语义的内核规则树
      */
     public RuleNode toRule(FlowNode un) {
-        Preconditions.checkNotNull(un, "ui node cannot be null!");
+        Objects.requireNonNull(un, "ui node cannot be null!");
         if (un instanceof ANode) {
             ANode an = (ANode) un;
             return aNode2Rule(an, new ArrayList<>());
@@ -83,9 +86,9 @@ public class UINodeAdapter {
      */
     private RuleNode cNode2Rule(CNode cn) {
         if (cn.getAction() == null) {
-            return NodeBuilder.build(cn.ruleExpr());
+            return parse(cn.ruleExpr());
         }
-        return new CaseNode(NodeBuilder.build(cn.ruleExpr()), toRule(cn.getAction()));
+        return new CaseNode(parse(cn.ruleExpr()), toRule(cn.getAction()));
     }
 
 
@@ -101,20 +104,15 @@ public class UINodeAdapter {
             throw new IllegalArgumentException("DNode requires at least two outcomes!");
         }
         List<CNode> branches = new ArrayList<>(dn.getBranches());
-        CaseNode root = new CaseNode(new ExprNode(""), new ExprNode(""));
-        CaseNode current = root;
-        for (CNode branch : branches) {
+        RuleNode fallback = dn.getAction() == null ? null : toRule(dn.getAction());
+        for (int i = branches.size() - 1; i >= 0; i--) {
+            CNode branch = branches.get(i);
             if (branch.getAction() == null) {
                 throw new IllegalArgumentException("DNode branch action is required!");
             }
-            CaseNode caseNode = new CaseNode(NodeBuilder.build(branch.ruleExpr()), toRule(branch.getAction()));
-            current.setFalseCase(caseNode);
-            current = caseNode;
+            fallback = new CaseNode(parse(branch.ruleExpr()), toRule(branch.getAction()), fallback);
         }
-        if (dn.getAction() != null) {
-            current.setFalseCase(toRule(dn.getAction()));
-        }
-        return root.getFalseCase();
+        return fallback;
     }
 
     /**
@@ -125,7 +123,7 @@ public class UINodeAdapter {
      * @return
      */
     private RuleNode aNode2Rule(ANode an, List<RuleNode> nodes) {
-        nodes.add(NodeBuilder.build(an.getExpr()));
+        nodes.add(parse(an.getExpr()));
         FlowNode next = an.getNext();
         if (next != null) {
             if (next instanceof ANode) {
@@ -135,6 +133,10 @@ public class UINodeAdapter {
             }
         }
         return nodes.size() == 1 ? nodes.get(0) : new SerNode(nodes.toArray(new RuleNode[0]));
+    }
+
+    private RuleNode parse(String expression) {
+        return NodeBuilder.build(expression, UI_NODE_GENERATOR);
     }
 
 

@@ -4,7 +4,6 @@ import com.skyfalling.mousika.eval.context.RuleContext;
 import com.skyfalling.mousika.eval.result.EvalResult;
 import lombok.Getter;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -25,7 +24,7 @@ public class HitsNode implements RuleNode {
     public HitsNode(Integer minHits, Integer maxHits, List<RuleNode> nodes) {
         this.minHits = minHits;
         this.maxHits = maxHits;
-        this.nodes = new ArrayList<>(Objects.requireNonNull(nodes, "rules cannot be null"));
+        this.nodes = List.copyOf(Objects.requireNonNull(nodes, "rules cannot be null"));
         validate();
     }
 

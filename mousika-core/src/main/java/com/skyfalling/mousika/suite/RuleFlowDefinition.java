@@ -1,34 +1,24 @@
 package com.skyfalling.mousika.suite;
 
-import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 
 /**
  * 规则流定义
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Data
+@Getter
 @AllArgsConstructor
 public class RuleFlowDefinition {
 
     /**
      * 规则流ID
      */
-    private String id;
+    private final String id;
 
     /**
      * 规则流DSL
      */
-    private String dsl;
-
-    /**
-     * 将规则流定义编译为可执行规则流
-     *
-     * @return 可执行规则流
-     */
-    public RuleFlow compile() {
-        return new RuleFlow(id, NodeBuilder.build(dsl));
-    }
+    private final String dsl;
 }

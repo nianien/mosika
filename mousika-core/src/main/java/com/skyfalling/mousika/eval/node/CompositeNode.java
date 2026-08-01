@@ -12,7 +12,7 @@ import com.skyfalling.mousika.eval.result.EvalResult;
  */
 public class CompositeNode extends ExprNode {
 
-    private RuleNode ruleNode;
+    private final RuleNode ruleNode;
 
     public CompositeNode(String expression, RuleNode ruleNode) {
         super(expression);

@@ -13,6 +13,9 @@ import com.skyfalling.mousika.ui.tree.visitor.TreeVisitor;
 import com.skyfalling.mousika.utils.Constants;
 import com.skyfalling.mousika.utils.JsonUtils;
 
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -80,6 +83,71 @@ public class TreeNode extends ANode {
      */
     public void validate() {
         visit(TreeVisitor.NODE_VALIDATOR, null);
+    }
+
+    /**
+     * 使用显式栈检查整棵 UI AST 的规模，并拒绝重复引用或循环引用。
+     * 该检查应在任何递归校验、编译和序列化之前执行。
+     *
+     * @param maxDepth 允许的最大嵌套深度，根节点深度为 1
+     * @param maxNodes 允许的最大节点总数
+     */
+    public void validateSize(int maxDepth, int maxNodes) {
+        if (maxDepth < 1 || maxNodes < 1) {
+            throw new IllegalArgumentException("tree limits must be positive");
+        }
+        Set<TypeNode> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        ArrayDeque<VisitFrame> stack = new ArrayDeque<>();
+        stack.push(new VisitFrame(this, 1));
+        int nodes = 0;
+        while (!stack.isEmpty()) {
+            VisitFrame frame = stack.pop();
+            TypeNode node = frame.node();
+            if (!visited.add(node)) {
+                throw new IllegalStateException("tree contains a repeated or cyclic node: "
+                        + node.getClass().getSimpleName());
+            }
+            nodes++;
+            if (nodes > maxNodes) {
+                throw new IllegalStateException("tree node count exceeds limit " + maxNodes);
+            }
+            if (frame.depth() > maxDepth) {
+                throw new IllegalStateException("tree depth exceeds limit " + maxDepth);
+            }
+            pushChildren(stack, node, frame.depth() + 1);
+        }
+    }
+
+    private static void pushChildren(ArrayDeque<VisitFrame> stack, TypeNode node, int childDepth) {
+        if (node instanceof JNode judge && judge.getRule() != null) {
+            stack.push(new VisitFrame(judge.getRule(), childDepth));
+        }
+        if (node instanceof LNode logic) {
+            for (TypeNode rule : logic.getRules()) {
+                if (rule != null) {
+                    stack.push(new VisitFrame(rule, childDepth));
+                }
+            }
+        }
+        if (node instanceof BranchNode<?> branch) {
+            for (TypeNode child : branch.getBranches()) {
+                if (child != null) {
+                    stack.push(new VisitFrame(child, childDepth));
+                }
+            }
+        }
+        if (node instanceof CNode condition && condition.getAction() != null) {
+            stack.push(new VisitFrame(condition.getAction(), childDepth));
+        }
+        if (node instanceof DNode decision && decision.getAction() != null) {
+            stack.push(new VisitFrame(decision.getAction(), childDepth));
+        }
+        if (node instanceof ANode action && action.getNext() != null) {
+            stack.push(new VisitFrame(action.getNext(), childDepth));
+        }
+    }
+
+    private record VisitFrame(TypeNode node, int depth) {
     }
 
     /**

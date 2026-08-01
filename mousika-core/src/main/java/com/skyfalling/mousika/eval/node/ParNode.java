@@ -8,7 +8,6 @@ import com.skyfalling.mousika.utils.Constants;
 import lombok.Getter;
 import lombok.SneakyThrows;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -31,7 +30,7 @@ public class ParNode implements RuleNode {
     /**
      * 待并发执行的分支节点。
      */
-    private List<RuleNode> nodes = new ArrayList<>();
+    private final List<RuleNode> nodes;
 
     /**
      * 创建并行执行结构。
@@ -39,7 +38,7 @@ public class ParNode implements RuleNode {
      * @param nodes 并行分支节点
      */
     public ParNode(RuleNode... nodes) {
-        this.nodes.addAll(Arrays.asList(nodes));
+        this.nodes = List.copyOf(Arrays.asList(nodes));
     }
 
 
@@ -51,8 +50,9 @@ public class ParNode implements RuleNode {
      */
     @Override
     public ParNode next(RuleNode node) {
-        this.nodes.add(node);
-        return this;
+        RuleNode[] combined = Arrays.copyOf(nodes.toArray(new RuleNode[0]), nodes.size() + 1);
+        combined[combined.length - 1] = node;
+        return new ParNode(combined);
     }
 
     /**

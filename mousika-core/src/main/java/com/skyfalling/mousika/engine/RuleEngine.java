@@ -6,7 +6,6 @@ import com.skyfalling.mousika.utils.JsRuntime;
 import com.skyfalling.mousika.utils.JsonUtils;
 import lombok.Builder;
 import lombok.Singular;
-import lombok.extern.slf4j.Slf4j;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -25,7 +24,6 @@ import java.util.regex.Pattern;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Slf4j
 public class RuleEngine {
 
     private static final Pattern DESC_PARAMETER = Pattern.compile("\\{(\\$+\\..+?)\\}");

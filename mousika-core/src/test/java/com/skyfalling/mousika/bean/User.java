@@ -1,6 +1,9 @@
 package com.skyfalling.mousika.bean;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 /**
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -8,14 +11,16 @@ import lombok.*;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@RequiredArgsConstructor
 public class User {
     @NonNull
     private String name;
-    @NonNull
     private int age;
     private Contact contact;
 
+    public User(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
 
     @Data
     @AllArgsConstructor

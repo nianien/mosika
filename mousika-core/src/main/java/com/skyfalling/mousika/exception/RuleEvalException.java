@@ -1,6 +1,6 @@
 package com.skyfalling.mousika.exception;
 
-import lombok.Data;
+import lombok.Getter;
 
 /**
  * 规则评估异常
@@ -8,9 +8,9 @@ import lombok.Data;
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2021-11-19
  */
-@Data
+@Getter
 public class RuleEvalException extends RuntimeException {
-    private String ruleId;
+    private final String ruleId;
 
     /**
      *

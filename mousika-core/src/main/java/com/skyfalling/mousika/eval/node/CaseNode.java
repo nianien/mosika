@@ -2,7 +2,7 @@ package com.skyfalling.mousika.eval.node;
 
 import com.skyfalling.mousika.eval.context.RuleContext;
 import com.skyfalling.mousika.eval.result.EvalResult;
-import lombok.Data;
+import lombok.Getter;
 
 /**
  * 条件执行节点
@@ -10,21 +10,21 @@ import lombok.Data;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-@Data
+@Getter
 public class CaseNode implements RuleNode {
     /**
      * 条件节点
      */
-    private RuleNode condition;
+    private final RuleNode condition;
     /**
      * 为真节点
      */
-    private RuleNode trueCase;
+    private final RuleNode trueCase;
 
     /**
      * 为假节点
      */
-    private RuleNode falseCase;
+    private final RuleNode falseCase;
 
 
     /**

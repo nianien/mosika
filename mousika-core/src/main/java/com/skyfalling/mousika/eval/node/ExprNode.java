@@ -15,7 +15,7 @@ public class ExprNode implements RuleNode {
     /**
      * 规则表达式
      */
-    private String expression;
+    private final String expression;
 
     /**
      * 表达式节点

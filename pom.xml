@@ -9,11 +9,12 @@
     <packaging>pom</packaging>
     <version>${revision}</version>
     <name>mousika</name>
-    <description>business based rule engine</description>
+    <description>general-purpose recursive rule flow engine</description>
     <url>https://github.com/nianien/mousika</url>
     <modules>
         <module>mousika-core</module>
         <module>mousika-ui</module>
+        <module>mousika-web</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -24,7 +25,7 @@
         <jackson.version>2.21.3</jackson.version>
         <cudrania.version>1.2.5</cudrania.version>
         <spring.version>6.2.19</spring.version>
-        <junit-jupiter.version>5.8.2</junit-jupiter.version>
+        <junit-jupiter.version>5.11.4</junit-jupiter.version>
         <jackson-datatype-protobuf.version>0.9.18</jackson-datatype-protobuf.version>
         <revision>1.0.0</revision>
         <antlr4.version>4.13.2</antlr4.version>
@@ -131,15 +132,6 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -280,9 +272,6 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <version>3.3.0</version>
-                    <configuration>
-                        <finalName>${project.artifactId}</finalName>
-                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

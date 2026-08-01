@@ -12,7 +12,7 @@ import lombok.Getter;
 @Getter
 public class NotNode implements RuleNode {
 
-    private RuleNode node;
+    private final RuleNode node;
 
     /**
      * 对node取反

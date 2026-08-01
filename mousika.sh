@@ -7,7 +7,7 @@ set -euo pipefail
 
 # ---------- 配置 ----------
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODULE="mousika-ui"
+MODULE="mousika-web"
 JAR="$PROJECT_DIR/$MODULE/target/$MODULE.jar"
 PORT="${MOUSIKA_PORT:-8080}"
 # 数据库固定到仓库根 data/（与默认 ./data 一致），绝对路径避免按启动 CWD 解析成别处
@@ -53,18 +53,13 @@ our_pid() {
     pid_alive "$p" && echo "$p" || true
 }
 
-# 强制释放端口：杀掉所有监听 $PORT 的进程（含早期 spring-boot:run 残留、连错库的僵尸）
-free_port() {
+# 端口只能由本脚本管理的实例占用；绝不结束来源不明的进程。
+assert_port_available() {
     local pids; pids="$(port_pids)"
     [ -z "$pids" ] && return 0
-    warn "端口 $PORT 被占用 (PID: $(echo "$pids" | tr '\n' ' '))，强制清理"
-    echo "$pids" | while read -r pp; do [ -n "$pp" ] && kill "$pp" 2>/dev/null || true; done
-    for _ in $(seq 1 10); do [ -z "$(port_pids)" ] && break; sleep 1; done
-    pids="$(port_pids)"
-    if [ -n "$pids" ]; then
-        echo "$pids" | while read -r pp; do [ -n "$pp" ] && kill -9 "$pp" 2>/dev/null || true; done
-        sleep 1
-    fi
+    err "端口 $PORT 已被占用 (PID: $(echo "$pids" | tr '\n' ' '))，未执行启动"
+    err "请先确认进程归属；本脚本不会结束未受管进程"
+    return 1
 }
 
 # 等待“本实例(PID=$1)”既占住端口又通过健康检查（避免被别的进程的 200 骗过）
@@ -91,20 +86,29 @@ cmd_build() {
 cmd_start() {
     # 本脚本实例已正常在跑则幂等返回
     local p; p="$(our_pid)"
-    if [ -n "$p" ] && pid_owns_port "$p" && health_ok; then
-        warn "服务已在运行 (PID $p, 端口 $PORT)。如需重启用: $0 restart"
-        return 0
+    if [ -n "$p" ]; then
+        if pid_owns_port "$p" && health_ok; then
+            warn "服务已在运行 (PID $p, 端口 $PORT)。如需重启用: $0 restart"
+            return 0
+        fi
+        if pid_owns_port "$p"; then
+            err "受管服务 PID $p 已占用端口但健康检查失败，请先执行: $0 stop"
+            return 1
+        fi
+        warn "清理不再占用端口的陈旧 PID 文件 (PID $p)"
+        rm -f "$PID_FILE"
     fi
     resolve_java_home
     [ -f "$JAR" ] || { warn "未找到胖包，先执行构建"; cmd_build; }
     mkdir -p "$RUN_DIR" "$(dirname "$DB_PATH")"
-    free_port   # 关键：先清掉任何占用者（含连错库的僵尸），保证本实例能真正绑定端口
+    assert_port_available
     info "启动中 (端口 $PORT, DB $DB_PATH) ..."
-    nohup "$JAVA_HOME/bin/java" -Dmousika.db.path="$DB_PATH" -jar "$JAR" > "$LOG_FILE" 2>&1 &
+    nohup "$JAVA_HOME/bin/java" -Dserver.port="$PORT" -Dmousika.db.path="$DB_PATH" \
+        -jar "$JAR" > "$LOG_FILE" 2>&1 &
     local newpid=$!; echo "$newpid" > "$PID_FILE"
     if wait_healthy_owned "$newpid"; then
         info "启动成功 (PID $newpid, DB $DB_PATH)"
-        echo    "  业务场景列表   : $BASE_URL/"
+        echo    "  规则流列表     : $BASE_URL/"
         echo    "  原子规则库     : $BASE_URL/rules"
         echo    "  API 基址       : $BASE_URL/api"
         echo    "  日志           : $LOG_FILE"
@@ -123,17 +127,21 @@ cmd_start() {
 
 cmd_stop() {
     local p; p="$(our_pid)"
-    if [ -z "$p" ] && [ -z "$(port_pids)" ]; then
-        warn "服务未在运行"; rm -f "$PID_FILE" 2>/dev/null || true; return 0
+    if [ -z "$p" ]; then
+        warn "没有本脚本管理的运行实例"
+        [ -n "$(port_pids)" ] && warn "端口 $PORT 由其他进程占用，未作处理"
+        rm -f "$PID_FILE" 2>/dev/null || true
+        return 0
     fi
-    if [ -n "$p" ]; then
-        info "停止服务 (PID $p) ..."
-        kill "$p" 2>/dev/null || true
-        for _ in $(seq 1 15); do pid_alive "$p" || break; sleep 1; done
-        if pid_alive "$p"; then warn "优雅停止超时，强制结束"; kill -9 "$p" 2>/dev/null || true; fi
+    if ! pid_owns_port "$p"; then
+        warn "PID 文件中的进程 $p 不再监听端口 $PORT，未结束该进程"
+        rm -f "$PID_FILE" 2>/dev/null || true
+        return 0
     fi
-    # 再清掉端口上任何残留（含非本脚本启动的僵尸实例）
-    [ -n "$(port_pids)" ] && free_port
+    info "停止服务 (PID $p) ..."
+    kill "$p" 2>/dev/null || true
+    for _ in $(seq 1 15); do pid_alive "$p" || break; sleep 1; done
+    if pid_alive "$p"; then warn "优雅停止超时，强制结束受管进程"; kill -9 "$p" 2>/dev/null || true; fi
     rm -f "$PID_FILE" 2>/dev/null || true
     info "已停止"
 }
@@ -144,13 +152,15 @@ cmd_dev() {
     resolve_java_home
     info "使用 JDK: $JAVA_HOME"
     mkdir -p "$(dirname "$DB_PATH")"
-    free_port   # 清掉占用者，确保 dev 实例能绑定端口
+    assert_port_available
+    info "先构建并安装 mousika-web 及其模块依赖 ..."
+    (cd "$PROJECT_DIR" && JAVA_HOME="$JAVA_HOME" mvn -q -pl "$MODULE" -am -DskipTests install)
     info "开发模式 (spring-boot:run，前台运行，Ctrl-C 退出)"
     info "改前端后另开终端执行  mvn -pl $MODULE -o resources:resources  即热生效，无需重打包"
     echo    "  入口: $BASE_URL/   DB: $DB_PATH"
     cd "$PROJECT_DIR"
     JAVA_HOME="$JAVA_HOME" exec mvn -pl "$MODULE" org.springframework.boot:spring-boot-maven-plugin:run \
-        -Dspring-boot.run.jvmArguments="-Dmousika.db.path=$DB_PATH"
+        -Dspring-boot.run.jvmArguments="-Dserver.port=$PORT -Dmousika.db.path=$DB_PATH"
 }
 
 cmd_status() {

@@ -5,7 +5,6 @@ import com.skyfalling.mousika.eval.result.NodeResult;
 import com.skyfalling.mousika.suite.RuleSuite;
 import com.skyfalling.mousika.udf.Functions.Function2;
 import com.skyfalling.mousika.udf.Functions.Function3;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 
@@ -23,7 +22,6 @@ import java.util.Map;
  * Created on 2022-08-26
  */
 @Udf(group = "sys.flow", value = "eval")
-@Slf4j
 public class EvalFlowUdf implements Function2<String, Object, Object>, Function3<String, Object, Map<String, Object>, Object> {
 
 
