@@ -269,7 +269,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function toggleStatus(id, to) {
     const f = flows.find((x) => x.id === id); if (!f) return;
     try {
-      if (to === 0) { await Api.disableFlow(id); }
+      if (to === 0) { await Api.disableFlow(id, f.version); }
       else { await Api.updateFlow(id, { id, name: f.name, description: f.description, ruleTree: f.ruleTree, status: 1, version: f.version }); }
       toast(to === 0 ? "已停用" : "已启用");
       loadFlows();

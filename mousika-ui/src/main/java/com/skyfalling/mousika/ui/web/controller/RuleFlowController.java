@@ -32,8 +32,9 @@ public class RuleFlowController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> disable(@PathVariable long id) {
-        service.disable(id);
+    public ApiResponse<Void> disable(@PathVariable long id,
+                                     @RequestParam(required = false) Long version) {
+        service.disable(id, version);
         return ApiResponse.ok();
     }
 
@@ -41,7 +42,7 @@ public class RuleFlowController {
     public ApiResponse<RuleFlowEntity> get(@PathVariable long id) {
         RuleFlowEntity e = service.findById(id);
         if (e == null) {
-            return ApiResponse.fail(404, "flow not found: " + id);
+            throw new com.skyfalling.mousika.ui.web.common.BusinessException(404, "flow not found: " + id);
         }
         return ApiResponse.ok(e);
     }

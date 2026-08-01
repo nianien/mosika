@@ -9,11 +9,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Web MVC 配置。
  * <ul>
- *   <li>CORS：对 {@code /api/**} 放开，便于本地前端调试。</li>
+ *   <li>CORS：本工具默认同源访问，仅放开本机回环开发源（localhost/127.0.0.1），
+ *       不携带凭证。若要对外提供服务，请在此显式配置受信 Origin 并补充鉴权。</li>
  *   <li>静态资源：规则编排前端位于 {@code classpath:/demo/ui-tree/}，对外统一挂在
  *       {@code /ui/**}（正式访问路径，URL 不含 demo）；{@code /demo/**} 仅保留给
  *       {@code bench} 基准工具向后兼容。</li>
- *   <li>入口：根路径 {@code /} 重定向到业务场景控制台 {@code /ui/console.html}。</li>
+ *   <li>入口：根路径 {@code /} 转发到业务列表控制台。</li>
  * </ul>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -23,11 +24,13 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // 本地工具：仅允许本机回环开发源跨端口调试，不带凭证。
+        // 对外部署时应改为明确 Origin 白名单并叠加鉴权，切勿放开任意 Origin。
         registry.addMapping("/api/**")
-                .allowedOriginPatterns("*")
+                .allowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true)
+                .allowCredentials(false)
                 .maxAge(3600);
     }
 

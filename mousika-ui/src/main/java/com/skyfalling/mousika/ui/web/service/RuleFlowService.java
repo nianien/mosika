@@ -48,15 +48,17 @@ public class RuleFlowService {
     @Transactional
     public RuleFlowEntity update(long id, RuleFlowEntity req) {
         RuleFlowEntity existing = requireFlow(id);
+        if (req.getVersion() == null) {
+            throw new IllegalArgumentException("version is required for update (expected " + existing.getVersion() + ")");
+        }
         basicCheck(req);
         CompileResult compiled = RuleTreeCompiler.compile(req.getRuleTree());
         Set<Long> refIds = verifyReferences(compiled.getReferenced());
         req.setId(id);
-        req.setVersion(existing.getVersion());
         req.setRuleTree(compiled.getCanonicalJson());
         int rows = flowDao.update(req);
         if (rows == 0) {
-            throw new BusinessException(409, "flow updated by others, please retry (version=" + existing.getVersion() + ")");
+            throw new BusinessException(409, "flow updated by others, please retry (expected version=" + req.getVersion() + ")");
         }
         refDao.replaceForFlow(id, refIds);
         suiteManager.refreshAsyncAfterCommit();
@@ -64,9 +66,10 @@ public class RuleFlowService {
     }
 
     @Transactional
-    public void disable(long id) {
+    public void disable(long id, Long expectedVersion) {
         RuleFlowEntity existing = requireFlow(id);
-        int rows = flowDao.disable(id, existing.getVersion());
+        long version = expectedVersion != null ? expectedVersion : existing.getVersion();
+        int rows = flowDao.disable(id, version);
         if (rows == 0) {
             throw new BusinessException(409, "flow updated by others, please retry");
         }

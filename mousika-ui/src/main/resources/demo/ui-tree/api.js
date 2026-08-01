@@ -37,13 +37,13 @@
         getFlow: (id) => request("GET", `/flows/${id}`),
         createFlow: (flow) => request("POST", "/flows", flow),
         updateFlow: (id, flow) => request("PUT", `/flows/${id}`, flow),
-        disableFlow: (id) => request("DELETE", `/flows/${id}`),
+        disableFlow: (id, version) => request("DELETE", `/flows/${id}${qs({ version })}`),
         validateFlow: (flow) => request("POST", "/flows/validate", flow),
         // rules
         listRules: (params) => request("GET", `/rules${qs(params)}`),
         getRule: (id) => request("GET", `/rules/${id}`),
         createRule: (rule) => request("POST", "/rules", rule),
         updateRule: (id, rule) => request("PUT", `/rules/${id}`, rule),
-        disableRule: (id) => request("DELETE", `/rules/${id}`)
+        disableRule: (id, version) => request("DELETE", `/rules/${id}${qs({ version })}`)
     };
 })(window);

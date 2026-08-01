@@ -37,26 +37,29 @@ public class RuleDefinitionService {
     @Transactional
     public RuleDefinitionEntity update(long id, RuleDefinitionEntity req) {
         RuleDefinitionEntity existing = requireRule(id);
+        if (req.getVersion() == null) {
+            throw new IllegalArgumentException("version is required for update (expected " + existing.getVersion() + ")");
+        }
         req.setId(id);
-        req.setVersion(existing.getVersion());
         validate(req);
         int rows = ruleDao.update(req);
         if (rows == 0) {
-            throw new BusinessException(409, "rule updated by others, please retry (version=" + existing.getVersion() + ")");
+            throw new BusinessException(409, "rule updated by others, please retry (expected version=" + req.getVersion() + ")");
         }
         suiteManager.refreshAsyncAfterCommit();
         return ruleDao.findById(id);
     }
 
     @Transactional
-    public void disable(long id) {
+    public void disable(long id, Long expectedVersion) {
         RuleDefinitionEntity existing = requireRule(id);
+        long version = expectedVersion != null ? expectedVersion : existing.getVersion();
         Set<Long> refs = refDao.activeFlowsReferencing(id);
         if (!refs.isEmpty()) {
             throw new BusinessException(409,
                     "rule " + id + " is still referenced by active flow(s): " + refs);
         }
-        int rows = ruleDao.disable(id, existing.getVersion());
+        int rows = ruleDao.disable(id, version);
         if (rows == 0) {
             throw new BusinessException(409, "rule updated by others, please retry");
         }
