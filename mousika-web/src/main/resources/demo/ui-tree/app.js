@@ -1627,6 +1627,8 @@
             docStatus = makeFormal ? "formal" : "draft";
             dirty = false;
             updateDocStatus(); pulseStatus();
+            // 保存/生效成功后自动返回规则流列表（dirty 已清空，不再触发离开提醒）。
+            setTimeout(() => { location.href = "/"; }, 300);
             return true;
         } catch (e) {
             openConfirm(`${makeFormal ? "生效" : "保存"}失败：${e.message}`,
@@ -1643,8 +1645,8 @@
         const problems = [];
         walk(tree, (node) => {
             if (node.type !== "D") return true;
-            // 与后端 TreeVisitor 契约一致：分支节点至少两个结果（决策分支+默认分支合计≥2），
-            // 且每条决策分支都必须配置命中后的后续动作。
+            // 与后端 TreeVisitor 契约一致：分支节点至少两个结果
+            // （决策分支+默认分支合计≥2）；决策分支的命中后续动作可以为空。
             const decisions = node.branches.length;
             const hasDefault = !!node.action;
             const outcomes = decisions + (hasDefault ? 1 : 0);
@@ -1654,14 +1656,6 @@
                     reason: "分支节点至少需要两个结果（决策分支与默认分支合计 ≥ 2）"
                 });
             }
-            node.branches.forEach((branch) => {
-                if (!branch.action) {
-                    problems.push({
-                        id: idOf(branch), name: flowNodeDisplayName(branch),
-                        reason: "决策分支必须配置命中后的后续动作"
-                    });
-                }
-            });
             return true;
         });
         return problems;

@@ -33,8 +33,9 @@ button,input,textarea,select{font:inherit}
 .btn:hover{border-color:#a9d3cc;background:#f5faf9}
 .btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
 .btn.primary:hover{background:var(--teal-d)}
+.btn.danger{color:#fff;border-color:#cf5552;background:#cf5552;font-weight:600}
+.btn.danger:hover{border-color:#b94340;background:#b94340}
 .btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;height:auto;cursor:pointer}
-.btn.link.danger{color:#c9504f}
 .main{overflow:auto;padding:22px 26px}
 .page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .page-head h1{font-size:19px}.page-head .sub{color:#6f8b86;font-size:13px;margin-left:10px;font-weight:400}
@@ -56,9 +57,20 @@ tbody tr:hover{background:#f7fcfb}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
 .num{font-variant-numeric:tabular-nums;color:#3f5f58}
 .time{color:#8aa39d;font-variant-numeric:tabular-nums}
-.actions{display:flex;gap:4px;align-items:center;justify-content:flex-end;white-space:nowrap}
-.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 12px;font-weight:600;font-size:12.5px;cursor:pointer}
+.actions{display:grid;grid-template-columns:112px 48px 104px;column-gap:10px;align-items:center;justify-content:end;min-width:284px;white-space:nowrap}
+.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;width:112px;height:28px;padding:0;font-weight:600;font-size:12.5px;cursor:pointer}
 .actions .open:hover{background:#cdeee7;border-color:#7fccc0}
+.actions [data-detail]{justify-self:center}
+.status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
+.status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
+.status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
+.status-toggle.is-on{color:var(--teal-d);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--teal)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
+.status-toggle.is-draft{color:#a67823}.status-toggle.is-draft .status-toggle-track{background:#e4c77c}
+.status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
+.status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
+.status-toggle:disabled{cursor:wait;opacity:.58}.status-toggle.is-pending .status-toggle-track{animation:switchPulse .8s ease-in-out infinite alternate}
+.status-toggle-label{font-size:12.5px;line-height:1}
+@keyframes switchPulse{to{opacity:.5}}
 .empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:13.5px}
 .pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:12.5px}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer}.pager button:disabled{opacity:.45;cursor:not-allowed}
 /* drawer */
@@ -89,11 +101,13 @@ tbody tr:hover{background:#f7fcfb}
 .dw-foot .grow{flex:1}
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(420px,92vw)}
+dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(420px,92vw)}
 dialog::backdrop{background:rgba(18,48,56,.3)}
 .dlg-head{padding:18px 22px 6px;font-size:16px;font-weight:700}
 .dlg-body{padding:12px 22px;display:flex;flex-direction:column;gap:14px}
 .dlg-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:10px}
+.confirm-message{font-size:14px;color:#23443d;line-height:1.6}
+.confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:12px;line-height:1.55}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.drawer{width:100%;max-width:100vw}.pager{justify-content:space-between}}
 </style>
 </head>
@@ -121,7 +135,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     </div>
     <div class="panel">
       <div class="table-scroll"><table>
-        <thead><tr><th style="width:42%">规则流 / 描述</th><th>状态</th><th>引用规则</th><th>更新时间</th><th style="text-align:right">操作</th></tr></thead>
+        <thead><tr><th style="width:42%">规则流 / 描述</th><th>状态</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
         <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
       </table></div>
       <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
@@ -133,7 +147,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dw-head"><h2 id="drawerTitle">规则流详情 <span class="pill live" id="dwStatusPill">已生效</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
     <div class="dw-body">
       <div class="field"><label>规则流名称</label><input id="dwName" maxlength="60"></div>
-      <div class="field"><label>规则流描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响规则流程结构与状态；状态通过列表的「生效 / 停用」变更。</div></div>
+      <div class="field"><label>规则流描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响规则流程结构与状态；状态通过列表中的开关变更。</div></div>
       <div>
         <div class="sec-title">概览</div>
         <div class="metarow">
@@ -161,6 +175,15 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并打开画布</button></div>
 </dialog>
 
+<dialog id="statusDlg" aria-labelledby="statusDlgTitle" aria-describedby="statusDlgMessage statusDlgNote">
+  <div class="dlg-head" id="statusDlgTitle">确认变更状态</div>
+  <div class="dlg-body">
+    <p class="confirm-message" id="statusDlgMessage"></p>
+    <p class="confirm-note" id="statusDlgNote"></p>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="statusCancel">取消</button><button class="btn primary" id="statusConfirm">确认</button></div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script src="/ui/api.js?v=20260802-1"></script>
@@ -180,6 +203,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   let current = null; // drawer 当前 flow
   let drawerOpener = null;
   let drawerSaving = false;
+  let statusDialogTarget = null;
+  const pendingFlowIds = new Set();
 
   const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
   const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
@@ -232,15 +257,17 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     $("#rows").innerHTML = flows.map((f) => {
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
-      const dim = f.status === 1 ? "" : ' style="opacity:.62"';
-      const openBtn = `<button class="open" data-open="${f.id}">打开画布</button><button class="btn link" data-detail="${f.id}">详情</button>`;
-      const publishBtn = `<button class="btn link" data-action="publish" data-id="${f.id}">生效</button>`;
-      const disableBtn = `<button class="btn link danger" data-action="disable" data-id="${f.id}">停用</button>`;
-      let ops;
-      if (f.status === 1) ops = openBtn + disableBtn;
-      else if (f.status === 2) ops = openBtn + publishBtn;
-      else ops = openBtn + publishBtn + disableBtn;
-      return `<tr${dim}>
+      const active = f.status === 1;
+      const pending = pendingFlowIds.has(f.id);
+      const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
+      const ops = `<button class="open" data-open="${f.id}">打开画布</button>
+        <button class="btn link" data-detail="${f.id}">详情</button>
+        <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
+          aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.id}"${pending ? " disabled aria-busy=\"true\"" : ""}>
+          <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
+          <span class="status-toggle-label">${meta.label}</span>
+        </button>`;
+      return `<tr>
         <td><div class="name">${esc(f.name)}<span class="id">#${f.id}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
         <td><span class="pill ${meta.cls}">${meta.label}</span></td>
         <td class="num">${ruleIds.length}</td>
@@ -314,8 +341,45 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }
   }
 
-  async function doAction(id, action) {
+  function openStatusDialog(id, button) {
+    const f = flows.find((x) => x.id === id); if (!f || pendingFlowIds.has(id)) return;
+    const disabling = f.status === 1;
+    statusDialogTarget = { id, button };
+    $("#statusDlgTitle").textContent = disabling ? "确认停用规则流" : "确认生效规则流";
+    $("#statusDlgMessage").textContent = `${disabling ? "确定停用" : "确定生效"}「${f.name}」吗？`;
+    $("#statusDlgNote").textContent = disabling
+      ? "停用后该规则流立即退出运行态，但规则树和配置仍会保留。"
+      : "生效前会校验并编译当前规则树；成功后该规则流立即进入运行态。";
+    const confirm = $("#statusConfirm");
+    confirm.textContent = disabling ? "确认停用" : "确认生效";
+    confirm.className = disabling ? "btn danger" : "btn primary";
+    const dialog = $("#statusDlg");
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function closeStatusDialog() {
+    const target = statusDialogTarget;
+    statusDialogTarget = null;
+    $("#statusDlg").close();
+    if (target?.button.isConnected) requestAnimationFrame(() => target.button.focus());
+  }
+
+  function confirmStatusChange() {
+    const target = statusDialogTarget; if (!target) return;
+    statusDialogTarget = null;
+    $("#statusDlg").close();
+    toggleStatus(target.id, target.button);
+  }
+
+  async function toggleStatus(id, button) {
     const f = flows.find((x) => x.id === id); if (!f) return;
+    if (pendingFlowIds.has(id)) return;
+    const action = f.status === 1 ? "disable" : "publish";
+    pendingFlowIds.add(id);
+    button.disabled = true;
+    button.classList.add("is-pending");
+    button.setAttribute("aria-busy", "true");
+    let statusChanged = false;
     try {
       if (action === "disable") {
         await Api.disableFlow(id, f.version);
@@ -325,8 +389,22 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         await Api.publishFlow(id, { id, name: full.name, description: full.description, ruleTree: full.ruleTree, version: full.version });
         toast("已生效");
       }
-      loadFlows();
+      statusChanged = true;
+      // 清除请求态后再重绘，避免新生成的开关继承旧请求的 pending 状态。
+      pendingFlowIds.delete(id);
+      await loadFlows();
     } catch (e) { toast("操作失败：" + e.message); }
+    finally {
+      pendingFlowIds.delete(id);
+      if (button.isConnected) {
+        button.disabled = false;
+        button.classList.remove("is-pending");
+        button.removeAttribute("aria-busy");
+      } else if (!statusChanged) {
+        // 请求期间若筛选/搜索触发过重绘，失败后还原新生成的开关。
+        renderRows();
+      }
+    }
   }
 
   async function createFlow() {
@@ -346,7 +424,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#rows").addEventListener("click", (e) => {
     const o = e.target.closest("[data-open]"); if (o) return openCanvas(Number(o.dataset.open));
     const d = e.target.closest("[data-detail]"); if (d) return openDrawer(Number(d.dataset.detail));
-    const t = e.target.closest("[data-action]"); if (t) return doAction(Number(t.dataset.id), t.dataset.action);
+    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(Number(t.dataset.statusToggle), t);
   });
   $("#filters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
@@ -365,6 +443,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#newFlowBtn").addEventListener("click", () => { $("#newName").value = ""; $("#newDesc").value = ""; $("#newDlg").showModal(); requestAnimationFrame(() => $("#newName").focus()); });
   $("#newCancel").addEventListener("click", () => $("#newDlg").close());
   $("#newCreate").addEventListener("click", createFlow);
+  $("#statusCancel").addEventListener("click", closeStatusDialog);
+  $("#statusConfirm").addEventListener("click", confirmStatusChange);
+  $("#statusDlg").addEventListener("cancel", () => {
+    const target = statusDialogTarget;
+    statusDialogTarget = null;
+    if (target?.button.isConnected) requestAnimationFrame(() => target.button.focus());
+  });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && current) closeDrawer(); });
 
   (async () => { await loadRuleNames(); await loadFlows(); })();
