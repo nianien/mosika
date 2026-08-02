@@ -222,7 +222,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function friendlyError(raw) {
     const m = String(raw || "");
     if (m.includes("rule kind does not match")) {
-      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断规则」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再生效。", detail: m };
+      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断条件」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再生效。", detail: m };
     }
     if (m.includes("unknown or disabled rule")) {
       return { msg: "引用了不存在或已停用的规则，请先到「业务规则」中启用相关规则后再重试。", detail: m };

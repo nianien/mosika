@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>业务规则 · Mousika 规则编排</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
 <style>
 :root{
   color-scheme:light;
@@ -74,12 +77,18 @@ tbody tr:hover{background:#f7fcfb}
 .pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:12.5px}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer}.pager button:disabled{opacity:.45;cursor:not-allowed}
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(460px,92vw)}
+dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(460px,92vw)}
 dialog::backdrop{background:rgba(18,48,56,.3)}
 .dlg-head{padding:18px 22px 6px;font-size:16px;font-weight:700}
 .dlg-body{padding:12px 22px;display:flex;flex-direction:column;gap:14px}
 .dlg-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:10px}
 .field label{display:block;font-size:12.5px;color:#5c766f;margin-bottom:7px;font-weight:600}
+.field .hint{margin-top:6px;font-size:11.5px;color:#8aa39d;line-height:1.5}
+.field .CodeMirror{border:1px solid var(--border);border-radius:9px;height:auto;min-height:88px;font-family:"JetBrains Mono",Menlo,Consolas,monospace;font-size:13px;background:#fbfefe;padding:4px 2px;transition:border-color .15s,box-shadow .15s}
+.field .CodeMirror-focused{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.field .CodeMirror-lines{padding:6px 0}
+.field .CodeMirror-gutters{background:#f2faf9;border-right:1px solid #e4efec}
+.field .CodeMirror-linenumber{color:#a7c0ba}
 .field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13.5px;color:#123038;background:#fff;font-family:inherit}
 .field textarea{min-height:64px;resize:vertical;font-family:"JetBrains Mono",Menlo,Consolas,monospace}
 .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
@@ -100,10 +109,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">业务规则</span><span class="sub" id="subCount">供业务场景复用的判断规则与执行动作</span></div>
+      <div><span style="font-size:19px;font-weight:700">业务规则</span><span class="sub" id="subCount">供业务场景复用的判断条件与执行动作</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-f="">全部</button>
-        <button type="button" class="chip" data-f="condition">判断规则</button>
+        <button type="button" class="chip" data-f="condition">判断条件</button>
         <button type="button" class="chip" data-f="action">执行动作</button>
         <button type="button" class="chip" data-f="off">已停用</button>
       </div>
@@ -122,8 +131,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-head" id="dlgTitle">新建规则</div>
   <div class="dlg-body">
     <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-    <div class="field"><label>描述</label><input id="fDesc" placeholder="一句话说明"></div>
-    <div class="field"><label>分类</label><select id="fKind"><option value="condition">判断规则（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
+    <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">可用 ${变量} 代入入参，运行时替换为实际值（如 ${score}）。</div></div>
+    <div class="field"><label>规则类型</label><select id="fKind"><option value="condition">判断条件（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
     <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
@@ -175,7 +184,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadRules();
       }
-      $("#subCount").textContent = `供业务场景复用的判断规则与执行动作 · 共 ${page.total} 条`;
+      $("#subCount").textContent = `供业务场景复用的判断条件与执行动作 · 共 ${page.total} 条`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -200,7 +209,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const dim = live ? "" : ' style="opacity:.62"';
       const cnt = refCount.get(String(r.id)) || 0;
       const isAction = r.ruleKind === "action";
-      const typeTag = isAction ? `<span class="tag action">执行动作</span>` : `<span class="tag cond">判断规则</span>`;
+      const typeTag = isAction ? `<span class="tag action">执行动作</span>` : `<span class="tag cond">判断条件</span>`;
       const toggle = `<button type="button" class="status-toggle ${live ? "is-on" : "is-off"}" role="switch"
           aria-checked="${live}" data-toggle="${r.id}" data-to="${live ? 0 : 1}" aria-label="${esc(r.name)}的启用状态">
           <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
@@ -216,20 +225,40 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }).join("");
   }
 
+  let exprEditor = null;
+  function ensureExprEditor() {
+    if (exprEditor || typeof window.CodeMirror === "undefined") return exprEditor;
+    exprEditor = window.CodeMirror.fromTextArea(document.getElementById("fExpr"), {
+      mode: "javascript",
+      lineNumbers: true,
+      lineWrapping: true,
+      matchBrackets: true,
+      tabSize: 2
+    });
+    return exprEditor;
+  }
+
   function openDialog(rule) {
     editing = rule || null;
     $("#dlgTitle").textContent = rule ? "编辑规则" : "新建规则";
     $("#fName").value = rule ? (rule.name || "") : "";
     $("#fDesc").value = rule ? (rule.description || "") : "";
     $("#fKind").value = rule ? (rule.ruleKind === "action" ? "action" : "condition") : "condition";
-    $("#fExpr").value = rule ? (rule.expression || "") : "";
+    const expr = rule ? (rule.expression || "") : "";
+    $("#fExpr").value = expr;
     $("#ruleDlg").showModal();
+    const cm = ensureExprEditor();
+    if (cm) {
+      cm.setValue(expr);
+      // 弹窗 showModal 后编辑器才可见，需 refresh 才能正确布局高度/行号
+      requestAnimationFrame(() => { cm.refresh(); });
+    }
     requestAnimationFrame(() => $("#fName").focus());
   }
 
   async function saveRule() {
     const name = $("#fName").value.trim();
-    const expression = $("#fExpr").value.trim();
+    const expression = (exprEditor ? exprEditor.getValue() : $("#fExpr").value).trim();
     if (!name) { toast("规则名称不能为空"); return; }
     if (!expression) { toast("表达式不能为空"); return; }
     const body = { name, description: $("#fDesc").value.trim(), expression, ruleKind: $("#fKind").value, useType: editing ? (editing.useType ?? 0) : 0, status: 1 };

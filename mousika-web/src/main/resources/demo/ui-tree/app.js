@@ -30,7 +30,7 @@
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
         R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
-        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断规则，可连接一个可选的后续流程。" },
+        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断条件，可连接一个可选的后续流程。" },
         A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作，执行后可连接一个可选的下一步。" },
         PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
     };
@@ -38,7 +38,7 @@
     // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
     // expr 只保存稳定的 ruleId 引用；desc 供展示。动作与条件同源于规则池。
     let RULE_DEFINITIONS = Array.from({ length: 12 }, (_, index) => ({
-        ruleId: `c${index + 1}`, desc: `业务判断规则${index + 1}`, useType: 0
+        ruleId: `c${index + 1}`, desc: `业务判断条件${index + 1}`, useType: 0
     }));
     let ACTION_DEFINITIONS = Array.from({ length: 13 }, (_, index) => ({
         ruleId: `a${index + 1}`, desc: `业务操作${index + 1}`, useType: 0
@@ -47,7 +47,7 @@
     let ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
 
     // 接入后端时用真实 RuleDefinition 列表覆盖演示数据，并按 ruleKind 拆分：
-    // 判断规则(condition) 供判断/条件节点引用；执行动作(action) 供动作节点引用。
+    // 判断条件(condition) 供判断/条件节点引用；执行动作(action) 供动作节点引用。
     function applyRuleDefinitions(list) {
         const toDef = (r) => ({
             ruleId: String(r.id ?? r.ruleId),
