@@ -10,6 +10,7 @@ import com.skyfalling.mousika.ui.tree.node.TreeNode;
 import com.skyfalling.mousika.ui.web.common.BusinessException;
 import com.skyfalling.mousika.ui.web.dao.RuleDefinitionDao;
 import com.skyfalling.mousika.ui.web.dao.RuleFlowDao;
+import com.skyfalling.mousika.ui.web.dao.FlowRuleRefDao;
 import com.skyfalling.mousika.ui.web.entity.RuleDefinitionEntity;
 import com.skyfalling.mousika.ui.web.entity.RuleFlowEntity;
 import com.skyfalling.mousika.utils.JsonUtils;
@@ -40,6 +41,7 @@ public class RuleSuiteManager {
 
     private final RuleDefinitionDao ruleDao;
     private final RuleFlowDao flowDao;
+    private final FlowRuleRefDao refDao;
     // 依赖迁移器仅为保证启动顺序：DbMigrator 的 @PostConstruct 补列先于本类装配 RuleSuite。
     private final DbMigrator dbMigrator;
 
@@ -103,7 +105,20 @@ public class RuleSuiteManager {
     private PreparedSuite prepareSuite() {
         refreshLock.lock();
         try {
-            List<RuleDefinition> ruleDefs = toRuleDefs(ruleDao.listActive());
+            // 运行态规则集合 = 启用中的规则 ∪ 被已生效场景引用的规则（即使规则已下架/停用）。
+            // 这样"停用=下架、禁止被新场景引用"，但已经引用它的老场景仍能正常运行；
+            // 新场景选不到它（下拉只列 listActive）。
+            List<RuleDefinitionEntity> ruleEntities = new ArrayList<>(ruleDao.listActive());
+            java.util.Set<Long> loadedIds = ruleEntities.stream()
+                    .map(RuleDefinitionEntity::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+            java.util.Set<Long> referenced = refDao.refCountsByActiveFlow().keySet();
+            java.util.Set<Long> missing = new java.util.HashSet<>(referenced);
+            missing.removeAll(loadedIds);
+            if (!missing.isEmpty()) {
+                ruleEntities.addAll(ruleDao.findByIds(missing));
+            }
+            List<RuleDefinition> ruleDefs = toRuleDefs(ruleEntities);
             List<RuleFlowDefinition> flowDefs = new ArrayList<>();
             for (RuleFlowEntity f : flowDao.listActive()) {
                 TreeNode tree = JsonUtils.toBean(f.getRuleTree(), TreeNode.class);

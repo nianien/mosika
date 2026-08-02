@@ -234,6 +234,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function toggleRule(id, to) {
     const r = rules.find((x) => x.id === id); if (!r) return;
+    if (to === 0) {
+      const cnt = refCount.get(String(id)) || 0;
+      const tip = cnt > 0
+        ? `该规则仍被 ${cnt} 个业务场景引用。停用（下架）后：新场景将无法再选用它，但已在使用的场景仍会继续正常运行。确定停用？`
+        : "确定停用该规则？停用后新场景将无法再选用它。";
+      if (!window.confirm(tip)) return;
+    }
     try {
       if (to === 0) await Api.disableRule(id, r.version);
       else await Api.enableRule(id, r.version);
@@ -242,8 +249,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     } catch (e) {
       const m = String(e.message || "");
       let msg;
-      if (m.includes("still referenced")) msg = "该规则正被已生效的业务场景引用，无法停用；请先停用或修改引用它的场景。";
-      else if (m.includes("compile failed")) msg = "规则表达式无法编译，请检查表达式后重试。";
+      if (m.includes("compile failed")) msg = "规则表达式无法编译，请检查表达式后重试。";
       else if (m.includes("updated by others") || m.includes("version")) msg = "该规则已被其他操作修改，请刷新后重试。";
       else msg = "操作失败：" + m;
       toast(msg);

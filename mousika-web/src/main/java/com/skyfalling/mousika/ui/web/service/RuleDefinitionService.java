@@ -80,19 +80,14 @@ public class RuleDefinitionService {
 
     @Transactional
     public void disable(long id, long expectedVersion) {
-        RuleDefinitionEntity existing = requireRule(id);
-        Set<Long> refs = refDao.activeFlowsReferencing(id);
-        if (!refs.isEmpty()) {
-            throw new BusinessException(409,
-                    "rule " + id + " is still referenced by active flow(s): " + refs);
-        }
+        requireRule(id);
+        // 停用 = 下架：从可选规则池移除、禁止被新场景引用；已引用它的已生效场景仍会正常运行
+        // （RuleSuiteManager 会继续装载被已生效场景引用的规则，即便其已停用）。故此处不因存量引用而拦截。
         int rows = ruleDao.disable(id, expectedVersion);
         if (rows == 0) {
             throw new BusinessException(409, "rule updated by others, please retry");
         }
-        if (existing.getStatus() != null && existing.getStatus() == 1) {
-            suiteManager.refreshAfterCommit();
-        }
+        suiteManager.refreshAfterCommit();
     }
 
     public RuleDefinitionEntity findById(long id) {

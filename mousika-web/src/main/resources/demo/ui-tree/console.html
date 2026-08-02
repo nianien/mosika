@@ -57,10 +57,9 @@ tbody tr:hover{background:#f7fcfb}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
 .num{font-variant-numeric:tabular-nums;color:#3f5f58}
 .time{color:#8aa39d;font-variant-numeric:tabular-nums}
-.actions{display:grid;grid-template-columns:112px 48px 104px;column-gap:10px;align-items:center;justify-content:end;min-width:284px;white-space:nowrap}
-.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;width:112px;height:28px;padding:0;font-weight:600;font-size:12.5px;cursor:pointer}
+.actions{display:flex;gap:14px;align-items:center;justify-content:flex-end;white-space:nowrap}
+.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 16px;font-weight:600;font-size:12.5px;cursor:pointer}
 .actions .open:hover{background:#cdeee7;border-color:#7fccc0}
-.actions [data-detail]{justify-self:center}
 .status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
 .status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
 .status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
