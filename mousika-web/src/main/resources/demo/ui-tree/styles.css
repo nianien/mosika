@@ -73,14 +73,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .brand div { display: flex; align-items: center; gap: 8px; }
 .brand strong { font-size: 15px; color: #1f3a34; letter-spacing: .2px; }
 .back-link {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 9px; border: 0; border-radius: 8px;
-    color: #5c766f; font-size: 13px; font-weight: 600; text-decoration: none;
-    background: transparent; transition: background .15s ease, color .15s ease;
+    display: inline-flex; align-items: center;
+    padding: 2px; border: 0; border-radius: 4px;
+    color: #6f8b86; font-size: 14px; font-weight: 600; text-decoration: none;
+    background: transparent; transition: color .15s ease;
 }
-.back-link:hover { background: var(--primary-soft); color: var(--primary-strong); }
-.back-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
-.crumb-sep { color: #cfd9d5; font-size: 14px; margin: 0 1px; }
+.back-link:hover { color: var(--primary-strong); text-decoration: underline; text-underline-offset: 3px; }
+.back-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.crumb-sep { color: #cfd9d5; font-size: 14px; margin: 0 4px; }
 
 .toolbar { display: flex; align-items: center; gap: 6px; }
 .toolbar button { white-space: nowrap; }
