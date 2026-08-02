@@ -115,8 +115,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>业务场景</small></div></div>
-      <div class="tabs"><a class="tab on" href="/">场景</a><a class="tab" href="/rules">规则库</a></div>
+      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b></div></div>
+      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索场景名称 / 描述"></div>
@@ -125,7 +125,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">场景</span><span class="sub" id="subCount">加载中…</span></div>
+      <div><span style="font-size:19px;font-weight:700">业务场景</span><span class="sub" id="subCount">加载中…</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-status="">全部</button>
         <button type="button" class="chip" data-status="1">已生效</button>
@@ -162,7 +162,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <div class="rules" id="dwRules"></div>
       </div>
     </div>
-    <div class="dw-foot"><button class="btn" id="dwCancel">取消</button><span class="grow"></span><button class="btn" id="dwSave">保存</button><button class="btn primary" id="dwOpen">打开规则画布 →</button></div>
+    <div class="dw-foot"><button class="btn" id="dwCancel">取消</button><span class="grow"></span><button class="btn" id="dwSave">保存</button><button class="btn primary" id="dwOpen">编辑编排 →</button></div>
   </aside>
 </div>
 
@@ -172,7 +172,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="field"><label>场景名称 *</label><input id="newName" placeholder="如：准入场景"></div>
     <div class="field"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
   </div>
-  <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并打开画布</button></div>
+  <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并编排</button></div>
 </dialog>
 
 <dialog id="statusDlg" aria-labelledby="statusDlgTitle" aria-describedby="statusDlgMessage statusDlgNote">
@@ -222,16 +222,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function friendlyError(raw) {
     const m = String(raw || "");
     if (m.includes("rule kind does not match")) {
-      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「条件规则」、动作位置只能引用「动作规则」。请打开画布检查并调整后再生效。", detail: m };
+      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断规则」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再生效。", detail: m };
     }
     if (m.includes("unknown or disabled rule")) {
-      return { msg: "引用了不存在或已停用的规则，请先到「规则库」启用相关规则后再重试。", detail: m };
+      return { msg: "引用了不存在或已停用的规则，请先到「业务规则」中启用相关规则后再重试。", detail: m };
     }
     if (m.includes("must use numeric") || m.includes("built-in reference")) {
-      return { msg: "存在不受支持的规则引用，请打开画布检查引用后再生效。", detail: m };
+      return { msg: "存在不受支持的规则引用，请到编排画布检查引用后再生效。", detail: m };
     }
     if (m.includes("structural validation") || m.includes("compile failed") || m.includes("ruleTree")) {
-      return { msg: "场景结构校验未通过，请打开画布修正后再生效。", detail: m };
+      return { msg: "场景结构校验未通过，请到编排画布修正后再生效。", detail: m };
     }
     if (m.includes("updated by others") || m.includes("version")) {
       return { msg: "该场景已被其他操作修改，请刷新页面后重试。", detail: "" };
@@ -268,7 +268,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadFlows();
       }
-      $("#subCount").textContent = `共 ${page.total} 个场景`;
+      $("#subCount").textContent = `将业务规则编排为可执行的业务流程 · 共 ${page.total} 个`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -293,14 +293,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   };
 
   function renderRows() {
-    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
+    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
     $("#rows").innerHTML = flows.map((f) => {
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
       const active = f.status === 1;
       const pending = pendingFlowIds.has(f.id);
       const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
-      const ops = `<button class="open" data-open="${f.id}">打开画布</button>
+      const ops = `<button class="open" data-open="${f.id}">编辑编排</button>
         <button class="btn link" data-detail="${f.id}">详情</button>
         <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
           aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.id}"${pending ? " disabled aria-busy=\"true\"" : ""}>

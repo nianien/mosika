@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>规则库 · Mousika 规则编排</title>
+<title>业务规则 · Mousika 规则编排</title>
 <style>
 :root{
   color-scheme:light;
@@ -82,8 +82,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>规则库</small></div></div>
-      <div class="tabs"><a class="tab" href="/">场景</a><a class="tab on" href="/rules">规则库</a></div>
+      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b></div></div>
+      <div class="tabs"><a class="tab" href="/">业务场景</a><a class="tab on" href="/rules">业务规则</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
@@ -92,11 +92,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">规则库</span><span class="sub" id="subCount">场景画布的「引用规则」从这里读取</span></div>
+      <div><span style="font-size:19px;font-weight:700">业务规则</span><span class="sub" id="subCount">供业务场景复用的判断规则与执行动作</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-f="">全部</button>
-        <button type="button" class="chip" data-f="condition">条件规则</button>
-        <button type="button" class="chip" data-f="action">动作规则</button>
+        <button type="button" class="chip" data-f="condition">判断规则</button>
+        <button type="button" class="chip" data-f="action">执行动作</button>
         <button type="button" class="chip" data-f="off">已停用</button>
       </div>
     </div>
@@ -115,7 +115,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-body">
     <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
     <div class="field"><label>描述</label><input id="fDesc" placeholder="一句话说明"></div>
-    <div class="field"><label>分类</label><select id="fKind"><option value="condition">条件规则（用于判断/条件节点）</option><option value="action">动作规则（用于动作节点）</option></select></div>
+    <div class="field"><label>分类</label><select id="fKind"><option value="condition">判断规则（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
     <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
@@ -167,7 +167,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadRules();
       }
-      $("#subCount").textContent = `场景画布的「引用规则」从这里读取 · 共 ${page.total} 条`;
+      $("#subCount").textContent = `供业务场景复用的判断规则与执行动作 · 共 ${page.total} 条`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -192,7 +192,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const dim = live ? "" : ' style="opacity:.62"';
       const cnt = refCount.get(String(r.id)) || 0;
       const isAction = r.ruleKind === "action";
-      const typeTag = isAction ? `<span class="tag action">动作规则</span>` : `<span class="tag cond">条件规则</span>`;
+      const typeTag = isAction ? `<span class="tag action">执行动作</span>` : `<span class="tag cond">判断规则</span>`;
       const ops = live
         ? `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link danger" data-toggle="${r.id}" data-to="0">停用</button>`
         : `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link" data-toggle="${r.id}" data-to="1">启用</button>`;
@@ -200,7 +200,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <td><div class="name">${esc(r.name)}<span class="id">#${r.id}</span></div><div class="rowdesc">${esc(r.description || "—")}</div></td>
         <td><span class="expr">${esc(r.expression)}</span></td>
         <td>${typeTag}</td>
-        <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 个场景</span></td>
+        <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 个业务场景</span></td>
         <td><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span></td>
         <td><div class="actions">${ops}</div></td>
       </tr>`;

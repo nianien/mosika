@@ -30,8 +30,8 @@
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
         R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
-        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台条件规则，可连接一个可选的后续流程。" },
-        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台动作规则，执行后可连接一个可选的下一步。" },
+        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断规则，可连接一个可选的后续流程。" },
+        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作，执行后可连接一个可选的下一步。" },
         PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
     };
 
@@ -47,7 +47,7 @@
     let ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
 
     // 接入后端时用真实 RuleDefinition 列表覆盖演示数据，并按 ruleKind 拆分：
-    // 条件规则(condition) 供判断/条件节点引用；动作规则(action) 供动作节点引用。
+    // 判断规则(condition) 供判断/条件节点引用；执行动作(action) 供动作节点引用。
     function applyRuleDefinitions(list) {
         const toDef = (r) => ({
             ruleId: String(r.id ?? r.ruleId),
@@ -1402,7 +1402,7 @@
             ruleField.hidden = false;
             $("#nodeConfigRule").innerHTML = ACTION_DEFINITIONS
                 .map((d) => `<option value="${escapeText(d.ruleId)}">${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("");
-            note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无动作规则，请先在「规则库」新建动作规则。";
+            note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无执行动作，请先在「业务规则」中新建执行动作。";
         } else if (type === "J") {
             ruleField.hidden = true;
             note.textContent = "确认后打开条件编辑，配置该条件（可原子 / 与或 / 命中）。";
