@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>规则流 · Mousika 规则编排</title>
+<title>场景 · Mousika 规则编排</title>
 <style>
 :root{
   color-scheme:light;
@@ -115,17 +115,17 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>规则流 / Rule Flows</small></div></div>
-      <div class="tabs"><a class="tab on" href="/">规则流</a><a class="tab" href="/rules">原子规则库</a></div>
+      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>业务场景</small></div></div>
+      <div class="tabs"><a class="tab on" href="/">场景</a><a class="tab" href="/rules">规则库</a></div>
     </div>
     <div class="top-right">
-      <div class="search">🔍 <input id="searchInput" placeholder="搜索规则流名称 / 描述"></div>
-      <button class="btn primary" id="newFlowBtn">＋ 新建规则流</button>
+      <div class="search">🔍 <input id="searchInput" placeholder="搜索场景名称 / 描述"></div>
+      <button class="btn primary" id="newFlowBtn">＋ 新建场景</button>
     </div>
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">规则流</span><span class="sub" id="subCount">加载中…</span></div>
+      <div><span style="font-size:19px;font-weight:700">场景</span><span class="sub" id="subCount">加载中…</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-status="">全部</button>
         <button type="button" class="chip" data-status="1">已生效</button>
@@ -135,7 +135,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     </div>
     <div class="panel">
       <div class="table-scroll"><table>
-        <thead><tr><th style="width:42%">规则流 / 描述</th><th>状态</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
+        <thead><tr><th style="width:42%">场景 / 描述</th><th>状态</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
         <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
       </table></div>
       <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
@@ -144,21 +144,21 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   <div class="scrim" id="scrim"></div>
   <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-    <div class="dw-head"><h2 id="drawerTitle">规则流详情 <span class="pill live" id="dwStatusPill">已生效</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
+    <div class="dw-head"><h2 id="drawerTitle">场景详情 <span class="pill live" id="dwStatusPill">已生效</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
     <div class="dw-body">
-      <div class="field"><label>规则流名称</label><input id="dwName" maxlength="60"></div>
-      <div class="field"><label>规则流描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响规则流程结构与状态；状态通过列表中的开关变更。</div></div>
+      <div class="field"><label>场景名称</label><input id="dwName" maxlength="60"></div>
+      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响流程结构与状态；状态通过列表中的开关变更。</div></div>
       <div>
         <div class="sec-title">概览</div>
         <div class="metarow">
-          <div class="metabox"><div class="k">引用原子规则</div><div class="v" id="dwRuleCount">0</div></div>
+          <div class="metabox"><div class="k">引用规则</div><div class="v" id="dwRuleCount">0</div></div>
           <div class="metabox"><div class="k">流程节点</div><div class="v" id="dwNodeCount">0</div></div>
           <div class="metabox"><div class="k">版本</div><div class="v" id="dwVersion">v0</div></div>
           <div class="metabox"><div class="k">最近更新</div><div class="v" id="dwUpdated" style="font-size:13px;padding-top:4px">-</div></div>
         </div>
       </div>
       <div>
-        <div class="sec-title">引用的原子规则</div>
+        <div class="sec-title">引用的规则</div>
         <div class="rules" id="dwRules"></div>
       </div>
     </div>
@@ -167,10 +167,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 </div>
 
 <dialog id="newDlg">
-  <div class="dlg-head">新建规则流</div>
+  <div class="dlg-head">新建场景</div>
   <div class="dlg-body">
-    <div class="field"><label>规则流名称 *</label><input id="newName" placeholder="如：准入规则流"></div>
-    <div class="field"><label>规则流描述</label><textarea id="newDesc" placeholder="一句话说明这条规则流做什么"></textarea></div>
+    <div class="field"><label>场景名称 *</label><input id="newName" placeholder="如：准入场景"></div>
+    <div class="field"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并打开画布</button></div>
 </dialog>
@@ -225,16 +225,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       return { msg: "规则类型与节点位置不匹配：条件位置只能引用「条件规则」、动作位置只能引用「动作规则」。请打开画布检查并调整后再生效。", detail: m };
     }
     if (m.includes("unknown or disabled rule")) {
-      return { msg: "引用了不存在或已停用的规则，请先到「原子规则库」启用相关规则后再重试。", detail: m };
+      return { msg: "引用了不存在或已停用的规则，请先到「规则库」启用相关规则后再重试。", detail: m };
     }
     if (m.includes("must use numeric") || m.includes("built-in reference")) {
       return { msg: "存在不受支持的规则引用，请打开画布检查引用后再生效。", detail: m };
     }
     if (m.includes("structural validation") || m.includes("compile failed") || m.includes("ruleTree")) {
-      return { msg: "规则流结构校验未通过，请打开画布修正后再生效。", detail: m };
+      return { msg: "场景结构校验未通过，请打开画布修正后再生效。", detail: m };
     }
     if (m.includes("updated by others") || m.includes("version")) {
-      return { msg: "该规则流已被其他操作修改，请刷新页面后重试。", detail: "" };
+      return { msg: "该场景已被其他操作修改，请刷新页面后重试。", detail: "" };
     }
     return { msg: m || "操作未完成，请稍后重试。", detail: "" };
   }
@@ -268,7 +268,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadFlows();
       }
-      $("#subCount").textContent = `共 ${page.total} 条 · 每条对应一棵可编排的规则流程`;
+      $("#subCount").textContent = `共 ${page.total} 个场景`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -293,7 +293,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   };
 
   function renderRows() {
-    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无规则流，点右上角「新建规则流」开始。</div></td></tr>`; return; }
+    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
     $("#rows").innerHTML = flows.map((f) => {
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
@@ -332,7 +332,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     $("#dwNodeCount").textContent = current.nodeCount ?? 0;
     $("#dwRules").innerHTML = ruleIds.length
       ? ruleIds.map((rid) => `<div class="rtag">${esc(ruleNameById.get(String(rid)) || rid)}<span class="rid">#${esc(rid)}</span></div>`).join("")
-      : `<span class="hint">未引用任何原子规则</span>`;
+      : `<span class="hint">未引用任何规则</span>`;
     setDrawerStatus(current.status);
     document.querySelector(".topbar").inert = true;
     document.querySelector(".main").inert = true;
@@ -362,7 +362,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function saveDrawer(openAfter) {
     if (!current || drawerSaving) return;
     const name = $("#dwName").value.trim();
-    if (!name) { toast("规则流名称不能为空"); return; }
+    if (!name) { toast("场景名称不能为空"); return; }
     drawerSaving = true;
     $("#dwSave").disabled = true; $("#dwOpen").disabled = true;
     try {
@@ -385,11 +385,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const f = flows.find((x) => x.id === id); if (!f || pendingFlowIds.has(id)) return;
     const disabling = f.status === 1;
     statusDialogTarget = { id, button };
-    $("#statusDlgTitle").textContent = disabling ? "确认停用规则流" : "确认生效规则流";
+    $("#statusDlgTitle").textContent = disabling ? "确认停用场景" : "确认生效场景";
     $("#statusDlgMessage").textContent = `${disabling ? "确定停用" : "确定生效"}「${f.name}」吗？`;
     $("#statusDlgNote").textContent = disabling
-      ? "停用后该规则流立即退出运行态，但规则树和配置仍会保留。"
-      : "生效前会校验并编译当前规则树；成功后该规则流立即进入运行态。";
+      ? "停用后该场景立即退出运行态，但规则树和配置仍会保留。"
+      : "生效前会校验并编译当前规则树；成功后该场景立即进入运行态。";
     const confirm = $("#statusConfirm");
     confirm.textContent = disabling ? "确认停用" : "确认生效";
     confirm.className = disabling ? "btn danger" : "btn primary";
@@ -449,7 +449,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function createFlow() {
     const name = $("#newName").value.trim();
-    if (!name) { toast("请填写规则流名称"); return; }
+    if (!name) { toast("请填写场景名称"); return; }
     try {
       const created = await Api.createFlow({
         name, description: $("#newDesc").value.trim(),

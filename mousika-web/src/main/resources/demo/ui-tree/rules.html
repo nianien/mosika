@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>原子规则库 · Mousika 规则编排</title>
+<title>规则库 · Mousika 规则编排</title>
 <style>
 :root{
   color-scheme:light;
@@ -82,8 +82,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>原子规则库 / Rule Definitions</small></div></div>
-      <div class="tabs"><a class="tab" href="/">规则流</a><a class="tab on" href="/rules">原子规则库</a></div>
+      <div class="brand"><div class="brand-mark">M</div><div><b>Mousika 规则编排</b><small>规则库</small></div></div>
+      <div class="tabs"><a class="tab" href="/">场景</a><a class="tab on" href="/rules">规则库</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
@@ -92,7 +92,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">原子规则库</span><span class="sub" id="subCount">规则流画布的「引用规则」从这里读取</span></div>
+      <div><span style="font-size:19px;font-weight:700">规则库</span><span class="sub" id="subCount">场景画布的「引用规则」从这里读取</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-f="">全部</button>
         <button type="button" class="chip" data-f="condition">条件规则</button>
@@ -136,7 +136,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   let total = 0;
   let loadSequence = 0;
   let rules = [];
-  let refCount = new Map(); // ruleId(String) -> 引用规则流数
+  let refCount = new Map(); // ruleId(String) -> 引用场景数
   let editing = null;
 
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
@@ -167,7 +167,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadRules();
       }
-      $("#subCount").textContent = `规则流画布的「引用规则」从这里读取 · 共 ${page.total} 条`;
+      $("#subCount").textContent = `场景画布的「引用规则」从这里读取 · 共 ${page.total} 条`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -200,7 +200,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <td><div class="name">${esc(r.name)}<span class="id">#${r.id}</span></div><div class="rowdesc">${esc(r.description || "—")}</div></td>
         <td><span class="expr">${esc(r.expression)}</span></td>
         <td>${typeTag}</td>
-        <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 条规则流</span></td>
+        <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 个场景</span></td>
         <td><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span></td>
         <td><div class="actions">${ops}</div></td>
       </tr>`;

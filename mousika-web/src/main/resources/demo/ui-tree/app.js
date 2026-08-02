@@ -2,7 +2,7 @@
     "use strict";
 
     // 画布页必须依附一条规则流程。通过 HTTP 访问且无 flowId（bench 基准除外）时，
-    // 回到规则流列表，避免正式服务里裸开画布展示内置演示假数据造成困惑。
+    // 回到场景列表，避免正式服务里裸开画布展示内置演示假数据造成困惑。
     // flowId 取自路径 /flow/{id}（正式路由）或查询串 ?flowId=（向后兼容）。
     function resolveFlowId() {
         const m = location.pathname.match(/\/flow\/(\d+)/);
@@ -29,14 +29,14 @@
         J: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的纯规则树，并连接可选的后续流程。" },
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
-        R: { name: "原子规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
+        R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
         C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台条件规则，可连接一个可选的后续流程。" },
         A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台动作规则，执行后可连接一个可选的下一步。" },
         PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
     };
 
-    // 原子规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
-    // expr 只保存稳定的 ruleId 引用；desc 供展示。动作与条件同源于原子规则池。
+    // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
+    // expr 只保存稳定的 ruleId 引用；desc 供展示。动作与条件同源于规则池。
     let RULE_DEFINITIONS = Array.from({ length: 12 }, (_, index) => ({
         ruleId: `c${index + 1}`, desc: `业务判断规则${index + 1}`, useType: 0
     }));
@@ -687,7 +687,7 @@
             const definition = definitions.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
             if (definition) node.expr = definition.ruleId;
         } else if (field === "expression" && node.type === "J") {
-            // 就地设置判断节点的根规则（单个原子规则）；保留原规则名与取反。
+            // 就地设置判断节点的根规则（单个规则）；保留原规则名与取反。
             const definition = RULE_DEFINITIONS.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
             if (definition) {
                 const r = jrule(node);
@@ -1402,7 +1402,7 @@
             ruleField.hidden = false;
             $("#nodeConfigRule").innerHTML = ACTION_DEFINITIONS
                 .map((d) => `<option value="${escapeText(d.ruleId)}">${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("");
-            note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无动作规则，请先在「原子规则库」新建动作规则。";
+            note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无动作规则，请先在「规则库」新建动作规则。";
         } else if (type === "J") {
             ruleField.hidden = true;
             note.textContent = "确认后打开条件编辑，配置该条件（可原子 / 与或 / 命中）。";
@@ -1627,7 +1627,7 @@
             docStatus = makeFormal ? "formal" : "draft";
             dirty = false;
             updateDocStatus(); pulseStatus();
-            // 保存/生效成功后自动返回规则流列表（dirty 已清空，不再触发离开提醒）。
+            // 保存/生效成功后自动返回场景列表（dirty 已清空，不再触发离开提醒）。
             setTimeout(() => { location.href = "/"; }, 300);
             return true;
         } catch (e) {
@@ -2293,34 +2293,34 @@
             $("#loadErrorBanner").hidden = true;
             render({ preserveView: true });
         } catch (e) {
-            console.error("加载规则定义失败", e);
-            showLoadError(`规则定义加载失败：${e.message}。规则选择暂不可用。`);
+            console.error("加载规则失败", e);
+            showLoadError(`规则加载失败：${e.message}。规则选择暂不可用。`);
         }
 
         try {
             const flow = await window.MousikaApi.getFlow(flowId);
-            if (!flow) throw new Error("规则流程不存在");
+            if (!flow) throw new Error("场景不存在");
             flowMeta = { id: flow.id, name: flow.name, description: flow.description, version: flow.version };
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = flow.name || "流程画布";
             const crumbEl = document.getElementById("flowCrumbName");
             if (crumbEl) crumbEl.textContent = flow.name || "规则树编辑器";
-            document.title = `${flow.name || "规则流程"} · Mousika`;
+            document.title = `${flow.name || "场景"} · Mousika`;
             loadTree(flow.ruleTree);
             docStatus = flow.status === 1 ? "formal" : flow.status === 2 ? "disabled" : "draft";
             dirty = false;
             updateDocStatus();
         } catch (e) {
-            console.error("加载规则流程失败", e);
+            console.error("加载场景失败", e);
             // 只读错误态：禁用保存/生效，避免把空白画布当成真实流程覆盖后端。
             flowLoadFailed = true;
             setSaveBusy(false);
-            showLoadError(`规则流程加载失败：${e.message}`);
+            showLoadError(`场景加载失败：${e.message}`);
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = "加载失败";
             const crumbEl = document.getElementById("flowCrumbName");
             if (crumbEl) crumbEl.textContent = "加载失败";
-            openConfirm(`加载规则流程失败：${e.message}`, { title: "加载失败", confirmLabel: "知道了" });
+            openConfirm(`加载场景失败：${e.message}`, { title: "加载失败", confirmLabel: "知道了" });
         }
     })();
 
@@ -2332,7 +2332,7 @@
     const backToFlows = $("#backToFlows");
     if (backToFlows) {
         backToFlows.addEventListener("click", (event) => {
-            if (dirty && !window.confirm("当前修改尚未保存，确定返回规则流列表吗？")) {
+            if (dirty && !window.confirm("当前修改尚未保存，确定返回场景列表吗？")) {
                 event.preventDefault();
             }
         });
