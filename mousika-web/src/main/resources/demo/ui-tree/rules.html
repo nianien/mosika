@@ -7,7 +7,7 @@
 <style>
 :root{
   color-scheme:light;
-  font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   color:#123038;background:#edf4f3;
   --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
   --cyan:#0891b2;--cyan-soft:#e3fafd;
@@ -102,8 +102,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     </div>
     <div class="panel">
       <div class="table-scroll"><table>
-        <thead><tr><th style="width:24%">规则名称 / 描述</th><th style="width:28%">表达式</th><th>类型</th><th>被引用</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="6"><div class="loading">加载中…</div></td></tr></tbody>
+        <thead><tr><th style="width:26%">规则名称 / 描述</th><th style="width:30%">表达式</th><th>类型</th><th>被引用</th><th style="text-align:right">状态 / 操作</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
       </table></div>
       <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
     </div>
@@ -152,7 +152,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function loadRules() {
     const sequence = ++loadSequence;
-    $("#rows").innerHTML = `<tr><td colspan="6"><div class="loading">加载中…</div></td></tr>`;
+    $("#rows").innerHTML = `<tr><td colspan="5"><div class="loading">加载中…</div></td></tr>`;
     const params = { keyword, pageNumber, pageSize };
     if (filter === "condition") { params.ruleKind = "condition"; params.status = 1; }
     else if (filter === "action") { params.ruleKind = "action"; params.status = 1; }
@@ -172,7 +172,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       renderPager();
     } catch (e) {
       if (sequence !== loadSequence) return;
-      $("#rows").innerHTML = `<tr><td colspan="6"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
+      $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
       $("#pager").hidden = true;
     }
   }
@@ -186,7 +186,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   function renderRows() {
-    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="6"><div class="empty">暂无规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
+    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
     $("#rows").innerHTML = rules.map((r) => {
       const live = r.status === 1;
       const dim = live ? "" : ' style="opacity:.62"';
@@ -201,8 +201,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <td><span class="expr">${esc(r.expression)}</span></td>
         <td>${typeTag}</td>
         <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 个业务场景</span></td>
-        <td><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span></td>
-        <td><div class="actions">${ops}</div></td>
+        <td><div class="actions"><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span>${ops}</div></td>
       </tr>`;
     }).join("");
   }
@@ -240,7 +239,15 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       else await Api.enableRule(id, r.version);
       toast(to === 0 ? "已停用" : "已启用");
       refresh();
-    } catch (e) { toast("操作失败：" + e.message); }
+    } catch (e) {
+      const m = String(e.message || "");
+      let msg;
+      if (m.includes("still referenced")) msg = "该规则正被已生效的业务场景引用，无法停用；请先停用或修改引用它的场景。";
+      else if (m.includes("compile failed")) msg = "规则表达式无法编译，请检查表达式后重试。";
+      else if (m.includes("updated by others") || m.includes("version")) msg = "该规则已被其他操作修改，请刷新后重试。";
+      else msg = "操作失败：" + m;
+      toast(msg);
+    }
   }
 
   async function refresh() { await loadRefCounts(); await loadRules(); }

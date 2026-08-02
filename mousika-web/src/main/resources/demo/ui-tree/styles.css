@@ -1,6 +1,6 @@
 :root {
     color-scheme: light;
-    font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     color: #17223b;
     background: #eef2f8;
     --line: #6f82a0;

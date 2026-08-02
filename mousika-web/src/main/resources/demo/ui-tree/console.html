@@ -7,7 +7,7 @@
 <style>
 :root{
   color-scheme:light;
-  font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   color:#123038;background:#edf4f3;
   --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
   --cyan:#0891b2;--cyan-soft:#e3fafd;
@@ -135,8 +135,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     </div>
     <div class="panel">
       <div class="table-scroll"><table>
-        <thead><tr><th style="width:42%">场景 / 描述</th><th>状态</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
+        <thead><tr><th style="width:46%">场景 / 描述</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="4"><div class="loading">加载中…</div></td></tr></tbody>
       </table></div>
       <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
     </div>
@@ -162,7 +162,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <div class="rules" id="dwRules"></div>
       </div>
     </div>
-    <div class="dw-foot"><button class="btn" id="dwCancel">取消</button><span class="grow"></span><button class="btn" id="dwSave">保存</button><button class="btn primary" id="dwOpen">编辑编排 →</button></div>
+    <div class="dw-foot"><button class="btn" id="dwCancel">取消</button><span class="grow"></span><button class="btn" id="dwSave">保存</button><button class="btn primary" id="dwOpen">编排 →</button></div>
   </aside>
 </div>
 
@@ -258,7 +258,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function loadFlows() {
     const sequence = ++loadSequence;
-    $("#rows").innerHTML = `<tr><td colspan="5"><div class="loading">加载中…</div></td></tr>`;
+    $("#rows").innerHTML = `<tr><td colspan="4"><div class="loading">加载中…</div></td></tr>`;
     try {
       const page = await Api.listFlows({ status: statusFilter, keyword, pageNumber, pageSize });
       if (sequence !== loadSequence) return;
@@ -273,7 +273,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       renderPager();
     } catch (e) {
       if (sequence !== loadSequence) return;
-      $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
+      $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
       $("#pager").hidden = true;
     }
   }
@@ -293,14 +293,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   };
 
   function renderRows() {
-    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
+    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">暂无业务场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
     $("#rows").innerHTML = flows.map((f) => {
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
       const active = f.status === 1;
       const pending = pendingFlowIds.has(f.id);
       const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
-      const ops = `<button class="open" data-open="${f.id}">编辑编排</button>
+      const ops = `<button class="open" data-open="${f.id}">编排</button>
         <button class="btn link" data-detail="${f.id}">详情</button>
         <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
           aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.id}"${pending ? " disabled aria-busy=\"true\"" : ""}>
@@ -309,7 +309,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         </button>`;
       return `<tr>
         <td><div class="name">${esc(f.name)}<span class="id">#${f.id}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
-        <td><span class="pill ${meta.cls}">${meta.label}</span></td>
         <td class="num">${ruleIds.length}</td>
         <td class="time">${esc((f.updatedAt || "").slice(5, 16))}</td>
         <td><div class="actions">${ops}</div></td>
