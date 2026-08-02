@@ -167,6 +167,18 @@ public class TreeNodeTest {
     }
 
     @Test
+    public void testDecisionAllowsBranchWithoutAction() {
+        DNode decision = new DNode();
+        decision.addBranch(c("c1"));
+        decision.addBranch(c("c2", "a2"));
+        TreeNode tree = tree(decision);
+
+        tree.validate();
+        assertEquals("c1?∅:(c2?a2)", tree.toRule().expr());
+        assertJsonAndRuleRoundTrip(tree);
+    }
+
+    @Test
     public void testSerialJsonRoundTrip() {
         SNode serial = new SNode();
         serial.addBranch(c("c1", "a1"));

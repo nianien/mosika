@@ -37,6 +37,7 @@ class MousikaWebIntegrationTest {
     private static final Path DB_PATH = createDatabasePath();
     private static final String EMPTY_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\"∅\"}}";
     private static final String INVALID_DECISION_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"D\",\"expr\":\"D\",\"branches\":[],\"action\":{\"type\":\"A\",\"expr\":\"∅\"}}}";
+    private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"D\",\"expr\":\"D\",\"branches\":[{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"R\",\"expr\":\"true\"}},{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"R\",\"expr\":\"false\"}}]}}";
     private static final String EMPTY_SERIAL_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"S\",\"expr\":\"S\",\"branches\":[]}}";
     private static final String SINGLE_LOGIC_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"L\",\"expr\":\"&&\",\"rules\":[{\"type\":\"R\",\"expr\":\"true\"}]}}}";
 
@@ -146,6 +147,23 @@ class MousikaWebIntegrationTest {
                         .content("{}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    void publishAcceptsDecisionBranchesWithoutActions() throws Exception {
+        long id = createFlow("optional-actions", OPTIONAL_ACTION_DECISION_TREE);
+
+        mvc.perform(post("/api/flows/{id}/publish", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("optional-actions", OPTIONAL_ACTION_DECISION_TREE, 0))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        mvc.perform(post("/api/eval/flow/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
     }
 
     @Test

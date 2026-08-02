@@ -107,10 +107,12 @@ public class UINodeAdapter {
         RuleNode fallback = dn.getAction() == null ? null : toRule(dn.getAction());
         for (int i = branches.size() - 1; i >= 0; i--) {
             CNode branch = branches.get(i);
-            if (branch.getAction() == null) {
-                throw new IllegalArgumentException("DNode branch action is required!");
-            }
-            fallback = new CaseNode(parse(branch.ruleExpr()), toRule(branch.getAction()), fallback);
+            // 分支 action 可选：命中纯条件分支时以 NOP 表示“已选择但无后续动作”，
+            // 从而停止继续检查后面的互斥分支，并保持 matched=true。
+            RuleNode matched = branch.getAction() == null
+                    ? new ExprNode(Constants.NOP)
+                    : toRule(branch.getAction());
+            fallback = new CaseNode(parse(branch.ruleExpr()), matched, fallback);
         }
         return fallback;
     }

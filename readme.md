@@ -9,10 +9,22 @@ mvn clean test
 模块职责：`mousika-core` 提供纯规则内核，`mousika-ui` 提供可序列化 UI AST，`mousika-web` 提供可选的 Spring Boot 管理服务与页面。启动 Web 服务：
 
 ```shell
-./mousika.sh start
+./scripts/mousika.sh start
 # 或开发模式
-./mousika.sh dev
+./scripts/mousika.sh dev
 ```
+
+服务脚本统一位于 `scripts/`，常用命令如下：
+
+```shell
+./scripts/mousika.sh doctor      # 检查 JDK、Maven 和运行工具
+./scripts/mousika.sh status      # 查看脚本管理的 PID、真实端口和健康状态
+./scripts/mousika.sh logs        # 查看最近日志；追加 -f 持续跟踪
+./scripts/mousika.sh restart     # 沿用状态文件记录的端口和数据库重启
+./scripts/mousika.sh stop        # 正常情况下只停止经过 PID、JAR 和端口校验的实例
+```
+
+PID、端口、项目路径、JAR 和数据库路径记录在 `${TMPDIR:-/tmp}/mousika/instance.state`，日志默认写入同目录，不再污染仓库。可通过 `MOUSIKA_PORT`、`MOUSIKA_DB_PATH`、`MOUSIKA_RUN_DIR` 等环境变量覆盖；完整参数执行 `./scripts/mousika.sh help` 查看。
 
 规则中的 JavaScript 由 GraalJS Polyglot 执行。普通 JDK 21 可以正常运行；高频 JavaScript 场景建议使用支持 GraalJS 优化运行时的 GraalVM。
 

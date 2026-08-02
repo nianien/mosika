@@ -74,9 +74,6 @@ public final class TreeVisitor {
                     || decision.getBranches().size() == 1 && decision.getAction() == null) {
                 throw new IllegalStateException("DNode requires at least two outcomes");
             }
-            if (decision.getBranches().stream().anyMatch(branch -> branch.getAction() == null)) {
-                throw new IllegalStateException("DNode branch action is required");
-            }
         }
     };
 

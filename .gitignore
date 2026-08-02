@@ -4,6 +4,7 @@ target/
 .idea/
 .DS_Store
 **.flattened-pom.xml
+/.run/
 
 # mousika-ui 运行期生成的 SQLite 数据目录（含 db / wal / shm 等）
 /mousika-ui/data/
