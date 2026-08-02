@@ -131,7 +131,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-head" id="dlgTitle">新建规则</div>
   <div class="dlg-body">
     <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-    <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">可用 ${变量} 代入入参，运行时替换为实际值（如 ${score}）。</div></div>
+    <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">支持变量代入：形如 {$.字段}（入参）或 {$$.字段}（上下文），运行时替换为实际值，如 {$.agent.id}。</div></div>
     <div class="field"><label>规则类型</label><select id="fKind"><option value="condition">判断条件（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
     <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
   </div>
