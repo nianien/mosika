@@ -61,7 +61,14 @@ tbody tr:hover{background:#f7fcfb}
 .refbadge{display:inline-flex;align-items:center;gap:5px;color:#3f5f58}
 .refbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
 .refbadge.zero{color:#a7c0ba}.refbadge.zero .dot{background:#cdddd8}
-.actions{display:flex;gap:4px;justify-content:flex-end}
+.actions{display:flex;gap:14px;align-items:center;justify-content:flex-end}
+.status-toggle{height:28px;padding:0;border:0;background:transparent;display:inline-flex;align-items:center;gap:7px;color:#8aa39d;cursor:pointer;text-align:left}
+.status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
+.status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
+.status-toggle.is-on{color:var(--teal-d);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--teal)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
+.status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
+.status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
+.status-toggle-label{font-size:12.5px;line-height:1;min-width:42px}
 .empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:13.5px}
 .pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:12.5px}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer}.pager button:disabled{opacity:.45;cursor:not-allowed}
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
@@ -193,15 +200,17 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const cnt = refCount.get(String(r.id)) || 0;
       const isAction = r.ruleKind === "action";
       const typeTag = isAction ? `<span class="tag action">执行动作</span>` : `<span class="tag cond">判断规则</span>`;
-      const ops = live
-        ? `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link danger" data-toggle="${r.id}" data-to="0">停用</button>`
-        : `<button class="btn link" data-edit="${r.id}">编辑</button><button class="btn link" data-toggle="${r.id}" data-to="1">启用</button>`;
+      const toggle = `<button type="button" class="status-toggle ${live ? "is-on" : "is-off"}" role="switch"
+          aria-checked="${live}" data-toggle="${r.id}" data-to="${live ? 0 : 1}" aria-label="${esc(r.name)}的启用状态">
+          <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
+          <span class="status-toggle-label">${live ? "启用" : "已停用"}</span>
+        </button>`;
       return `<tr${dim}>
         <td><div class="name">${esc(r.name)}<span class="id">#${r.id}</span></div><div class="rowdesc">${esc(r.description || "—")}</div></td>
         <td><span class="expr">${esc(r.expression)}</span></td>
         <td>${typeTag}</td>
         <td><span class="refbadge ${cnt ? "" : "zero"}"><span class="dot"></span>${cnt} 个业务场景</span></td>
-        <td><div class="actions"><span class="pill ${live ? "on" : "off"}">${live ? "启用" : "已停用"}</span>${ops}</div></td>
+        <td><div class="actions"><button class="btn link" data-edit="${r.id}">编辑</button>${toggle}</div></td>
       </tr>`;
     }).join("");
   }
