@@ -87,15 +87,26 @@ public class ParNode implements RuleNode {
             }
             throw new RuleEvalException(expr(), cause == null ? e.getMessage() : cause.getMessage(), cause);
         } catch (InterruptedException e) {
+            cancelPending(futures);
             Thread.currentThread().interrupt();
             throw new RuleEvalException(expr(), "parallel rule execution interrupted", e);
         } catch (TimeoutException e) {
+            cancelPending(futures);
             throw new RuleEvalException(expr(), "parallel rule execution timed out after 1 minute", e);
         } finally {
             // 线程策略可能使用当前线程，需要恢复父评估节点
             context.setCurrentEval(parentNode);
         }
         return new EvalResult(expr(), null, true);
+    }
+
+    /**
+     * 取消尚未开始执行的分支，不尝试中断已在运行的分支。
+     */
+    private static void cancelPending(CompletableFuture<?>[] futures) {
+        for (CompletableFuture<?> future : futures) {
+            future.cancel(false);
+        }
     }
 
 

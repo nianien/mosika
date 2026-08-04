@@ -29,6 +29,11 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -163,6 +168,51 @@ public class RuleNodeFlowTest {
                 () -> new RuleEvaluator(engine).eval(NodeBuilder.build("boom=>true"), null));
 
         assertEquals("boom", exception.getRuleId());
+    }
+
+    @Test
+    public void testInterruptedParallelExecutionCancelsPendingBranches() throws InterruptedException {
+        int parallelism = ForkJoinPool.getCommonPoolParallelism();
+        CountDownLatch workersStarted = new CountDownLatch(parallelism);
+        CountDownLatch releaseWorkers = new CountDownLatch(1);
+        List<CompletableFuture<Void>> blockers = IntStream.range(0, parallelism)
+                .mapToObj(i -> CompletableFuture.runAsync(() -> {
+                    workersStarted.countDown();
+                    try {
+                        releaseWorkers.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }, ForkJoinPool.commonPool()))
+                .collect(Collectors.toList());
+        AtomicInteger executions = new AtomicInteger();
+        RuleNode pending = new RuleNode() {
+            @Override
+            public EvalResult eval(RuleContext context) {
+                executions.incrementAndGet();
+                return new EvalResult(expr(), null, true);
+            }
+
+            @Override
+            public String expr() {
+                return "pending";
+            }
+        };
+
+        try {
+            assertTrue(workersStarted.await(5, TimeUnit.SECONDS));
+            Thread.currentThread().interrupt();
+
+            assertThrows(RuleEvalException.class,
+                    () -> new ParNode(pending).eval(new RuleVisitor(ruleEngine, null)));
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+            releaseWorkers.countDown();
+            blockers.forEach(CompletableFuture::join);
+        }
+        assertTrue(ForkJoinPool.commonPool().awaitQuiescence(5, TimeUnit.SECONDS));
+        assertEquals(0, executions.get());
     }
 
     @Test
