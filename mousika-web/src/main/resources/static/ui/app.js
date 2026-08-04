@@ -62,7 +62,7 @@
         ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
     }
 
-    // 与 img/ui-tree.png 逐节点对应，用 TreeNode 语义模型重建。
+    // 与 docs/images/ui-tree.svg 中的示例逐节点对应，用 TreeNode 语义模型重建。
     const sampleTree = () => {
         const root = make.root();
         const s = make.serial();
@@ -2266,7 +2266,7 @@
     render({ preserveView: false });
     updateDocStatus();
 
-    // 对外只读桥（供后端接线层与基准/测试使用）。
+    // 对外桥接层，供页面接线和浏览器交互测试使用。
     window.__mousikaEditor = {
         getTreeJson() { return T.serialize(tree); },
         loadTreeJson(json, opts) { loadTree(json, opts || {}); },
@@ -2338,32 +2338,4 @@
         });
     }
 
-    if (new URLSearchParams(location.search).has("bench")) {
-        window.__mousikaBench = {
-            sampleTree,
-            setTree(newTree) { loadTree(newTree, { bypassLimits: true }); },
-            loadTree(newTree, opts) { loadTree(newTree, opts); },
-            limits: TREE_LIMITS,
-            assertWithinLimits(root) { return assertTreeWithinLimits(root); },
-            render(opts) { render(opts || { preserveView: true }); },
-            metrics() {
-                const stats = canvasStats(tree);
-                return {
-                    width: treeRoot.offsetWidth,
-                    height: treeRoot.offsetHeight,
-                    flowCount: stats.flowNodes,
-                    ruleCount: stats.modalRuleNodes
-                };
-            },
-            findNode,
-            openRuleDialog(judgeId) { openRuleDialog(judgeId); },
-            closeRuleDialog() { if (ruleDialog.open) ruleDialog.close(); },
-            renderRuleTree() { renderRuleTree(); },
-            ruleTreeRoot() { return ruleTreeRoot; },
-            fitTree() { fitTree(); },
-            getTree() { return tree; },
-            treeRoot() { return treeRoot; },
-            viewport() { return viewport; }
-        };
-    }
 })();

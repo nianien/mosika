@@ -21,12 +21,15 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -174,6 +177,29 @@ class MousikaWebIntegrationTest {
         mvc.perform(get("/favicon.ico"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    void webRoutesUseSpringBootStaticResources() throws Exception {
+        mvc.perform(get("/ui/console.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"newFlowBtn\"")));
+        mvc.perform(get("/ui/rules.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"newRuleBtn\"")));
+        mvc.perform(get("/ui/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"treeRoot\"")));
+
+        mvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/console.html"));
+        mvc.perform(get("/rules"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/rules.html"));
+        mvc.perform(get("/flow/12"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/index.html"));
     }
 
     @Test

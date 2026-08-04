@@ -2,7 +2,6 @@ package com.skyfalling.mousika.ui.web.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -11,9 +10,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * <ul>
  *   <li>CORS：本工具默认同源访问，仅放开本机回环开发源（localhost/127.0.0.1），
  *       不携带凭证。若要对外提供服务，请在此显式配置受信 Origin 并补充鉴权。</li>
- *   <li>静态资源：规则编排前端位于 {@code classpath:/demo/ui-tree/}，对外统一挂在
- *       {@code /ui/**}（正式访问路径，URL 不含 demo）；{@code /demo/**} 仅保留给
- *       {@code bench} 基准工具向后兼容。</li>
+ *   <li>静态资源：规则编排前端位于 Spring Boot 标准目录
+ *       {@code classpath:/static/ui/}，直接以 {@code /ui/**} 对外提供。</li>
  *   <li>入口：根路径 {@code /} 转发到规则流列表控制台。</li>
  * </ul>
  *
@@ -32,16 +30,6 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedHeaders("*")
                 .allowCredentials(false)
                 .maxAge(3600);
-    }
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 正式访问路径：/ui/console.html、/ui/rules.html、/ui/index.html?flowId=N
-        registry.addResourceHandler("/ui/**")
-                .addResourceLocations("classpath:/demo/ui-tree/");
-        // 向后兼容：bench 基准工具与历史链接仍可用 /demo/ 访问
-        registry.addResourceHandler("/demo/**")
-                .addResourceLocations("classpath:/demo/");
     }
 
     @Override
