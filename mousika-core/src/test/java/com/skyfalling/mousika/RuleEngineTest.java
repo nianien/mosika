@@ -10,6 +10,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -100,20 +101,22 @@ public class RuleEngineTest {
 
     @Test
     public void testDesc() {
-        RuleEngine ruleEngine = RuleEngine.builder().build();
-        String desc = "代理商【{$.agentId}】不允许【{$.customerId}】跨开{}";
-        desc = "\"" + desc.replaceAll("\\{(\\$+\\..+?)\\}", "\\\"+$1+\\\"") + "\"";
-        System.out.println(desc);
-        Map<String, String> map = new HashMap<>();
-        map.put("agentId", "a");
-        map.put("customerId", "b");
-        System.out.println(ruleEngine.evalExpr(desc, map, null));
-        assertEquals("代理商【a】不允许【b】跨开{}", ruleEngine.evalExpr(desc, map, null));
+        String desc = "代理商【${$.agentId}】不允许【${$.customerId}】跨开{}";
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("agentRule", "true", desc))
+                .build();
+
+        String result = ruleEngine.evalRuleDesc(
+                "agentRule",
+                Map.of("agentId", "a", "customerId", "b"),
+                null);
+
+        assertEquals("代理商【a】不允许【b】跨开{}", result);
     }
 
     @Test
     public void testDescriptionEscaping() {
-        String desc = "用户“{$.name}”状态：\"{$$.status}\"\n路径 C:\\temp";
+        String desc = "用户“${$.name}”状态：\"${$$.status}\"\n路径 C:\\temp";
         RuleEngine ruleEngine = RuleEngine.builder()
                 .ruleDefinition(new RuleDefinition("escapedDesc", "true", desc))
                 .build();
@@ -124,6 +127,60 @@ public class RuleEngineTest {
                 Map.of("status", "通过"));
 
         assertEquals("用户“jack”状态：\"通过\"\n路径 C:\\temp", result);
+    }
+
+    @Test
+    public void testDescriptionSupportsJavaScriptExpression() {
+        String desc = "qq${$.name.toUpperCase()}xxx；${$$.agent}；"
+                + "${$.name + ({suffix: '}'}).suffix}；${$.code.replace(/a}/g, 'X')}";
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("expressionDesc", "true", desc))
+                .build();
+
+        String result = ruleEngine.evalRuleDesc(
+                "expressionDesc",
+                Map.of("name", "jack", "code", "a}"),
+                Map.of("agent", "system"));
+
+        assertEquals("qqJACKxxx；system；jack}；X", result);
+    }
+
+    @Test
+    public void testDescriptionEvaluationIsThreadSafe() {
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("concurrentDesc", "true", "value=${$.value.toUpperCase()}"))
+                .build();
+
+        List<CompletableFuture<String>> futures = IntStream.range(0, 10)
+                .mapToObj(value -> CompletableFuture.supplyAsync(() -> ruleEngine.evalRuleDesc(
+                        "concurrentDesc", Map.of("value", "v" + value), null)))
+                .toList();
+
+        for (int i = 0; i < futures.size(); i++) {
+            assertEquals("value=V" + i, futures.get(i).join());
+        }
+    }
+
+    @Test
+    public void testDescriptionKeepsJavaScriptStringConversion() {
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("valueDesc", "true", "null=${$.nullable},number=${$.number}"))
+                .build();
+        Map<String, Object> data = new HashMap<>();
+        data.put("nullable", null);
+        data.put("number", 7);
+
+        assertEquals("null=null,number=7", ruleEngine.evalRuleDesc("valueDesc", data, null));
+    }
+
+    @Test
+    public void testJavaHostValuesRemainAvailable() {
+        RuleEngine ruleEngine = RuleEngine.builder().build();
+        Map<String, Object> data = Map.of("amount", new BigDecimal("12.50"));
+
+        assertEquals(new BigDecimal("12.50"), ruleEngine.evalExpr("$.amount", data, null));
+        assertEquals(new BigDecimal("13.50"), ruleEngine.evalExpr(
+                "$.amount.add(new (Java.type('java.math.BigDecimal'))('1.00'))", data, null));
     }
 
     @Test

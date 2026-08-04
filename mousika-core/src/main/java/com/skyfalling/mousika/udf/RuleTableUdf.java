@@ -1,4 +1,4 @@
-package com.skyfalling.mousika.suite;
+package com.skyfalling.mousika.udf;
 
 import com.skyfalling.mousika.utils.JsonUtils;
 import lombok.SneakyThrows;

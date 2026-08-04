@@ -7,6 +7,7 @@ import com.skyfalling.mousika.eval.node.RuleNode;
 import com.skyfalling.mousika.eval.parser.NodeGenerator;
 import com.skyfalling.mousika.eval.result.NodeResult;
 import com.skyfalling.mousika.exception.NoRuleFlowException;
+import com.skyfalling.mousika.udf.RuleTableUdf;
 import lombok.Getter;
 
 import java.util.*;

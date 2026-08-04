@@ -3,7 +3,6 @@ package com.skyfalling.mousika.engine;
 import com.skyfalling.mousika.eval.result.NaResult;
 import com.skyfalling.mousika.utils.Constants;
 import com.skyfalling.mousika.utils.JsRuntime;
-import com.skyfalling.mousika.utils.JsonUtils;
 import lombok.Builder;
 import lombok.Singular;
 import org.graalvm.polyglot.Context;
@@ -15,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 /**
@@ -25,9 +22,6 @@ import java.util.regex.Pattern;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class RuleEngine {
-
-    private static final Pattern DESC_PARAMETER = Pattern.compile("\\{(\\$+\\..+?)\\}");
-
 
     /**
      * 规则定义
@@ -123,24 +117,15 @@ public class RuleEngine {
 
 
     /**
-     * 编译规则描述，形如:{$.agentId}格式的表达式支持参数代入<p/>
+     * 编译规则描述，使用JavaScript模板字符串支持表达式插值，
+     * 例如:你好${$.agent}或你好${$$.agent}<p/>
      *
      * @param originDesc
      * @return
      */
     private Source compileDesc(String originDesc) {
-        Matcher matcher = DESC_PARAMETER.matcher(originDesc);
-        StringBuilder expression = new StringBuilder();
-        int start = 0;
-        while (matcher.find()) {
-            expression.append(JsonUtils.toJson(originDesc.substring(start, matcher.start())))
-                    .append('+')
-                    .append(matcher.group(1))
-                    .append('+');
-            start = matcher.end();
-        }
-        expression.append(JsonUtils.toJson(originDesc.substring(start)));
-        return compiledDesc.computeIfAbsent(expression.toString(), this::doCompile);
+        return compiledDesc.computeIfAbsent(originDesc,
+                desc -> doCompile("String.raw`" + desc + "`"));
     }
 
 

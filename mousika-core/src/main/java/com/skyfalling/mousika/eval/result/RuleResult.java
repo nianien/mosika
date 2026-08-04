@@ -15,9 +15,8 @@ public class RuleResult extends EvalResult {
     /**
      * @param result
      * @param desc
- *
- * @author skyfalling {@literal <skyfalling@live.com>}
-    */
+     * @author skyfalling {@literal <skyfalling@live.com>}
+     */
     public RuleResult(EvalResult result, String desc) {
         super(result.getExpr(), result.getResult(), result.isMatched());
         this.desc = desc;
@@ -25,14 +24,14 @@ public class RuleResult extends EvalResult {
 
     /**
      * 规则描述
- *
- * @author skyfalling {@literal <skyfalling@live.com>}
+     *
+     * @author skyfalling {@literal <skyfalling@live.com>}
      */
     private String desc;
     /**
      * 子规则
- *
- * @author skyfalling {@literal <skyfalling@live.com>}
+     *
+     * @author skyfalling {@literal <skyfalling@live.com>}
      */
 
     private List<RuleResult> subRules = new ArrayList<>();

@@ -33,6 +33,7 @@ public final class JsRuntime {
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(className -> true)
                 .option("js.nashorn-compat", "true")
+                .option("js.ecmascript-version", "latest")
                 .build();
     }
 

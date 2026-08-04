@@ -7,6 +7,7 @@ import org.graalvm.polyglot.Value;
 import java.util.function.Function;
 
 /**
+ *  支持JS 定义 UDF
  * @author skyfalling {@literal <skyfalling@live.com>}
  * @since 2023/12/8
  * Copyright (c) 2004-2029 All Rights Reserved.
