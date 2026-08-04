@@ -13,7 +13,10 @@ import com.skyfalling.mousika.eval.node.SerNode;
 import com.skyfalling.mousika.eval.parser.NodeBuilder;
 import com.skyfalling.mousika.eval.result.EvalResult;
 import com.skyfalling.mousika.eval.result.NodeResult;
+import com.skyfalling.mousika.exception.RuleEvalException;
 import com.skyfalling.mousika.suite.RuleEvaluator;
+import com.skyfalling.mousika.suite.RuleFlowDefinition;
+import com.skyfalling.mousika.suite.RuleSuite;
 import com.skyfalling.mousika.udf.SayHelloUdf;
 import com.skyfalling.mousika.utils.Constants;
 import lombok.SneakyThrows;
@@ -26,11 +29,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -145,6 +150,47 @@ public class RuleNodeFlowTest {
         NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
         assertNull(nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testParallelBranchKeepsRuleEvalExceptionContract() {
+        RuleEngine engine = RuleEngine.builder()
+                .ruleDefinition(new RuleDefinition("boom",
+                        "Java.type('java.lang.Integer').parseInt('x')", "boom"))
+                .build();
+
+        RuleEvalException exception = assertThrows(RuleEvalException.class,
+                () -> new RuleEvaluator(engine).eval(NodeBuilder.build("boom=>true"), null));
+
+        assertEquals("boom", exception.getRuleId());
+    }
+
+    @Test
+    public void testDescriptionUsesTheRuleBeingMaterialized() {
+        RuleDefinition composite = new RuleDefinition("composite", "a&&b",
+                "desc-rule=${$$.rule}", 2);
+        RuleSuite suite = new RuleSuite(
+                List.of(
+                        new RuleDefinition("a", "true", "desc-rule=${$$.rule}"),
+                        new RuleDefinition("b", "true", "desc-rule=${$$.rule}"),
+                        composite),
+                List.of(),
+                List.of(
+                        new RuleFlowDefinition("serial", "a->b"),
+                        new RuleFlowDefinition("parallel", "a=>b"),
+                        new RuleFlowDefinition("composite", "composite")));
+
+        Map<String, String> serialDescriptions = suite.evalFlow("serial", null)
+                .getDetails().get(0).getSubRules().stream()
+                .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
+        Map<String, String> parallelDescriptions = suite.evalFlow("parallel", null)
+                .getDetails().get(0).getSubRules().stream()
+                .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
+
+        assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), serialDescriptions);
+        assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), parallelDescriptions);
+        assertEquals("desc-rule=composite", suite.evalFlow("composite", null)
+                .getDetails().get(0).getDesc());
     }
 
     @Test

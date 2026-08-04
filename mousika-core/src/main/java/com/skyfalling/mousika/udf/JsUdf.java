@@ -2,6 +2,7 @@ package com.skyfalling.mousika.udf;
 
 import com.skyfalling.mousika.utils.JsRuntime;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 
 import java.util.function.Function;
@@ -16,7 +17,7 @@ public class JsUdf implements Function<Object[], Object> {
 
 
     private final String funcName;
-    private final String funcBody;
+    private final Source funcSource;
 
 
     /**
@@ -37,7 +38,10 @@ public class JsUdf implements Function<Object[], Object> {
      */
     public JsUdf(String funcName, String funcBody) {
         this.funcName = funcName;
-        this.funcBody = funcBody;
+        this.funcSource = JsRuntime.createSource("(function () {\n"
+                + funcBody + "\n"
+                + "return typeof " + funcName + " === 'function' ? " + funcName + " : null;\n"
+                + "})()", "udf-" + funcName);
     }
 
     @Override
@@ -47,8 +51,7 @@ public class JsUdf implements Function<Object[], Object> {
 
     private Value createFuncObject() {
         Context context = CONTEXT_FACTORY.get();
-        context.eval(JsRuntime.createSource(funcBody, "udf-" + funcName));
-        Value function = context.getBindings(JsRuntime.LANGUAGE_ID).getMember(funcName);
+        Value function = context.eval(funcSource);
         if (function == null || !function.canExecute()) {
             throw new IllegalArgumentException("JavaScript UDF is not executable: " + funcName);
         }

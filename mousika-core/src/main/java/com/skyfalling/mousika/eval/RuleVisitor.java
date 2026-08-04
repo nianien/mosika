@@ -197,7 +197,17 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      * @return
      */
     private String evalDesc(String ruleId) {
-        return ruleEngine.evalRuleDesc(ruleId, data, this);
+        String previousRule = currentRule.get();
+        currentRule.set(ruleId);
+        try {
+            return ruleEngine.evalRuleDesc(ruleId, data, this);
+        } finally {
+            if (previousRule == null) {
+                currentRule.remove();
+            } else {
+                currentRule.set(previousRule);
+            }
+        }
     }
 
 
@@ -211,5 +221,4 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         evalCache.put(expr, result);
     }
 }
-
 

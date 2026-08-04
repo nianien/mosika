@@ -2,6 +2,8 @@ package com.skyfalling.mousika.eval.result;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Map;
 
@@ -54,7 +56,16 @@ public class EvalResult {
             return (Boolean) res;
         }
         if (res instanceof Number) {
-            return ((Number) res).floatValue() > 0;
+            if (res instanceof BigDecimal) {
+                return ((BigDecimal) res).signum() > 0;
+            }
+            if (res instanceof BigInteger) {
+                return ((BigInteger) res).signum() > 0;
+            }
+            if (res instanceof Byte || res instanceof Short || res instanceof Integer || res instanceof Long) {
+                return ((Number) res).longValue() > 0;
+            }
+            return ((Number) res).doubleValue() > 0;
         }
         if (res instanceof String) {
             return !((String) res).toLowerCase().matches("no|false|null|0|fail");

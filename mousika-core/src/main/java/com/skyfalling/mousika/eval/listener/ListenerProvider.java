@@ -2,6 +2,8 @@ package com.skyfalling.mousika.eval.listener;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * 监听器驱动
@@ -10,6 +12,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class ListenerProvider implements RuleListener {
+
+    private static final Logger LOGGER = Logger.getLogger(ListenerProvider.class.getName());
 
     /**
      * 默认单例
@@ -25,14 +29,22 @@ public class ListenerProvider implements RuleListener {
     @Override
     public void onParse(RuleEvent event) {
         for (RuleListener listener : listeners) {
-            listener.onParse(event);
+            try {
+                listener.onParse(event);
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, "rule parse listener failed: " + listener.getClass().getName(), e);
+            }
         }
     }
 
     @Override
     public void onEval(RuleEvent event) {
         for (RuleListener listener : listeners) {
-            listener.onEval(event);
+            try {
+                listener.onEval(event);
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, "rule eval listener failed: " + listener.getClass().getName(), e);
+            }
         }
     }
 

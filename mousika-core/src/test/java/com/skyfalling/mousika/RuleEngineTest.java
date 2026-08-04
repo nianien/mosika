@@ -4,6 +4,7 @@ import com.cudrania.core.utils.TimeCounter;
 import com.skyfalling.mousika.engine.RuleDefinition;
 import com.skyfalling.mousika.engine.RuleEngine;
 import com.skyfalling.mousika.engine.UdfDefinition;
+import com.skyfalling.mousika.eval.result.EvalResult;
 import com.skyfalling.mousika.utils.JsRuntime;
 import lombok.SneakyThrows;
 import org.graalvm.polyglot.Context;
@@ -11,6 +12,7 @@ import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -65,6 +68,27 @@ public class RuleEngineTest {
         RuleEngine engine = builder.build();
         Object object = engine.evalExpr("jdUdf.test(1001,10000)", null, null);
         System.out.println(object);
+    }
+
+    @Test
+    public void testGroupedJsUdfsKeepIndependentLexicalScopes() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinitions(List.of(
+                        new UdfDefinition("group1", "factorial", """
+                                function factorial(n) {
+                                    return n <= 1 ? 1 : n * factorial(n - 1);
+                                }
+                                """),
+                        new UdfDefinition("group2", "factorial", """
+                                function factorial(n) {
+                                    return 100;
+                                }
+                                """)))
+                .build();
+
+        assertEquals(120, engine.evalExpr("group1.factorial(5)", null, null));
+        assertEquals(100, engine.evalExpr("group2.factorial(5)", null, null));
+        assertEquals(120, engine.evalExpr("group1.factorial(5)", null, null));
     }
 
     /**
@@ -181,6 +205,15 @@ public class RuleEngineTest {
         assertEquals(new BigDecimal("12.50"), ruleEngine.evalExpr("$.amount", data, null));
         assertEquals(new BigDecimal("13.50"), ruleEngine.evalExpr(
                 "$.amount.add(new (Java.type('java.math.BigDecimal'))('1.00'))", data, null));
+    }
+
+    @Test
+    public void testNumberMatchingKeepsNumberPrecision() {
+        assertTrue(new EvalResult("tinyDecimal", new BigDecimal("1E-1000")).isMatched());
+        assertTrue(new EvalResult("bigInteger", new BigInteger("999999999999999999999999")).isMatched());
+        assertTrue(new EvalResult("tinyDouble", Double.MIN_VALUE).isMatched());
+        assertFalse(new EvalResult("zero", BigDecimal.ZERO).isMatched());
+        assertFalse(new EvalResult("negative", new BigDecimal("-1E-1000")).isMatched());
     }
 
     @Test

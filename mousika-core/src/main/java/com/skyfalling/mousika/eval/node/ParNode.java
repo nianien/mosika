@@ -4,16 +4,18 @@ package com.skyfalling.mousika.eval.node;
 import com.skyfalling.mousika.eval.EvalNode;
 import com.skyfalling.mousika.eval.context.RuleContext;
 import com.skyfalling.mousika.eval.result.EvalResult;
+import com.skyfalling.mousika.exception.RuleEvalException;
 import com.skyfalling.mousika.utils.Constants;
 import lombok.Getter;
-import lombok.SneakyThrows;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -62,7 +64,6 @@ public class ParNode implements RuleNode {
      * @return 无业务结果的结构执行结果
      */
     @Override
-    @SneakyThrows
     public EvalResult eval(RuleContext context) {
         EvalNode parentNode = context.getCurrentEval();
         CompletableFuture<?>[] futures = nodes.stream()
@@ -76,6 +77,20 @@ public class ParNode implements RuleNode {
 
         try {
             CompletableFuture.allOf(futures).get(1, TimeUnit.MINUTES);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new RuleEvalException(expr(), cause == null ? e.getMessage() : cause.getMessage(), cause);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuleEvalException(expr(), "parallel rule execution interrupted", e);
+        } catch (TimeoutException e) {
+            throw new RuleEvalException(expr(), "parallel rule execution timed out after 1 minute", e);
         } finally {
             // 线程策略可能使用当前线程，需要恢复父评估节点
             context.setCurrentEval(parentNode);
