@@ -29,10 +29,16 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -155,6 +161,49 @@ public class RuleNodeFlowTest {
         NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
         assertNull(nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testConcurrentDuplicateRuleEvaluatedOnce() throws Exception {
+        int concurrency = 8;
+        AtomicInteger executions = new AtomicInteger();
+        CyclicBarrier callers = new CyclicBarrier(concurrency);
+        CyclicBarrier evaluations = new CyclicBarrier(concurrency);
+        RuleEngine engine = new RuleEngine(List.of(), List.of()) {
+            @Override
+            public Object evalRule(String ruleId, Object root, Object context) {
+                executions.incrementAndGet();
+                try {
+                    evaluations.await(1, TimeUnit.SECONDS);
+                } catch (TimeoutException expected) {
+                    // ConcurrentHashMap only allows one mapping function to execute for this key.
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
+                } catch (BrokenBarrierException e) {
+                    throw new AssertionError(e);
+                }
+                return true;
+            }
+        };
+        RuleVisitor context = new RuleVisitor(engine, null);
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+
+        try {
+            List<Future<EvalResult>> results = IntStream.range(0, concurrency)
+                    .mapToObj(i -> executor.submit(() -> {
+                        callers.await(5, TimeUnit.SECONDS);
+                        return context.eval("shared");
+                    }))
+                    .collect(Collectors.toList());
+            for (Future<EvalResult> result : results) {
+                assertTrue(result.get(5, TimeUnit.SECONDS).isMatched());
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(1, executions.get());
     }
 
     @Test

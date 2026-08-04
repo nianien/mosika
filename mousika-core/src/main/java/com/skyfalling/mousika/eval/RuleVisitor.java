@@ -15,7 +15,7 @@ import lombok.Getter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -42,7 +42,7 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
     /**
      * 缓存评估结果
      */
-    private Map<String, EvalResult> evalCache = new ConcurrentSkipListMap<>();
+    private Map<String, EvalResult> evalCache = new ConcurrentHashMap<>();
 
     /**
      * 执行规则根节点
@@ -221,4 +221,3 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         evalCache.put(expr, result);
     }
 }
-
