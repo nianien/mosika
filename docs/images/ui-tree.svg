@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 900" role="img" aria-labelledby="title desc">
+    <title id="title">Mousika 完整规则流 UI 树</title>
+    <desc id="desc">串行、并行、判断、决策、规则组合与动作节点递归组成的规则流</desc>
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#64748b"/>
+        </marker>
+        <style>
+            .edge { fill: none; stroke: #64748b; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+            .rule-edge { fill: none; stroke: #d97706; stroke-width: 2.3; stroke-dasharray: 7 6; stroke-linecap: round; marker-end: url(#arrow); }
+            .flow-node { fill: #eff6ff; stroke: #60a5fa; stroke-width: 2.5; }
+            .root-node { fill: #ecfeff; stroke: #0891b2; stroke-width: 2.5; }
+            .logic-node { fill: #fff7ed; stroke: #f59e0b; stroke-width: 2.5; }
+            .action-node { fill: #ecfdf5; stroke: #34d399; stroke-width: 2.5; }
+            .rule-node { fill: #fffbeb; stroke: #f59e0b; stroke-width: 2.5; }
+            .domain { fill: #fffbeb; fill-opacity: .5; stroke: #fbbf24; stroke-width: 1.5; stroke-dasharray: 8 7; }
+            .node-text { fill: #0f172a; font: 600 17px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; text-anchor: middle; dominant-baseline: central; }
+            .small-text { fill: #475569; font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; text-anchor: middle; }
+            .domain-text { fill: #b45309; font: 700 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .08em; }
+            .legend-text { fill: #475569; font: 500 14px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; dominant-baseline: central; }
+        </style>
+    </defs>
+
+    <rect class="domain" x="405" y="393" width="355" height="370" rx="18"/>
+    <text class="domain-text" x="425" y="420">RULE</text>
+
+    <!-- 顶层 Flow：开始 -> 串行 -> 并行 / 决策。 -->
+    <path class="edge" d="M 850 78 V 99"/>
+    <path class="edge" d="M 850 153 V 186 H 250 V 222"/>
+    <path class="edge" d="M 850 153 V 186 H 1200 V 222"/>
+
+    <!-- 并行分支。 -->
+    <path class="edge" d="M 250 278 V 310 H 90 V 327"/>
+    <path class="edge" d="M 250 278 V 327"/>
+    <path class="edge" d="M 250 278 V 310 H 410 V 327"/>
+
+    <!-- 顶层有序决策：两个条件分支和一个默认串行分支。 -->
+    <path class="edge" d="M 1200 278 V 292 H 760 V 322"/>
+    <path class="edge" d="M 1200 278 V 322"/>
+    <path class="edge" d="M 1200 278 V 292 H 1660 V 322"/>
+    <text class="small-text" x="1580" y="283">默认</text>
+
+    <!-- 第一个判断节点：左侧 Rule 子树，右侧命中 Flow。 -->
+    <path class="rule-edge" d="M 738 368 C 690 392 635 414 598 432"/>
+    <path class="edge" d="M 782 368 C 815 392 842 414 857 432"/>
+    <text class="small-text" x="682" y="389">规则</text>
+    <text class="small-text" x="823" y="389">命中</text>
+
+    <!-- Rule = OR(会员, AND(成年, 已实名))。 -->
+    <path class="rule-edge" d="M 558 474 C 530 495 505 514 486 532"/>
+    <path class="rule-edge" d="M 602 474 C 625 495 643 514 656 532"/>
+    <path class="rule-edge" d="M 642 574 C 622 598 607 620 598 644"/>
+    <path class="rule-edge" d="M 678 574 C 697 598 710 620 716 644"/>
+
+    <!-- 第一个判断节点命中后串行执行。 -->
+    <path class="edge" d="M 880 480 V 526"/>
+    <path class="edge" d="M 880 574 V 624"/>
+    <path class="edge" d="M 880 680 V 722"/>
+
+    <!-- 第二个判断节点及其嵌套决策。 -->
+    <path class="rule-edge" d="M 1178 368 C 1162 391 1147 413 1137 434"/>
+    <path class="edge" d="M 1222 368 C 1245 391 1268 412 1279 432"/>
+    <text class="small-text" x="1140" y="389">规则</text>
+    <text class="small-text" x="1260" y="389">命中</text>
+    <path class="edge" d="M 1280 480 V 498 H 1080 V 526"/>
+    <path class="edge" d="M 1280 480 V 526"/>
+    <path class="edge" d="M 1280 480 V 498 H 1480 V 528"/>
+    <text class="small-text" x="1416" y="489">默认</text>
+    <path class="edge" d="M 1080 578 V 622"/>
+    <path class="edge" d="M 1280 578 V 622"/>
+    <path class="edge" d="M 1480 578 V 622"/>
+
+    <!-- 默认串行分支。 -->
+    <path class="edge" d="M 1660 378 V 432"/>
+    <path class="edge" d="M 1660 480 V 532"/>
+
+    <!-- 顶层节点。 -->
+    <circle class="root-node" cx="850" cy="52" r="26"/>
+    <text class="node-text" x="850" y="52">始</text>
+    <circle class="flow-node" cx="850" cy="126" r="27"/>
+    <text class="node-text" x="850" y="126">串</text>
+    <circle class="flow-node" cx="250" cy="250" r="28"/>
+    <text class="node-text" x="250" y="250">并</text>
+    <circle class="flow-node" cx="1200" cy="250" r="28"/>
+    <text class="node-text" x="1200" y="250">分</text>
+
+    <!-- 并行动作。 -->
+    <rect class="action-node" x="25" y="328" width="130" height="48" rx="13"/>
+    <text class="node-text" x="90" y="352">操作规则 11</text>
+    <rect class="action-node" x="185" y="328" width="130" height="48" rx="13"/>
+    <text class="node-text" x="250" y="352">操作规则 12</text>
+    <rect class="action-node" x="345" y="328" width="130" height="48" rx="13"/>
+    <text class="node-text" x="410" y="352">操作规则 13</text>
+
+    <!-- 顶层决策的三个结果。 -->
+    <circle class="flow-node" cx="760" cy="350" r="28"/>
+    <text class="node-text" x="760" y="350">判</text>
+    <circle class="flow-node" cx="1200" cy="350" r="28"/>
+    <text class="node-text" x="1200" y="350">判</text>
+    <circle class="flow-node" cx="1660" cy="350" r="28"/>
+    <text class="node-text" x="1660" y="350">串</text>
+
+    <!-- 第一个判断的规则树。 -->
+    <circle class="logic-node" cx="580" cy="454" r="26"/>
+    <text class="node-text" x="580" y="454">或</text>
+    <path class="rule-node" d="M 480 530 L 552 554 L 480 578 L 408 554 Z"/>
+    <text class="node-text" x="480" y="554">会员规则</text>
+    <circle class="logic-node" cx="660" cy="554" r="26"/>
+    <text class="node-text" x="660" y="554">且</text>
+    <path class="rule-node" d="M 590 642 L 655 666 L 590 690 L 525 666 Z"/>
+    <text class="node-text" x="590" y="666">成年规则</text>
+    <path class="rule-node" d="M 720 642 L 785 666 L 720 690 L 655 666 Z"/>
+    <text class="node-text" x="720" y="666">实名规则</text>
+
+    <!-- 第一个判断的命中流程。 -->
+    <circle class="flow-node" cx="880" cy="454" r="26"/>
+    <text class="node-text" x="880" y="454">串</text>
+    <rect class="action-node" x="810" y="526" width="140" height="48" rx="13"/>
+    <text class="node-text" x="880" y="550">发放基础权益</text>
+    <path class="rule-node" d="M 880 622 L 955 652 L 880 682 L 805 652 Z"/>
+    <text class="node-text" x="880" y="652">高价值用户</text>
+    <rect class="action-node" x="810" y="722" width="140" height="48" rx="13"/>
+    <text class="node-text" x="880" y="746">升级专属权益</text>
+
+    <!-- 第二个判断及嵌套决策。 -->
+    <path class="rule-node" d="M 1130 432 L 1202 456 L 1130 480 L 1058 456 Z"/>
+    <text class="node-text" x="1130" y="456">风险可控</text>
+    <circle class="flow-node" cx="1280" cy="454" r="26"/>
+    <text class="node-text" x="1280" y="454">分</text>
+    <path class="rule-node" d="M 1080 528 L 1152 554 L 1080 580 L 1008 554 Z"/>
+    <text class="node-text" x="1080" y="554">低风险</text>
+    <path class="rule-node" d="M 1280 528 L 1352 554 L 1280 580 L 1208 554 Z"/>
+    <text class="node-text" x="1280" y="554">需要复核</text>
+    <rect class="action-node" x="1415" y="530" width="130" height="48" rx="13"/>
+    <text class="node-text" x="1480" y="554">默认拒绝</text>
+    <rect class="action-node" x="1015" y="622" width="130" height="48" rx="13"/>
+    <text class="node-text" x="1080" y="646">自动通过</text>
+    <rect class="action-node" x="1215" y="622" width="130" height="48" rx="13"/>
+    <text class="node-text" x="1280" y="646">人工审核</text>
+    <rect class="action-node" x="1415" y="622" width="130" height="48" rx="13"/>
+    <text class="node-text" x="1480" y="646">记录拒绝</text>
+
+    <!-- 顶层默认串行流程。 -->
+    <rect class="action-node" x="1590" y="432" width="140" height="48" rx="13"/>
+    <text class="node-text" x="1660" y="456">记录执行日志</text>
+    <rect class="action-node" x="1590" y="532" width="140" height="48" rx="13"/>
+    <text class="node-text" x="1660" y="556">发送结果通知</text>
+
+    <!-- 图例。 -->
+    <circle class="flow-node" cx="520" cy="835" r="17"/>
+    <text class="legend-text" x="548" y="835">流程结构</text>
+    <path class="rule-node" d="M 710 818 L 754 835 L 710 852 L 666 835 Z"/>
+    <text class="legend-text" x="765" y="835">原子规则</text>
+    <circle class="logic-node" cx="930" cy="835" r="17"/>
+    <text class="legend-text" x="958" y="835">规则组合</text>
+    <rect class="action-node" x="1080" y="818" width="90" height="34" rx="10"/>
+    <text class="legend-text" x="1182" y="835">业务动作</text>
+</svg>

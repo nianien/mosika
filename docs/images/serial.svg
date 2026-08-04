@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 104" role="img" aria-labelledby="title desc">
+    <title id="title">串行执行</title>
+    <desc id="desc">规则 a、b、c、d 按顺序串行执行</desc>
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#475569"/>
+        </marker>
+        <style>
+            .edge { fill: none; stroke: #475569; stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); }
+            .node { fill: #f0fdfa; stroke: #14b8a6; stroke-width: 3; }
+            .label { fill: #0f172a; font: 600 24px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; dominant-baseline: central; }
+        </style>
+    </defs>
+    <path class="edge" d="M 74 52 H 184"/>
+    <path class="edge" d="M 234 52 H 344"/>
+    <path class="edge" d="M 394 52 H 504"/>
+    <circle class="node" cx="50" cy="52" r="22"/>
+    <circle class="node" cx="210" cy="52" r="22"/>
+    <circle class="node" cx="370" cy="52" r="22"/>
+    <circle class="node" cx="530" cy="52" r="22"/>
+    <text class="label" x="50" y="52">a</text>
+    <text class="label" x="210" y="52">b</text>
+    <text class="label" x="370" y="52">c</text>
+    <text class="label" x="530" y="52">d</text>
+</svg>

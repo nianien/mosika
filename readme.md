@@ -1,266 +1,131 @@
 # Mousika
 
-Mousika 要求 JDK 21，使用 Maven 构建：
+<p align="center">
+  <strong>用递归 AST 表达规则、规则流与可视化编排</strong><br>
+  <sub>JDK 21 · Maven · GraalJS · ANTLR4 · Spring Boot</sub>
+</p>
 
-```shell
+<p align="center">
+  <a href="#规则流是什么样的">核心能力</a> ·
+  <a href="./docs/规则编辑器.md">Web 编辑器</a> ·
+  <a href="./docs/核心设计.md">内核设计</a> ·
+  <a href="./docs/README.md">完整文档</a> ·
+  <a href="./mousika-web/src/main/resources/static/ui/index.html">Web UI 源码</a>
+</p>
+
+## 规则流是什么样的
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>串行</strong><br>
+      <code>a-&gt;b-&gt;c-&gt;d</code><br><br>
+      <img src="./docs/images/serial.svg" alt="串行执行：a、b、c、d 依次执行" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>并行</strong><br>
+      <code>a-&gt;(b=&gt;c)-&gt;d</code><br><br>
+      <img src="./docs/images/parallel.svg" alt="并行执行：b、c 同时执行并等待完成" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>完整条件</strong><br>
+      <code>(a?b:c)-&gt;d</code><br><br>
+      <img src="./docs/images/conditional.svg" alt="完整条件：a 命中执行 b，否则执行 c" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>半条件</strong><br>
+      <code>a?(b-&gt;d)</code><br><br>
+      <img src="./docs/images/half-conditional.svg" alt="半条件：a 命中后执行 b 和 d" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <strong>有序多分支</strong><br>
+      <code>a?b:(c?d:e)</code><br><br>
+      <img src="./docs/images/multi-branch.svg" alt="有序多分支：命中首个条件后停止，并支持默认分支" width="56%">
+    </td>
+  </tr>
+</table>
+
+串行、并行、条件和决策都是显式结构节点，可以递归嵌套；布局方向只负责展示，不参与执行语义。
+
+## 完整 UI 树
+
+<p align="center">
+  <img src="./docs/images/ui-tree.svg" alt="Mousika 完整规则流 UI 树：串行、并行、决策、判断与动作递归组合" width="100%">
+</p>
+
+<p align="center"><sub>Flow 是主递归域，Rule 通过判断节点嵌入；规则子树与命中流程保持明确边界。</sub></p>
+
+## 从定义到执行
+
+```mermaid
+flowchart LR
+    RD[RuleDefinition] --> RE[RuleEngine]
+    FD[RuleFlowDefinition] --> RE
+    UD[UdfDefinition] --> RE
+    RE --> RS[RuleSuite]
+    RS --> RN[RuleNode / RuleFlow]
+    RN --> NR[NodeResult]
+
+    classDef source fill:#f0fdfa,stroke:#14b8a6,color:#0f172a;
+    classDef engine fill:#ecfeff,stroke:#0891b2,color:#0f172a;
+    classDef result fill:#fff7ed,stroke:#f59e0b,color:#0f172a;
+    class RD,FD,UD source;
+    class RE,RS,RN engine;
+    class NR result;
+```
+
+- `RuleDefinition` 描述可执行规则；`RuleFlowDefinition` 描述命名规则流。
+- `RuleSuite` 统一装配规则、Java/JS UDF 和规则流。
+- `sys.flow.eval(flowId, target, context)` 支持规则流之间的内核级调用。
+- `matched` 表达匹配或控制状态，`result` 只传递节点具有明确语义的业务返回值。
+
+## 模块边界
+
+| 模块 | 职责 | 不负责 |
+| --- | --- | --- |
+| `mousika-core` | DSL、规则树、执行上下文、求值、UDF、RuleFlow | 页面、持久化、业务场景映射 |
+| `mousika-ui` | 可序列化 UI AST，单向编译为 `RuleNode` | 页面布局、Web 依赖、从执行树反推 UI |
+| `mousika-web` | REST、SQLite、规则管理和可视化编辑页面 | 替代 core/ui 的库制品 |
+
+## 运行
+
+要求 JDK 21。
+
+```bash
 mvn clean test
 ```
 
-模块职责：`mousika-core` 提供纯规则内核，`mousika-ui` 提供可序列化 UI AST，`mousika-web` 提供可选的 Spring Boot 管理服务与页面。启动 Web 服务：
+启动管理界面：
 
-```shell
+```bash
 ./scripts/mousika.sh start
-# 或开发模式
+```
+
+访问：
+
+- 规则流列表：<http://127.0.0.1:8080/>
+- 原子规则库：<http://127.0.0.1:8080/rules>
+- 规则流画布：`http://127.0.0.1:8080/flow/{id}`
+
+开发与运维命令：
+
+```bash
 ./scripts/mousika.sh dev
+./scripts/mousika.sh status
+./scripts/mousika.sh logs
+./scripts/mousika.sh restart
+./scripts/mousika.sh stop
 ```
 
-服务脚本统一位于 `scripts/`，常用命令如下：
+环境变量、运行目录和分模块验证命令见[开发与运行](./docs/开发与运行.md)。
 
-```shell
-./scripts/mousika.sh doctor      # 检查 JDK、Maven 和运行工具
-./scripts/mousika.sh status      # 查看脚本管理的 PID、真实端口和健康状态
-./scripts/mousika.sh logs        # 查看最近日志；追加 -f 持续跟踪
-./scripts/mousika.sh restart     # 沿用状态文件记录的端口和数据库重启
-./scripts/mousika.sh stop        # 正常情况下只停止经过 PID、JAR 和端口校验的实例
-```
+## 进一步阅读
 
-PID、端口、项目路径、JAR 和数据库路径记录在 `${TMPDIR:-/tmp}/mousika/instance.state`，日志默认写入同目录，不再污染仓库。可通过 `MOUSIKA_PORT`、`MOUSIKA_DB_PATH`、`MOUSIKA_RUN_DIR` 等环境变量覆盖；完整参数执行 `./scripts/mousika.sh help` 查看。
-
-规则中的 JavaScript 由 GraalJS Polyglot 执行。普通 JDK 21 可以正常运行；高频 JavaScript 场景建议使用支持 GraalJS 优化运行时的 GraalVM。
-
-## RuleFlow：命名规则编排
-
-`RuleFlow` 是内核中的命名规则编排实体，对外提供 Flow 能力，内部以 `RuleNode` 树表达串行、并行、条件和决策等执行结构：
-
-```text
-RuleFlowDefinition(id, dsl)
-          │ compile
-          ▼
-RuleFlow(id, RuleNode root)
-          │ evalFlow
-          ▼
-NodeResult
-```
-
-- `RuleFlowDefinition` 是声明态，只保存规则流 ID 和 DSL。
-- `RuleFlow` 是运行态，保存规则流 ID 和编译后的根节点。
-- `RuleLoader.loadFlows()` 加载规则流定义，`RuleSuite` 在完成规则和 UDF 装配后统一编译并管理规则流。
-- `RuleSuite.getRuleFlow()` 获取命名规则流；`evalFlow()` 执行规则流，并保持现有 `NodeResult` 结果契约。
-
-```java
-RuleFlowDefinition flow = new RuleFlowDefinition(
-        "flow1",
-        "a->(b=>c)->d"
-);
-
-RuleSuite suite = new RuleSuite(
-        ruleDefinitions,
-        udfDefinitions,
-        List.of(flow)
-);
-
-NodeResult result = suite.evalFlow("flow1", target);
-```
-
-注册 `EvalFlowUdf` 后，规则表达式可以通过 `sys.flow.eval(flowId, target, context)` 调用另一条规则流。该能力属于内核规则流之间的组合，不包含业务场景含义。
-
-业务系统如需按场景、产品或策略选择规则流，应在内核外维护业务标识到 `flowId` 的映射。`RuleFlow` 不保存业务配置，也不负责解释业务结果。
-
-这里的 Flow 不依赖传统流程图或通用 Graph 数据结构。`RuleFlow.root` 是递归组合树：并行子树完成即表示该局部作用域自然汇合，公共后续流程由外层串行节点表达，因此不需要多入边、隐式汇合点、环或 DAG。树是 Flow 的结构实现和作用域约束，Flow 是该实体对外提供的能力。
-
-## 1. 串行执行
-
-![img.png](mousika-ui/src/main/resources/img/serial.png)
-
-```text
- a->b->c->d
-```
-
-## 2. 并行执行
-![img.png](mousika-ui/src/main/resources/img/parallel.png)
-```text
- a->(b=>c)->d
-```
-
-## 3.条件执行
-![img.png](mousika-ui/src/main/resources/img/conditional.png)
-```text
- (a?b:c)->d
-```
-
-## 4.半条件执行
-![img.png](mousika-ui/src/main/resources/img/half-conditional.png)
-```text
- a?(b->d)
-```
-
-## 5.多分支执行
-![img.png](mousika-ui/src/main/resources/img/multi-branch.png)
-```text
-(a?b)->d
-```
-
-## 6.UI树交互
-![ui-tree.png](mousika-ui/src/main/resources/img/ui-tree.png)
-```text
- (∅->(∅=>a11=>a12=>a13)->((c1||(c2&&c3))?(∅->(c1?a1:((c2&&c3)?a3:∅))->(c4?a4)):(c5?(c6?a6:(c7?a7:a5)):(∅->(c8?a8)->(c9?a9)))))
-```
-上述表达式执行逻辑如下:
-```shell
- a11 &
- a12 &
- a13 &
- wait
- 
- if [c1||c2&&c3];then
-    if [c1];then
-      a1;
-    elif [c2&&c3];then
-      a3;
-    fi
-    
-    if [c4];then
-      a4;
-    fi
-    
- elif [c5];then
-    if [c6];then
-      a6;
-    elif [c7];then  
-      a7;
-    else
-      a5;
-    fi
-    
- else
-    if [c8];then
-      a8;
-    fi;
-    
-    if [c9];then
-      a9;
-    fi
- fi
-```
-注：`∅` 不参与规则计算，仅作为 `SNode`、`PNode` 的结构标记，确保单分支结构也能稳定反序列化。
-
-## 7. 可视化节点的递归模型
-
-可视化树包含串行、并行、决策、判断、与、或、条件和动作等节点。它们分为两类：
-
-- **流程节点**负责描述执行顺序，包括串行、并行、决策、判断、条件和动作。
-- **规则节点**只负责产生匹配结果，包括原子条件、与、或和 `hits`；规则求值过程中不会执行流程节点。
-
-### 7.1 核心设计思想
-
-这套设计不是用节点和连线模拟传统流程图，而是把规则执行过程表达为一棵可无限递归组合的树。串行、并行、决策、判断等控制关系均由显式结构节点表达，节点位置和连线方向只负责展示，不参与决定执行语义。
-
-串行和并行都是一等组合节点，因此可以任意交替嵌套：
-
-```text
-S(P(a,b), P(c,d))
-P(S(a,b), S(c,d))
-S(P(S(a,b),c), D(...))
-```
-
-例如 `S(P(a,b),P(c,d))` 明确表示：先并行执行 `a、b` 并等待全部完成，再并行执行 `c、d`。如果省略串行节点，仅依靠纵向位置表示先后关系，那么并行后的公共后续流程必须增加汇合线、汇合点或隐形节点；结构将从单父节点的树变成带多入边的图，编辑器还需要额外推断每次分叉和汇合的作用范围。
-
-判断节点固定连接两种递归结构：
-
-```text
-Judge
-├─ Rule
-└─ Flow
-```
-
-左侧规则树可以由原子条件、与、或、`hits` 继续递归，右侧命中流程可以再次包含串行、并行、决策或判断。单规则同样可以转换为 `Judge(AtomicRule, Flow)`，因此单规则和复合规则不需要两套结构模型。
-
-显式结构节点带来的主要优势包括：
-
-- **递归闭合**：每次规则组合仍然得到规则节点，每次流程组合仍然得到流程节点，复杂度增加不会产生新的结构特例。
-- **任意组合**：串行之后可以并行，并行之后也可以继续串行或进入另一组并行，所有组合都只是普通子树嵌套。
-- **局部可替换**：任意流程子树可以替换另一个流程分支，任意规则子树可以替换另一个子规则，新增、移动、复制和删除都可以按局部树操作完成。
-- **保持树结构**：并行完成后的后续流程由外层串行节点表达，不需要显式或隐式汇合节点，也不会退化为 DAG。
-- **机器处理自然**：求值、遍历、校验、序列化和 DSL 转换都可以使用同一套递归逻辑。
-- **持久化稳定**：虚拟根和 `∅` 使单分支与多分支使用相同结构，保证“UI → JSON → UI”的结构稳定，并确保恢复后的 UI 树编译出相同执行语义。
-- **展示与语义分离**：横排、竖排、折叠、缩放只改变视觉效果，不会改变串行、并行、判断或决策的含义。
-
-这套设计有意用少量视觉结构换取递归自洽、组合能力和机器可理解性。节点信息密度和画布空间应通过压缩结构节点尺寸、减少间距、按实际轮廓布局及支持折叠来优化，而不是删除结构节点或把执行语义隐藏在坐标和连线中。
-
-### 7.2 多分类 AST 与异构投影
-
-从语言工程角度，UI 树是一个以 `Flow` 为宿主语言、以 `Rule` 为嵌入式子语言的多分类 AST（multi-sorted AST）。两个语法域之间是单向嵌入，而不是相互递归：
-
-```text
-Rule -> Rule
-Flow -> Flow
-Flow -> Rule   // 通过 JNode 单向嵌入
-Rule -X-> Flow
-```
-
-`Rule` 是边界封闭的规则递归域，只包含原子条件、与、或和 `hits`；`Flow` 是主流程递归域，可以继续包含串行、并行、决策、条件、动作和新的判断节点。`JNode` 是两个语法域之间固定的嵌入点：它引用一棵纯 `Rule` 子树，同时连接零个或一个 `Flow` 命中分支。
-
-这一结构允许前端对同一棵 AST 采用两种编辑投影：
-
-- **规则侧使用局部投影**：演示编辑器把 `JNode` 与其规则子树统一投影为一个规则节点，不在主画布展开 `JNode.rule`，也不展示可能很长的 DSL 或条件摘要；点击该节点后，通过一个弹窗完整展示和编辑规则树及规则名称。规则名称属于 `JNode.rule` 指向的实际规则根节点，不属于外层 `JNode`。简单规则表示为 `JNode(RNode, Flow?)`，主画布显示 `RNode` 的名称；复合规则表示为 `JNode(LNode/HNode, Flow?)`，根节点有名称时显示名称，未命名时显示“复合规则”。两者仅有规则子树复杂度差异，因而简单规则可以在同一弹窗和递归域内继续扩展为复合规则。所有情况都不回退展示表达式。因为规则子树不会重新进入流程域，所以无论内部递归多深，都只需要一个编辑容器。视觉上的节点合并不改变底层 `JNode(Rule, Flow?)` 结构。
-- **流程侧使用主画布投影**：`JNode.action` 必须留在主画布中原位展开。命中流程可能再次包含 `JNode`；如果用弹窗承载流程递归，交互层级会随树深度变成“弹窗中再打开弹窗”，用户也会失去当前流程上下文。
-
-两个投影采用不同阅读方向：主画布中的 `Flow` 从上到下表达执行顺序，弹窗中的 `Rule` 从左到右表达“操作符到操作数”的逻辑组合；规则同级节点在纵向排列。方向只服务于阅读，不参与执行语义。
-
-主画布将三个流程组合节点统一投影为圆形的“串、并、分”：分别对应顺序执行的 `SNode`、并发并等待完成的 `PNode`，以及按顺序检查、命中首个后停止并可带默认分支的 `DNode`。“分”是有序互斥选择，不表示普通的无条件分叉；该简称只属于视觉投影，不改变节点类型和执行语义。
-
-演示编辑器的新建入口统一使用 `JNode` 创建业务规则，不再把简单规则作为独立的 `CNode` 创作模式；已有 `CNode` 仍属于合法模型并可兼容渲染。这个编辑策略不删除 `CNode`，只避免简单规则和复合规则在创作阶段形成两套无法平滑演进的交互路径。
-
-UI 数据模型在 `RNode` 上提供可选的 `name` 字段，`LNode`、`HNode` 通过继承获得同一字段；名称只用于 UI 展示，不参与 `ruleExpr()` 和规则求值。UI 树及其 JSON 是编辑和持久化的唯一事实来源；`UINodeAdapter` 只通过 `toRule()` 把 `Flow`/`Rule` 多分类 AST 单向编译为内核 `RuleNode`。`label`、`name` 等 UI 元数据不进入执行树，也不支持从 `RuleNode` 或 DSL 反向猜测恢复 UI 结构。旧 JSON 中的 `CNode` 仍可反序列化并通过 `toRule()` 参与执行。
-
-新增 `JNode` 后，编辑器直接进入统一规则弹窗；通用流程节点弹窗不编辑 `JNode` 的 DSL。原子规则不是在弹窗中临时创建的，而是从后端已有 `RuleDefinition` 下拉框中选择。UI 树只把 `RuleDefinition.ruleId` 写入 `RNode.expr` 作为稳定引用，并以 `RuleDefinition.desc` 初始化节点自身的 `RNode.name`；后端定义中的可执行 `expression` 不复制到 UI 树，也不允许用户在这里手填。节点名称仍可独立修改，因此同一条后端规则可以在不同规则树位置使用不同显示名称。
-
-规则弹窗右侧是常驻的直接编辑面板。选中规则节点后即可修改名称、取反状态和引用；逻辑节点可以切换“与/或”、调整直接子规则顺序，并通过“添加规则”向末尾增补子规则。规则节点没有查看/编辑模式切换，也不使用右键菜单。
-
-配置根规则或向组合节点添加内容时共用规则列表面板。面板默认只有一条已有规则，通过“添加规则”增加第二条及后续规则：只有一条时生成 `RNode`；两条及以上时才显示与/或，并生成包含全部所选规则的 `LNode`。新增内容追加到组合末尾，顺序再通过拖拽或行内上下移动调整；名称在结构创建后单独编辑。
-
-当规则根是单一 `RNode` 时，弹窗提供“转为复合规则”操作。用户选择与/或以及第二条已有规则后，编辑器创建一个未命名的 `LNode` 根，将原 `RNode` 连同名称、规则 ID 引用和取反状态完整保留为第一个子规则，把所选规则作为第二个子规则；不会生成虚假的占位规则。原 `JNode.action` 和主流程位置保持不变。已有 `HNode` 仍可展示和编辑，但当前转换入口不新建 `hits`。
-
-因此，弹窗适合承载规则子树、原子属性等具有明确边界的局部编辑，不能作为流程递归的导航容器。规则侧是否折叠、使用弹窗还是独立面板只属于展示策略，不改变 `Rule`、`Flow`、`JNode` 的类型关系和执行语义。
-
-### 7.3 节点分支约束
-
-各节点的分支约束如下：
-
-1. 串行、并行节点包含一个或多个流程分支，每个分支都可以递归包含任意流程节点。串行节点按顺序执行；并行节点同时执行所有分支并等待完成。前端通常横向展示这些分支，但布局方向不改变执行语义。
-2. 动作节点可以没有后继，也可以连接一个任意流程节点。
-3. 判断节点包含一棵纯规则子树和零个或一个命中分支。规则子树由原子条件、与、或、`hits` 等节点递归组成；匹配为 `true` 时才执行命中分支。带有执行分支的判断节点不能再次作为外层规则使用。
-4. 条件节点包含一个条件表达式以及零个或一个命中分支。没有分支时表示纯条件；存在分支时，条件为 `true` 才执行该分支。
-5. 与、或节点至少包含两个纯规则子节点，并按照各自的短路规则求值，不能直接包含动作、串行或并行等流程节点。
-6. 决策节点包含一个或多个有序条件分支，每个条件分支是条件节点或判断节点；节点依次检查各分支，命中第一个后停止。最后还可以有一个默认分支，在全部条件均未命中时执行。默认分支可以是任意流程节点，不限于动作节点；没有默认分支时不执行额外流程。
-
-### 7.4 递归关系
-
-递归关系可以概括为：
-
-```text
-Flow = Action(next?)
-     | Serial(Flow+)
-     | Parallel(Flow+)
-     | Condition(rule, Flow?)
-     | Judge(Rule, Flow?)
-     | Decision((Condition | Judge)+, Flow?)
-
-Rule = AtomicCondition
-     | And(Rule, Rule+)
-     | Or(Rule, Rule+)
-     | Hits(bounds, Rule+)
-```
-
-可视化树、JSON 数据和内核规则必须保持同一层级与同一递归关系。缩放、折叠、横排或竖排只改变展示方式，不得改变 DSL 和执行语义。
-
-## 8. 命中数量
-
-`hits(min, max, rules...)` 用于判断子规则的命中数是否位于指定区间，`_` 表示该边界不限制。
-
-```text
-hits(2, _, a, b, c)  // 至少命中 2 个
-hits(_, 2, a, b, c)  // 至多命中 2 个
-hits(2, 2, a, b, c)  // 恰好命中 2 个
-hits(1, 2, a, b, c)  // 命中 1～2 个
-```
+- [文档索引](./docs/README.md)：全部有效文档及其适用边界。
+- [Core 核心设计](./docs/核心设计.md)：内核设计、运行链路与核心不变量。
+- [UI 树与 Web 编辑器](./docs/规则编辑器.md)：UI AST、画布投影、编辑与持久化契约。
+- [开发与运行](./docs/开发与运行.md)：构建、测试、服务脚本和运行配置。
