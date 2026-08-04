@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>mosika</artifactId>
+        <groupId>io.github.nianien</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>mosika-web</artifactId>
+    <description>
+        规则编排 Web 服务：Spring Boot Web + JdbcTemplate + SQLite，依赖 mosika-ui（AST 库）与
+        mosika-core（内核）。本模块产出可执行 Spring Boot 胖包；库制品仍由 mosika-ui 提供。
+    </description>
+
+    <properties>
+        <spring-boot.version>3.4.5</spring-boot.version>
+        <sqlite-jdbc.version>3.47.1.0</sqlite-jdbc.version>
+        <!-- 父 POM 已将 spring-context 固定为 6.2.19，此处把 Spring Boot 管理的整个
+             spring-framework 家族一同上拉到 6.2.19，避免方法签名错配（NoSuchMethodError）。 -->
+        <spring-framework.version>6.2.19</spring-framework.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 子模块导入 Spring Boot BOM 后重新声明根工程 Jackson BOM，确保三模块版本一致。 -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-framework-bom</artifactId>
+                <version>6.2.19</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.nianien</groupId>
+            <artifactId>mosika-ui</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.nianien</groupId>
+            <artifactId>mosika-core</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!-- Web 后端：轻量栈 Spring Boot Web + JdbcTemplate + SQLite，不引入 JPA/ORM -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>${sqlite-jdbc.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- 保留形参名，避免 Spring MVC 因缺 -parameters 无法绑定
+                         @RequestParam / @PathVariable 时报"Name for argument ... not specified" -->
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <configuration>
+                    <mainClass>com.skyfalling.mosika.ui.web.MosikaWebApplication</mainClass>
+                </configuration>
+                <executions>
+                    <!-- 绑定 repackage：mvn package 产出可执行胖包
+                         java -jar mosika-web/target/mosika-web.jar 启动。 -->
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

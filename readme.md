@@ -1,17 +1,114 @@
-# Mousika
+# Mosika
 
 <p align="center">
-  <strong>用递归 AST 表达规则、规则流与可视化编排</strong><br>
-  <sub>JDK 21 · Maven · GraalJS · ANTLR4 · Spring Boot</sub>
+  <strong>让规则图成为可编译、可执行、可追踪、可回放的业务语言</strong><br>
+  <sub><strong>模型驱动的可视化规则流语言与执行内核</strong></sub><br>
+  <sub>源自大规模企业级规则平台实践 · JDK 21 · GraalJS · ANTLR4</sub>
 </p>
 
 <p align="center">
+  <a href="#为什么是-mosika">技术价值</a> ·
   <a href="#规则流是什么样的">核心能力</a> ·
-  <a href="./docs/规则编辑器.md">Web 编辑器</a> ·
+  <a href="./docs/规则编辑器.md">参考 Web UI</a> ·
   <a href="./docs/核心设计.md">内核设计</a> ·
+  <a href="./docs/技术演进规划-v1.md">技术演进</a> ·
   <a href="./docs/README.md">完整文档</a> ·
-  <a href="./mousika-web/src/main/resources/static/ui/index.html">Web UI 源码</a>
+  <a href="./mosika-web/src/main/resources/static/ui/index.html">参考 UI 源码</a>
 </p>
+
+## 为什么是 Mosika
+
+> **真正稀缺的不是“能拖拽”，而是从画布到运行时始终只有一套语义。**
+
+Mosika 定义了一门以可视化 AST 为源代码的规则流语言：用户编辑的结构就是持久化模型，也是编译、执行、追踪和回放的唯一事实来源。它不是给编程框架补一层画布，也不是把另一套复杂 DSL 包装成流程图；**图就是语法，树形作用域就是语义，编译后的 `RuleFlow` 就是运行时。**
+
+这套内核已经在大规模企业级规则产品实践中衍生出可拖拽编辑、在线编译与测试、动态插件热插拔、实时回放、本地执行和远程执行。不同产品能力共享同一结构契约，无需在编辑器、服务端和执行器之间重复解释流程含义。
+
+企业平台实现及其架构适配不属于本仓库。本项目保留与平台解耦的 Core、可序列化 UI AST 和参考 Web 服务，让同一语义内核能够被独立嵌入、扩展和验证。
+
+### 核心与参考实现的边界
+
+> **`mosika-web` 只是 UI 与控制面的参考实现，不是 Mosika 的核心。**
+
+Mosika 的规则语义和执行能力全部来自 `mosika-core`；`mosika-ui` 只提供可序列化的 UI AST 及其到执行树的单向编译能力，也不包含真正的页面。可选的 `mosika-web` 使用 Spring Boot、SQLite 和静态页面演示如何把两者组合成一套可运行的规则管理与可视化编排界面，主要用于能力展示、集成验证和独立体验。
+
+接入 Mosika 内核不需要依赖 `mosika-web`。参考 Web 不定义新的规则语义，不替代 Core/UI 的库制品，也不代表公司内部生产级产品的完整控制面、平台集成和生态能力。
+
+### 设计初衷：让稳定语义沉淀，让业务策略自由组合
+
+> **原子规则沉淀业务事实，规则流表达产品策略。**
+
+Mosika 从一开始就把**规则的生成**与**规则的编排**作为两个独立生命周期：规则生产侧负责把领域知识封装为具有稳定业务语义、可以独立测试和复用的最小单元 `RuleDefinition`；产品与业务侧基于这些原子规则的稳定标识组织 `RuleFlow`，表达串行、并行、判断和决策，而不需要感知底层表达式或实现细节。
+
+```text
+规则生产：领域知识 ──> RuleDefinition(ruleId, expression, desc)
+                              │
+                              │ 稳定 ruleId 引用
+                              ▼
+产品编排：业务策略 ──> RuleFlow(串行 / 并行 / 判断 / 决策)
+```
+
+这条边界让规则实现可以独立演进，让同一业务语义可以被多个产品复用，也让产品策略能够以编排方式快速变化。技术团队沉淀可靠的规则能力，产品和业务专注表达“在什么场景下，按什么顺序，做什么决策”。
+
+### 一次建模，全链路一致
+
+```mermaid
+flowchart LR
+    subgraph AUTHORING[规则创作]
+        EDITOR[拖拽编辑]
+        TEST[在线编译与测试]
+    end
+
+    subgraph KERNEL[统一语义内核]
+        AST[UI AST / DSL]
+        COMPILER[校验与编译]
+        SUITE[RuleSuite 运行快照]
+        EVAL[RuleEvaluator]
+    end
+
+    subgraph ECOSYSTEM[执行生态]
+        PLUGIN[插件 / UDF]
+        LOCAL[本地执行]
+        REMOTE[远程执行]
+        TRACE[追踪]
+        REPLAY[实时回放]
+    end
+
+    EDITOR --> AST
+    TEST --> COMPILER
+    AST --> COMPILER --> SUITE --> EVAL
+    PLUGIN --> SUITE
+    EVAL --> LOCAL
+    EVAL --> REMOTE
+    EVAL --> TRACE --> REPLAY
+
+    classDef input fill:#f0fdfa,stroke:#14b8a6,color:#0f172a;
+    classDef core fill:#ecfeff,stroke:#0891b2,color:#0f172a;
+    classDef output fill:#fff7ed,stroke:#f59e0b,color:#0f172a;
+    class EDITOR,TEST input;
+    class AST,COMPILER,SUITE,EVAL core;
+    class PLUGIN,LOCAL,REMOTE,TRACE,REPLAY output;
+```
+
+### 七个核心主张
+
+| 核心主张 | Mosika 的回答 |
+| --- | --- |
+| **生成与编排解耦** | 原子规则是具有稳定业务语义的最小单元；`RuleFlow` 只引用稳定 `ruleId`，让规则实现与产品策略分别演进 |
+| **图即源代码** | UI AST 及其 JSON 是编辑和持久化的唯一事实来源，不从执行树反推模型，也不存在与画布分离的第二套流程语义 |
+| **规则与流程分域** | `Rule` 只负责求值，`Flow` 负责执行；两者通过固定的 `JNode` 单向连接，从类型上阻止动作越过规则边界 |
+| **作用域显式可组合** | 串行、并行、判断和决策都是可递归嵌套的结构节点，不依赖坐标、连线方向、隐式汇合或通用 DAG 推断 |
+| **先编译，后发布** | 定义先经过规模校验、结构校验和完整编译，再原子发布不可变 `RuleSuite` 快照，不向运行流量暴露半成品 |
+| **结果语义不污染** | `matched`、业务 `result` 和执行详情各司其职，为在线测试、诊断、追踪和回放提供稳定契约 |
+| **一核多端** | JavaScript 与 Java/JS UDF 提供插件扩展，同一 `RuleFlow` 可以由本地、远程或混合执行后端承载 |
+
+### 它不是普通规则框架的“可视化版”
+
+- 组件编排从代码组件和共享上下文出发；Mosika 从可持久化、可编译的业务规则模型出发。
+- 推理引擎从事实匹配、规则激活和冲突消解出发；Mosika 从确定性的树形作用域和执行顺序出发。
+- 通用流程画布从节点、边和拓扑关系出发；Mosika 的 Flow 子树天然定义分支、顺序和局部汇合，不需要多入边或隐藏图算法。
+
+Mosika 不试图替代 BPM、通用 DAG 或企业平台基础设施。它专注做好一件事：**让一份规则流语义在创作、持久化、编译、测试、执行、追踪和回放之间始终一致。**
 
 ## 规则流是什么样的
 
@@ -54,7 +151,7 @@
 ## 完整 UI 树
 
 <p align="center">
-  <img src="./docs/images/ui-tree.svg" alt="Mousika 完整规则流 UI 树：串行、并行、决策、判断与动作递归组合" width="100%">
+  <img src="./docs/images/ui-tree.svg" alt="Mosika 完整规则流 UI 树：串行、并行、决策、判断与动作递归组合" width="100%">
 </p>
 
 <p align="center"><sub>Flow 是主递归域，Rule 通过判断节点嵌入；规则子树与命中流程保持明确边界。</sub></p>
@@ -87,9 +184,21 @@ flowchart LR
 
 | 模块 | 职责 | 不负责 |
 | --- | --- | --- |
-| `mousika-core` | DSL、规则树、执行上下文、求值、UDF、RuleFlow | 页面、持久化、业务场景映射 |
-| `mousika-ui` | 可序列化 UI AST，单向编译为 `RuleNode` | 页面布局、Web 依赖、从执行树反推 UI |
-| `mousika-web` | REST、SQLite、规则管理和可视化编辑页面 | 替代 core/ui 的库制品 |
+| `mosika-core` | DSL、规则树、执行上下文、求值、UDF、RuleFlow | 页面、持久化、业务场景映射 |
+| `mosika-ui` | 可序列化 UI AST，单向编译为 `RuleNode` | 页面布局、Web 依赖、从执行树反推 UI |
+| `mosika-web` | 可选的 UI/控制面参考实现：REST、SQLite、规则管理和可视化编辑页面 | 规则语义、执行内核、替代 Core/UI 库制品、代表完整生产级平台 |
+
+## 技术演进
+
+后续演进坚持“语义契约优先、平台能力外置、兼容性可验证”：
+
+1. 建立 DSL、UI JSON、执行结果和异常语义的兼容性测试套件，并为公开 API 建立版本基线。
+2. 将全局运行快照、并行执行器、超时和取消策略改造成可注入的运行时能力，支持多套件隔离。
+3. 提炼规则来源、插件解析、执行后端、追踪与回放等中立 SPI，使企业平台和独立实现复用同一内核。
+4. 建立本地/远程执行一致性、插件生命周期、并发压力和性能回归基线。
+5. 在保持语义稳定的前提下拆分模型、解析、运行时和 GraalJS 适配，降低按需接入成本。
+
+完整阶段、交付物、验收标准和非目标见[技术演进规划 v1](./docs/技术演进规划-v1.md)。
 
 ## 运行
 
@@ -102,7 +211,7 @@ mvn clean test
 启动管理界面：
 
 ```bash
-./scripts/mousika.sh start
+./scripts/mosika.sh start
 ```
 
 访问：
@@ -111,14 +220,16 @@ mvn clean test
 - 原子规则库：<http://127.0.0.1:8080/rules>
 - 规则流画布：`http://127.0.0.1:8080/flow/{id}`
 
+仓库同时提供一套可重复导入的[内容生成领域演示数据](./mosika-web/src/main/resources/demo/README.md)：用 64 条原子规则和 7 条相互复用的规则流模拟素材证据链、内容路由、深度文章/快讯/营销文案生产、多渠道适配和分级发布门禁。它用于展示 Mosika 内核如何承载真实领域编排，不改变 `mosika-web` 仅作为参考 UI 与控制面的定位。
+
 开发与运维命令：
 
 ```bash
-./scripts/mousika.sh dev
-./scripts/mousika.sh status
-./scripts/mousika.sh logs
-./scripts/mousika.sh restart
-./scripts/mousika.sh stop
+./scripts/mosika.sh dev
+./scripts/mosika.sh status
+./scripts/mosika.sh logs
+./scripts/mosika.sh restart
+./scripts/mosika.sh stop
 ```
 
 环境变量、运行目录和分模块验证命令见[开发与运行](./docs/开发与运行.md)。
@@ -128,4 +239,5 @@ mvn clean test
 - [文档索引](./docs/README.md)：全部有效文档及其适用边界。
 - [Core 核心设计](./docs/核心设计.md)：内核设计、运行链路与核心不变量。
 - [UI 树与 Web 编辑器](./docs/规则编辑器.md)：UI AST、画布投影、编辑与持久化契约。
+- [技术演进规划 v1](./docs/技术演进规划-v1.md)：内核契约、运行时解耦、SPI、回放和模块化路线。
 - [开发与运行](./docs/开发与运行.md)：构建、测试、服务脚本和运行配置。

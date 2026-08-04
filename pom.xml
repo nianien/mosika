@@ -5,16 +5,16 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.nianien</groupId>
-    <artifactId>mousika</artifactId>
+    <artifactId>mosika</artifactId>
     <packaging>pom</packaging>
     <version>${revision}</version>
-    <name>mousika</name>
+    <name>mosika</name>
     <description>general-purpose recursive rule flow engine</description>
-    <url>https://github.com/nianien/mousika</url>
+    <url>https://github.com/nianien/mosika</url>
     <modules>
-        <module>mousika-core</module>
-        <module>mousika-ui</module>
-        <module>mousika-web</module>
+        <module>mosika-core</module>
+        <module>mosika-ui</module>
+        <module>mosika-web</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -51,9 +51,9 @@
         </developer>
     </developers>
     <scm>
-        <connection>https://github.com/nianien/mousika.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com:nianien/mousika.git</developerConnection>
-        <url>https://github.com/nianien/mousika</url>
+        <connection>https://github.com/nianien/mosika.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:nianien/mosika.git</developerConnection>
+        <url>https://github.com/nianien/mosika</url>
     </scm>
     <dependencyManagement>
         <dependencies>

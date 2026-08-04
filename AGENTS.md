@@ -4,10 +4,10 @@
 
 本项目是基于 JDK 21 的 Maven 多模块规则引擎。
 
-- `mousika-core/` 是纯内核，负责 DSL 解析、规则语法树、执行上下文、规则求值和 UDF；ANTLR 语法位于 `src/main/antlr4/Rule.g4`。
-- `mousika-ui/` 不包含真正的页面或布局，只把内核语法树转换为前端容易序列化、递归遍历和渲染的数据结构。
-- `mousika-web/` 是可选的规则编排服务与管理页面，依赖 `mousika-ui` 和 `mousika-core`，负责 REST、SQLite 持久化和静态前端；其 Spring Boot 胖包不能替代前两个库制品。
-- `scripts/mousika.sh` 统一负责 Web 服务的构建、启停、状态、日志和开发模式；运行状态及日志不得写入仓库目录。
+- `mosika-core/` 是纯内核，负责 DSL 解析、规则语法树、执行上下文、规则求值和 UDF；ANTLR 语法位于 `src/main/antlr4/Rule.g4`。
+- `mosika-ui/` 不包含真正的页面或布局，只把内核语法树转换为前端容易序列化、递归遍历和渲染的数据结构。
+- `mosika-web/` 是可选的规则编排服务与管理页面，依赖 `mosika-ui` 和 `mosika-core`，负责 REST、SQLite 持久化和静态前端；其 Spring Boot 胖包不能替代前两个库制品。
+- `scripts/mosika.sh` 统一负责 Web 服务的构建、启停、状态、日志和开发模式；运行状态及日志不得写入仓库目录。
 - 生产代码和测试分别位于各模块的 `src/main/java`、`src/test/java`；不要修改 `target/generated-sources/` 中的生成代码。
 
 内核使用 `RuleFlow` 承载一条完整的命名规则编排。`RuleFlowDefinition` 是由 `id` 和 `dsl` 组成的声明态，编译后得到由 `id` 和 `RuleNode root` 组成的运行态 `RuleFlow`；`RuleLoader.loadFlows()` 负责加载定义，`RuleSuite.getRuleFlow()` 和 `evalFlow()` 负责查找与执行。Flow 是对外能力，Tree 是其结构实现：串行、并行、条件和决策通过递归组合节点定义作用域，不使用多入边、隐式汇合、环或通用 DAG。
@@ -83,15 +83,15 @@ Rule = R | And(Rule, Rule+) | Or(Rule, Rule+) | Hits(bounds, Rule+)
 ## 构建与测试
 
 - `mvn clean test`：重新生成 ANTLR 代码并运行全部测试。
-- `mvn -pl mousika-core test`：只验证内核。
-- `mvn -pl mousika-ui -am test`：验证 UI 树及其内核依赖。
-- `mvn -pl mousika-web -am test`：验证 Web/API 及其依赖模块。
+- `mvn -pl mosika-core test`：只验证内核。
+- `mvn -pl mosika-ui -am test`：验证 UI 树及其内核依赖。
+- `mvn -pl mosika-web -am test`：验证 Web/API 及其依赖模块。
 - `mvn clean package`：测试并生成各模块 JAR。
 
 解析、执行、并发上下文或树转换的修改必须增加针对性回归测试。测试类使用 JUnit 5，命名为 `*Test`。
 
 ## 编码与提交
 
-Java 使用四空格缩进，包名保持在 `com.skyfalling.mousika` 下；类、方法、常量分别使用大驼峰、小驼峰和全大写下划线命名。保持相邻代码的导入和注释风格，不引入无必要的抽象或依赖。
+Java 使用四空格缩进，包名保持在 `com.skyfalling.mosika` 下；类、方法、常量分别使用大驼峰、小驼峰和全大写下划线命名。保持相邻代码的导入和注释风格，不引入无必要的抽象或依赖。
 
 提交信息使用简短中文主题，一个提交聚焦一个问题。合并请求需说明影响模块、语义变化、验证命令；涉及 UI 树时附代表性 DSL、JSON 或结构示例。

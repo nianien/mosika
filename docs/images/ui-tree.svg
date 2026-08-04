@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 900" role="img" aria-labelledby="title desc">
-    <title id="title">Mousika 完整规则流 UI 树</title>
+    <title id="title">Mosika 完整规则流 UI 树</title>
     <desc id="desc">串行、并行、判断、决策、规则组合与动作节点递归组成的规则流</desc>
     <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">

@@ -6,8 +6,6 @@ target/
 **.flattened-pom.xml
 /.run/
 
-# mousika-ui 运行期生成的 SQLite 数据目录（含 db / wal / shm 等）
-/mousika-ui/data/
-/data/
-mousika.db
-mousika.db-*
+# mosika-web 的演示数据库纳入 Git，仅忽略 SQLite 运行期侧车文件
+mosika.db-*
+*.db-journal
