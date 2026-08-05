@@ -104,8 +104,8 @@ public class RuleEngine {
             throw new IllegalArgumentException("duplicate function defined: " + definition.getRuleId());
         }
         ruleDefinitions.put(definition.getRuleId(), definition);
-        if (definition.getUseType() != 2) {
-            //符合规则不编译
+        if (definition.getUseType() == RuleDefinition.USE_TYPE_ATOMIC) {
+            //仅编译原子规则
             compile(definition.getExpression());
         }
         compileDesc(definition.getDesc());
