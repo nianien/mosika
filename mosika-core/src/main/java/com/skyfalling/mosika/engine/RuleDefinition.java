@@ -13,6 +13,9 @@ import lombok.*;
 @RequiredArgsConstructor
 public class RuleDefinition {
 
+    public static final int USE_TYPE_ATOMIC = 0;
+    public static final int USE_TYPE_COMPOSITE = 2;
+
     /**
      * 规则id
      */
@@ -30,8 +33,8 @@ public class RuleDefinition {
     private String desc;
 
     /**
-     * 使用方式
+     * 规则定义类型：0 表示 JavaScript 原子规则，2 表示规则 ID DSL 复合规则。
      */
-    private int useType = 0;
+    private int useType = USE_TYPE_ATOMIC;
 
 }
