@@ -4,7 +4,6 @@ import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.engine.UdfDefinition;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -24,14 +23,6 @@ public interface RuleLoader {
     List<UdfDefinition> loadUdfs();
 
     /**
-     * 加载规则流定义
-     */
-    default List<RuleFlowDefinition> loadFlows() {
-        return Collections.emptyList();
-    }
-
-
-    /**
      * 加载规则套件
      *
      * @return
@@ -40,7 +31,7 @@ public interface RuleLoader {
     default RuleSuite loadSuite() {
         List<RuleDefinition> ruleDefinitions = new ArrayList<>(this.loadRules());
         List<UdfDefinition> udfDefinitions = new ArrayList<>(this.loadUdfs());
-        return new RuleSuite(ruleDefinitions, udfDefinitions, loadFlows());
+        return new RuleSuite(ruleDefinitions, udfDefinitions);
     }
 
 
