@@ -3,6 +3,7 @@ package com.skyfalling.mosika.eval.node;
 
 import com.skyfalling.mosika.eval.context.RuleContext;
 import com.skyfalling.mosika.eval.result.EvalResult;
+import lombok.Getter;
 
 /**
  * 复合节点
@@ -12,6 +13,7 @@ import com.skyfalling.mosika.eval.result.EvalResult;
  */
 public class CompositeNode extends ExprNode {
 
+    @Getter
     private final RuleNode ruleNode;
 
     public CompositeNode(String expression, RuleNode ruleNode) {
