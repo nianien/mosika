@@ -2,7 +2,6 @@ package com.skyfalling.mosika.ui.tree;
 
 import com.skyfalling.mosika.eval.node.*;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
-import com.skyfalling.mosika.eval.parser.NodeGenerator;
 import com.skyfalling.mosika.ui.tree.node.define.FlowNode;
 import com.skyfalling.mosika.ui.tree.node.flow.*;
 import com.skyfalling.mosika.utils.Constants;
@@ -24,8 +23,8 @@ import java.util.stream.Collectors;
  */
 public class UINodeAdapter {
 
-    /** UI AST 只保留规则 ID 结构，不展开任何进程级复合规则配置。 */
-    private static final NodeGenerator UI_NODE_GENERATOR = NodeGenerator.create();
+    /** UI AST 只保留规则 ID 结构，不展开任何进程级复合规则配置 */
+    private static final NodeBuilder UI_NODE_BUILDER = new NodeBuilder();
 
     /**
      * 将流程节点编译为内核规则节点。
@@ -138,7 +137,7 @@ public class UINodeAdapter {
     }
 
     private RuleNode parse(String expression) {
-        return NodeBuilder.build(expression, UI_NODE_GENERATOR);
+        return UI_NODE_BUILDER.build(expression);
     }
 
 

@@ -22,6 +22,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -68,6 +69,63 @@ public class RuleEngineTest {
         RuleEngine engine = builder.build();
         Object object = engine.evalExpr("jdUdf.test(1001,10000)", null, null);
         System.out.println(object);
+    }
+
+    @Test
+    public void testJsUdfAcceptsAnonymousFunctions() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinitions(List.of(
+                        new UdfDefinition("math", "arrowSum", "(a, b) => a + b;"),
+                        new UdfDefinition("math", "functionSum", """
+                                function (a, b) {
+                                    return a + b;
+                                }
+                                """)))
+                .build();
+
+        assertEquals(3, engine.evalExpr("math.arrowSum(1, 2)", null, null));
+        assertEquals(7, engine.evalExpr("math.functionSum(3, 4)", null, null));
+    }
+
+    @Test
+    public void testJsUdfRequiresNamedFunctionToMatchRegistrationName() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> RuleEngine.builder()
+                        .udfDefinition(new UdfDefinition("math", "sum", """
+                                function add(a, b) {
+                                    return a + b;
+                                }
+                                """))
+                        .build());
+
+        assertEquals("JavaScript UDF name mismatch: registered as sum but declared as add",
+                exception.getMessage());
+    }
+
+    @Test
+    public void testJsUdfRejectsNonFunctionDuringRegistration() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> RuleEngine.builder()
+                        .udfDefinition(new UdfDefinition("math", "sum", "1 + 2"))
+                        .build());
+
+        assertEquals("JavaScript UDF is not executable: sum", exception.getMessage());
+    }
+
+    @Test
+    public void testJsUdfKeepsLegacyScriptWithHelperFunctions() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("math", "sum", """
+                        function normalize(value) {
+                            return Number(value);
+                        }
+                        function sum(a, b) {
+                            return normalize(a) + normalize(b);
+                        }
+                        """))
+                .build();
+
+        assertEquals(3, engine.evalExpr("math.sum('1', '2')", null, null));
     }
 
     @Test

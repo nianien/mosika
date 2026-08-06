@@ -10,9 +10,11 @@
 - `scripts/mosika.sh` 统一负责 Web 服务的构建、启停、状态、日志和开发模式；运行状态及日志不得写入仓库目录。
 - 生产代码和测试分别位于各模块的 `src/main/java`、`src/test/java`；不要修改 `target/generated-sources/` 中的生成代码。
 
-内核使用 `RuleFlow` 承载一条完整的命名规则编排。`RuleFlowDefinition` 是由 `id` 和 `dsl` 组成的声明态，编译后得到由 `id` 和 `RuleNode root` 组成的运行态 `RuleFlow`；`RuleLoader.loadFlows()` 负责加载定义，`RuleSuite.getRuleFlow()` 和 `evalFlow()` 负责查找与执行。Flow 是对外能力，Tree 是其结构实现：串行、并行、条件和决策通过递归组合节点定义作用域，不使用多入边、隐式汇合、环或通用 DAG。
+内核只装配 `RuleDefinition` 和 `UdfDefinition`，不定义 `RuleFlow`、`RuleFlowDefinition` 或 Flow 专用的查找与执行 API。`RuleDefinition.useType=0` 表示 JavaScript 原子规则，`useType=2` 表示规则 ID DSL 复合规则；两者统一按 `ruleId` 编译为 `RuleNode`，其中复合规则的运行根是 `CompositeNode`。构造套件时必须先收集全部复合规则，再递归编译，因而允许复合规则引用后定义的复合规则。
 
-业务场景、产品、策略等标识到 `flowId` 的映射属于内核外部。不得在 `RuleFlow`、`RuleFlowDefinition` 或 `RuleSuite` 中重新加入业务配置、结果解析类型或 `Scene` 抽象；规则流之间的内核级调用使用 `EvalFlowUdf` / `sys.flow.eval`。
+`RuleEngine` 是规则注册状态的唯一事实来源：构造时注册内置规则和全部 `RuleDefinition`，并预编译 `useType=0` 的 JavaScript 表达式。`NodeGenerator.create(compositeRules)` 只接收完整复合规则表，负责递归展开 `CompositeNode`、复用编译结果和检测复合规则循环；不再接收或维护另一份已注册规则集合。未命中复合规则表的 ID 直接生成 `ExprNode`，执行时由 `RuleVisitor` 交给 `RuleEngine.evalRule()` 从已注册定义中解析。
+
+业务场景、产品、策略和规则流属于内核外部。Web 等产品层可以把自己的编排树单向编译成 `useType=2` 的 `RuleDefinition` 后交给 Core，但不得把产品 Flow 类型、配置或 API 引回 `mosika-core`。Web 的规则与 Flow 使用分表主键，进入 Core 的统一 `ruleId` 命名空间时必须给 Flow ID 加稳定前缀，不能假设两张表的数值 ID 不会相同；参考实现直接把 `flow_<id>` 保存为普通 `ANode.expr`。目标按普通裸 `ruleId` 递归解析为 `CompositeNode`；各层都不定义独立调用节点或特殊调用语法，`EvalFlowUdf` / `sys.flow.eval` 也不属于兼容契约。
 
 ## 核心设计理念
 
@@ -36,7 +38,7 @@ UI 节点表达结构而非业务语义或页面布局：`ANode.next` 表示后�
 
 所有同类子树都必须满足可替换性：任意 `FlowNode` 子树可以作为另一个流程组合的分支，任意 `RNode` 子树可以作为另一个规则组合的子规则。`JNode` 是规则递归与流程递归之间的固定连接点，左侧始终是 `Rule`，右侧始终是 `Flow`；单规则和复合规则都可以使用同一判断形态，区别只在左侧规则树的复杂程度。`∅` 用于稳定表示单分支结构，使单分支和多分支沿用同一套组合、遍历和序列化逻辑。
 
-从语言工程角度，这是一种以 `Flow` 为宿主、以 `Rule` 为嵌入式子语言的多分类 AST（multi-sorted AST）。两个递归域是单向嵌入而非相互递归：`Flow` 可以通过 `JNode` 引用 `Rule`，`Rule` 只能继续包含纯规则节点，不能反向引用 `Flow`。`JNode` 是两个语法域之间的嵌入点和边界节点。
+从语言工程角度，这是一种以 `Flow` 为宿主、以 `Rule` 为嵌入式子语言的多分类 AST（multi-sorted AST）。两个递归域不直接结构互嵌：`Flow` 可以通过 `JNode` 引用 `Rule`，`Rule` 不能挂载或展开 `Flow` 子树。另一条编排在产品边界被赋予稳定的命名规则 ID，并作为普通 `ANode` 引用；进入 Core 后像其他裸 `ruleId` 一样由 `NodeGenerator` 在同一递归解析栈中生成普通 `CompositeNode`。内核保留完整目标规则树和执行详情，产品层可根据命名空间决定是否折叠；循环引用与普通复合规则循环使用同一解析阶段检测。
 
 前端可以对两个语法域采用异构投影：`JNode` 与 `JNode.rule` 可以在主画布统一投影为一个规则节点，主画布不展示可能很长的 DSL 或规则摘要，完整规则树和名称在单一弹窗或独立子编辑器中展示。规则名称属于 `JNode.rule` 指向的实际规则根节点，不属于外层 `JNode`：简单规则表示为 `JNode(RNode, Flow?)`，主画布显示 `RNode` 的名称；复合规则表示为 `JNode(LNode/HNode, Flow?)`，根节点有名称时显示名称，未命名时显示“复合规则”。两者区别只在规则子树复杂度，使简单规则能在同一个规则递归域内继续扩展；不得回退展示表达式。这种视觉合并不得删除底层 `JNode`、改变 `rule/action` 边界或破坏底层树结构及 JSON 往返。`JNode.action` 属于主流程递归，后续流程还可能再次包含 `JNode`，必须在主画布中原位展开。不得用弹窗承载流程递归，否则交互层级会随树深度退化为弹窗嵌套。弹窗只负责规则子树或原子属性等有明确边界的局部编辑，不承担流程导航。
 
@@ -74,8 +76,8 @@ UI 节点表达结构而非业务语义或页面布局：`ANode.next` 表示后�
 从类型上可将递归关系概括为：
 
 ```text
-Flow = A(next?) | S(Flow+) | P(Flow+) | C(rule, Flow?) | J(Rule, Flow?) | D((C|J)+, Flow?)
-Rule = R | And(Rule, Rule+) | Or(Rule, Rule+) | Hits(bounds, Rule+)
+Flow = A(next?) | Call(flowId, next?) | S(Flow+) | P(Flow+) | C(rule, Flow?) | J(Rule, Flow?) | D((C|J)+, Flow?)
+Rule = R | Call(flowId) | And(Rule, Rule+) | Or(Rule, Rule+) | Hits(bounds, Rule+)
 ```
 
 修改节点时必须同步检查：`toRule()` 的单向编译、`TreeNode.visit()` 的全部递归边、`NodeTypeResolver` 的 JSON 类型映射，以及“UI → JSON → UI → Rule”的结构与执行语义一致性。不得根据 `RuleNode` 或 DSL 猜测恢复 UI 结构；不要重新引入已合并删除的 `tree2`。

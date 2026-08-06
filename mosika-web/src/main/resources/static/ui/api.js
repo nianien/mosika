@@ -34,19 +34,29 @@
     root.MosikaApi = {
         // flows
         listFlows: (params) => request("GET", `/flows${qs(params)}`),
-        getFlow: (id) => request("GET", `/flows/${id}`),
+        getFlow: (flowId) => request("GET", `/flows/${flowId}`),
         createFlow: (flow) => request("POST", "/flows", flow),
-        updateFlow: (id, flow) => request("PUT", `/flows/${id}`, flow),
-        publishFlow: (id, flow) => request("POST", `/flows/${id}/publish`, flow),
-        updateFlowMeta: (id, meta) => request("PUT", `/flows/${id}/meta`, meta),
-        disableFlow: (id, version) => request("DELETE", `/flows/${id}${qs({ version })}`),
+        updateFlow: (flowId, flow) => request("PUT", `/flows/${flowId}`, flow),
+        publishFlow: (flowId, flow) => request("POST", `/flows/${flowId}/publish`, flow),
+        updateFlowMeta: (flowId, meta) => request("PUT", `/flows/${flowId}/meta`, meta),
+        disableFlow: (flowId, version) => request("DELETE", `/flows/${flowId}${qs({ version })}`),
+        listFlowReferences: (namespace) => request("GET", `/flows/references/active${qs({ namespace })}`),
         // rules
         listRules: (params) => request("GET", `/rules${qs(params)}`),
-        listRuleReferences: () => request("GET", "/rules/references"),
+        listRuleReferences: (namespace) => request("GET", `/rules/references${qs({ namespace })}`),
         getRuleRefCounts: () => request("GET", "/rules/ref-counts"),
         createRule: (rule) => request("POST", "/rules", rule),
-        updateRule: (id, rule) => request("PUT", `/rules/${id}`, rule),
-        enableRule: (id, version) => request("POST", `/rules/${id}/enable${qs({ version })}`),
-        disableRule: (id, version) => request("DELETE", `/rules/${id}${qs({ version })}`)
+        updateRule: (ruleId, rule) => request("PUT", `/rules/${ruleId}`, rule),
+        enableRule: (ruleId, version) => request("POST", `/rules/${ruleId}/enable${qs({ version })}`),
+        disableRule: (ruleId, version) => request("DELETE", `/rules/${ruleId}${qs({ version })}`),
+        // namespaces
+        listNamespaces: () => request("GET", "/namespaces"),
+        createNamespace: (namespace) => request("POST", "/namespaces", namespace),
+        // user-registered JavaScript UDFs
+        listUdfs: (params) => request("GET", `/udfs${qs(params)}`),
+        createUdf: (udf) => request("POST", "/udfs", udf),
+        updateUdf: (id, udf) => request("PUT", `/udfs/${id}`, udf),
+        enableUdf: (id, version) => request("POST", `/udfs/${id}/enable${qs({ version })}`),
+        disableUdf: (id, version) => request("DELETE", `/udfs/${id}${qs({ version })}`)
     };
 })(window);

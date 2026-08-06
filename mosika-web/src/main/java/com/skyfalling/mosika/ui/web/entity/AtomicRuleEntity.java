@@ -8,13 +8,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 /**
- * {@code rule_flow} 表的实体映射
+ * {@code atomic_rule} 表的实体映射
  * <p>
- * {@code id} 是数据库自增主键，进入 UI 树、REST API 和 Core 的 {@code flowId}
- * 由 {@code f + id} 实时派生，{@code ruleTree} 是编辑和持久化的唯一事实来源
+ * {@code id} 是数据库自增主键，进入 UI 树、REST API 和 Core 的 {@code ruleId}
+ * 由 {@code r + id} 实时派生，不单独持久化
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -22,7 +20,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RuleFlowEntity {
+public class AtomicRuleEntity {
 
     /** 数据库自增主键 */
     @JsonIgnore
@@ -35,16 +33,19 @@ public class RuleFlowEntity {
     /** 所属命名空间业务编码 */
     private String namespace;
 
-    /** 面向用户展示的规则流名称 */
+    /** 面向用户展示的规则名称 */
     private String name;
 
-    /** 规则流业务描述 */
+    /** 规则业务描述 */
     private String description;
 
-    /** UI AST JSON */
-    private String ruleTree;
+    /** JavaScript 原子规则表达式 */
+    private String expression;
 
-    /** 0 草稿；1 已生效；2 已停用 */
+    /** 规则分类：condition 条件规则 / action 动作规则 */
+    private String kind;
+
+    /** 1 启用；0 停用 */
     private Integer status;
 
     /** 乐观锁版本号 */
@@ -56,15 +57,9 @@ public class RuleFlowEntity {
     /** SQLite 记录最后更新时间字符串 */
     private String updatedAt;
 
-    /** 列表接口摘要：规则树节点总数，不落库 */
-    private Integer nodeCount;
-
-    /** 列表接口摘要：规则树中的全部业务引用，不落库 */
-    private List<String> referencedRuleIds;
-
-    /** 返回由数据库主键派生的规则流 ID */
-    @JsonProperty(value = "flowId", access = JsonProperty.Access.READ_ONLY)
-    public String getFlowId() {
-        return RuleIds.flowId(id);
+    /** 返回由数据库主键派生的原子规则 ID */
+    @JsonProperty(value = "ruleId", access = JsonProperty.Access.READ_ONLY)
+    public String getRuleId() {
+        return RuleIds.ruleId(id);
     }
 }

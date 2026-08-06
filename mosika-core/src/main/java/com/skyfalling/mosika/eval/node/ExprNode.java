@@ -5,7 +5,7 @@ import com.skyfalling.mosika.eval.result.EvalResult;
 import lombok.Getter;
 
 /**
- * 表达式规则
+ * 由规则上下文按规则 ID 求值的普通叶子节点
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -13,14 +13,14 @@ import lombok.Getter;
 public class ExprNode implements RuleNode {
 
     /**
-     * 规则表达式
+     * 规则 ID
      */
     private final String expression;
 
     /**
-     * 表达式节点
+     * 创建普通叶子节点
      *
-     * @param expression 规则表达式
+     * @param expression 规则 ID
      */
     public ExprNode(String expression) {
         this.expression = expression;

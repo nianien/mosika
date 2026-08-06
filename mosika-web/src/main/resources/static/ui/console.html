@@ -116,7 +116,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="topbar">
     <div class="brandwrap">
       <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika 规则编排</b></div></div>
-      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a></div>
+      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a><a class="tab" href="/udfs">UDF</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索场景名称 / 描述"></div>
@@ -170,6 +170,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-head">新建场景</div>
   <div class="dlg-body">
     <div class="field"><label>场景名称 *</label><input id="newName" placeholder="如：准入场景"></div>
+    <div class="field"><label>命名空间 *</label><select id="newNamespace"></select><div class="hint">规则流只能引用同一命名空间内的规则和规则流</div></div>
     <div class="field"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并编排</button></div>
@@ -249,11 +250,26 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     if (!dlg.open) dlg.showModal();
   }
 
-  async function loadRuleNames() {
+  async function loadReferenceNames() {
+    ruleNameById = new Map();
+    const namespaces = [...new Set(flows.map((flow) => flow.namespace).filter(Boolean))];
     try {
-      const items = await Api.listRuleReferences();
-      items.forEach((r) => ruleNameById.set(String(r.id), r.name || r.description || String(r.id)));
-    } catch (_) { /* 下拉名称非关键 */ }
+      const groups = await Promise.all(namespaces.flatMap((namespace) => [
+        Api.listRuleReferences(namespace), Api.listFlowReferences(namespace)
+      ]));
+      groups.flat().forEach((item) => {
+        const id = item.ruleId || item.flowId;
+        if (id) ruleNameById.set(String(id), item.name || item.description || String(id));
+      });
+    } catch (_) { /* 引用名称不是列表主链路 */ }
+  }
+
+  async function loadNamespaces() {
+    const namespaces = await Api.listNamespaces();
+    $("#newNamespace").innerHTML = (namespaces || [])
+      .filter((item) => item.status === 1)
+      .map((item) => `<option value="${esc(item.code)}">${esc(item.name)}（${esc(item.code)}）</option>`)
+      .join("");
   }
 
   async function loadFlows() {
@@ -298,17 +314,17 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
       const active = f.status === 1;
-      const pending = pendingFlowIds.has(f.id);
+      const pending = pendingFlowIds.has(f.flowId);
       const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
-      const ops = `<button class="open" data-open="${f.id}">编排</button>
-        <button class="btn link" data-detail="${f.id}">详情</button>
+      const ops = `<button class="open" data-open="${f.flowId}">编排</button>
+        <button class="btn link" data-detail="${f.flowId}">详情</button>
         <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
-          aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.id}"${pending ? " disabled aria-busy=\"true\"" : ""}>
+          aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.flowId}"${pending ? " disabled aria-busy=\"true\"" : ""}>
           <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
           <span class="status-toggle-label">${meta.label}</span>
         </button>`;
       return `<tr>
-        <td><div class="name">${esc(f.name)}<span class="id">#${f.id}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
+        <td><div class="name">${esc(f.name)}<span class="id">${esc(f.namespace)} / ${esc(f.flowId)}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
         <td class="num">${ruleIds.length}</td>
         <td class="time">${esc((f.updatedAt || "").slice(5, 16))}</td>
         <td><div class="actions">${ops}</div></td>
@@ -319,7 +335,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function openCanvas(id) { location.href = `/flow/${id}`; }
 
   function openDrawer(id) {
-    current = flows.find((f) => f.id === id);
+    current = flows.find((f) => f.flowId === id);
     if (!current) return;
     drawerOpener = document.activeElement;
     $("#dwName").value = current.name || "";
@@ -365,11 +381,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     drawerSaving = true;
     $("#dwSave").disabled = true; $("#dwOpen").disabled = true;
     try {
-      await Api.updateFlowMeta(current.id, {
+      await Api.updateFlowMeta(current.flowId, {
+        flowId: current.flowId, namespace: current.namespace,
         name, description: $("#dwDesc").value.trim(), version: current.version
       });
       toast("已保存");
-      const id = current.id;
+      const id = current.flowId;
       closeDrawer(true);
       await loadFlows();
       if (openAfter) openCanvas(id);
@@ -381,7 +398,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   function openStatusDialog(id, button) {
-    const f = flows.find((x) => x.id === id); if (!f || pendingFlowIds.has(id)) return;
+    const f = flows.find((x) => x.flowId === id); if (!f || pendingFlowIds.has(id)) return;
     const disabling = f.status === 1;
     statusDialogTarget = { id, button };
     $("#statusDlgTitle").textContent = disabling ? "确认停用场景" : "确认生效场景";
@@ -411,7 +428,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   async function toggleStatus(id, button) {
-    const f = flows.find((x) => x.id === id); if (!f) return;
+    const f = flows.find((x) => x.flowId === id); if (!f) return;
     if (pendingFlowIds.has(id)) return;
     const action = f.status === 1 ? "disable" : "publish";
     pendingFlowIds.add(id);
@@ -425,7 +442,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         toast("已停用");
       } else if (action === "publish") {
         const full = await Api.getFlow(id);
-        await Api.publishFlow(id, { id, name: full.name, description: full.description, ruleTree: full.ruleTree, version: full.version });
+        await Api.publishFlow(id, {
+          flowId: full.flowId, namespace: full.namespace,
+          name: full.name, description: full.description,
+          ruleTree: full.ruleTree, version: full.version
+        });
         toast("已生效");
       }
       statusChanged = true;
@@ -451,19 +472,19 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     if (!name) { toast("请填写场景名称"); return; }
     try {
       const created = await Api.createFlow({
-        name, description: $("#newDesc").value.trim(),
+        name, namespace: $("#newNamespace").value, description: $("#newDesc").value.trim(),
         ruleTree: JSON.stringify({ type: "T", expr: "", next: { type: "A", expr: "∅" } })
       });
       $("#newDlg").close();
-      openCanvas(created.id);
+      openCanvas(created.flowId);
     } catch (e) { showError(e.message, "创建失败"); }
   }
 
   // events
   $("#rows").addEventListener("click", (e) => {
-    const o = e.target.closest("[data-open]"); if (o) return openCanvas(Number(o.dataset.open));
-    const d = e.target.closest("[data-detail]"); if (d) return openDrawer(Number(d.dataset.detail));
-    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(Number(t.dataset.statusToggle), t);
+    const o = e.target.closest("[data-open]"); if (o) return openCanvas(o.dataset.open);
+    const d = e.target.closest("[data-detail]"); if (d) return openDrawer(d.dataset.detail);
+    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(t.dataset.statusToggle, t);
   });
   $("#filters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
@@ -492,7 +513,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && current) closeDrawer(); });
 
-  (async () => { await loadRuleNames(); await loadFlows(); })();
+  (async () => { await Promise.all([loadNamespaces(), loadFlows()]); await loadReferenceNames(); })();
 })();
 </script>
 </body>

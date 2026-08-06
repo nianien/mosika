@@ -6,16 +6,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 规则执行结果
+ * 单个执行节点的递归详情
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
 public class RuleResult extends EvalResult {
     /**
-     * @param result
-     * @param desc
-     * @author skyfalling {@literal <skyfalling@live.com>}
+     * 根据节点评估结果创建规则详情
+     *
+     * @param result 节点评估结果
+     * @param desc   规则描述
      */
     public RuleResult(EvalResult result, String desc) {
         super(result.getExpr(), result.getResult(), result.isMatched());
@@ -24,16 +25,12 @@ public class RuleResult extends EvalResult {
 
     /**
      * 规则描述
-     *
-     * @author skyfalling {@literal <skyfalling@live.com>}
      */
     private String desc;
-    /**
-     * 子规则
-     *
-     * @author skyfalling {@literal <skyfalling@live.com>}
-     */
 
+    /**
+     * 按执行结构保存的子规则详情
+     */
     private List<RuleResult> subRules = new ArrayList<>();
 
 

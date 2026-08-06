@@ -17,32 +17,44 @@ import java.util.concurrent.ConcurrentMap;
 
 
 /**
- * 规则引擎
+ * 规则定义和 UDF 的注册执行引擎
+ * <p>
+ * 构造阶段注册内置规则和输入定义，预编译原子规则脚本、规则描述模板和 UDF
+ * 执行阶段为每次调用创建独立的 JavaScript 上下文并绑定目标对象、规则上下文和 UDF
+ * 复合规则 DSL 由 {@link com.skyfalling.mosika.eval.parser.NodeBuilder NodeBuilder} 编译
+ * 本类只负责其中普通规则 ID 的脚本求值
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class RuleEngine {
 
     /**
-     * 规则定义
+     * 按规则 ID 保存内置规则和输入规则定义
      */
     private Map<String, RuleDefinition> ruleDefinitions = new HashMap<>();
     /**
-     * 编译规则, key=expression, value=Source
+     * 按 JavaScript 源码缓存已验证的规则脚本
      */
     private final ConcurrentMap<String, Source> compiledScripts = new ConcurrentHashMap<>();
     /**
-     * 编译描述, key=desc, value=Source
+     * 按描述模板缓存已验证的 JavaScript 脚本
      */
     private final ConcurrentMap<String, Source> compiledDesc = new ConcurrentHashMap<>();
     /**
-     * 编译后的UDF
+     * 按顶层名称保存编译后的 UDF 绑定对象
      */
     private Map<String, Object> compiledUdfs;
 
+    /**
+     * 注册规则定义和 UDF 定义并完成可执行内容的预编译
+     *
+     * @param ruleDefinitions 规则定义
+     * @param udfDefinitions  UDF 定义
+     * @throws IllegalArgumentException 规则 ID 或 UDF 名称冲突、UDF 定义不合法时抛出
+     */
     @Builder
     public RuleEngine(@Singular List<RuleDefinition> ruleDefinitions, @Singular List<UdfDefinition> udfDefinitions) {
-        //添加默认规则定义
+        // 注册内置规则
         this.register(new RuleDefinition(Constants.TRUE, Constants.TRUE, "SUCCESS"));
         this.register(new RuleDefinition(Constants.FALSE, Constants.FALSE, "FAILED"));
         this.register(new RuleDefinition(Constants.NULL, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NULL"));
@@ -52,9 +64,16 @@ public class RuleEngine {
     }
 
     /**
-     * 执行规则
+     * 按规则 ID 执行已注册定义中的 JavaScript 表达式
+     * <p>
+     * 命名复合规则应先由 {@link com.skyfalling.mosika.eval.parser.NodeBuilder NodeBuilder}
+     * 展开为规则节点
      *
-     * @param ruleId 规则名
+     * @param ruleId  规则 ID
+     * @param root    规则计算的目标对象，通过 {@code $} 访问
+     * @param context 规则执行上下文，通过 {@code $$} 访问
+     * @return JavaScript 表达式返回值
+     * @throws IllegalArgumentException 规则未注册时抛出
      */
     public Object evalRule(String ruleId, Object root, Object context) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
@@ -65,7 +84,13 @@ public class RuleEngine {
     }
 
     /**
-     * 解析规则描述
+     * 计算指定规则的描述模板
+     *
+     * @param ruleId  规则 ID
+     * @param root    规则计算的目标对象，通过 {@code $} 访问
+     * @param context 规则执行上下文，通过 {@code $$} 访问
+     * @return 完成表达式插值的规则描述
+     * @throws IllegalArgumentException 规则未注册时抛出
      */
     public String evalRuleDesc(String ruleId, Object root, Object context) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
@@ -76,7 +101,12 @@ public class RuleEngine {
     }
 
     /**
-     * 执行表达式
+     * 直接执行 JavaScript 表达式
+     *
+     * @param expression JavaScript 表达式
+     * @param root       规则计算的目标对象，通过 {@code $} 访问
+     * @param context    规则执行上下文，通过 {@code $$} 访问
+     * @return JavaScript 表达式返回值
      */
     public Object evalExpr(String expression, Object root, Object context) {
         return doEval(compile(expression), root, context);
@@ -84,7 +114,12 @@ public class RuleEngine {
 
 
     /**
-     * 执行编译脚本
+     * 在独立 JavaScript 上下文中执行已编译脚本
+     *
+     * @param script      已编译脚本
+     * @param root        规则计算的目标对象
+     * @param ruleContext 规则执行上下文
+     * @return 转换为 Java 对象的脚本返回值
      */
     private Object doEval(Source script, Object root, Object ruleContext) {
         try (Context context = JsRuntime.createContext()) {
@@ -97,27 +132,41 @@ public class RuleEngine {
     }
 
     /**
-     * 注册规则
+     * 注册规则并预编译需要直接执行的内容
+     *
+     * @param definition 规则定义
+     * @throws IllegalArgumentException 规则 ID 已存在时抛出
      */
     private void register(RuleDefinition definition) {
         if (ruleDefinitions.containsKey(definition.getRuleId())) {
             throw new IllegalArgumentException("duplicate function defined: " + definition.getRuleId());
         }
         ruleDefinitions.put(definition.getRuleId(), definition);
-        if (definition.getUseType() == RuleDefinition.USE_TYPE_ATOMIC) {
-            //仅编译原子规则
+        if (definition.getRuleType() == RuleDefinition.RULE_TYPE_ATOMIC) {
+            // 仅原子规则表达式作为 JavaScript 脚本预编译
             compile(definition.getExpression());
         }
         compileDesc(definition.getDesc());
     }
 
+    /**
+     * 获取或编译 JavaScript 规则脚本
+     *
+     * @param expression JavaScript 表达式
+     * @return 已验证的脚本
+     */
     private Source compile(String expression) {
         return compiledScripts.computeIfAbsent(expression, this::compileExpression);
     }
 
     /**
-     * 顶层对象字面量在 JavaScript 中会被当作代码块，因此在编译边界
-     * 自动补充分组括号。其他表达式保持原样，不改写用户脚本。
+     * 编译 JavaScript 规则表达式
+     * <p>
+     * 顶层对象字面量会按代码块解析，首尾为大括号时补充分组括号
+     * 其他表达式保持原样
+     *
+     * @param expression JavaScript 表达式
+     * @return 已验证的脚本
      */
     private Source compileExpression(String expression) {
         String trimmed = expression.trim();
@@ -129,11 +178,12 @@ public class RuleEngine {
 
 
     /**
-     * 编译规则描述，使用JavaScript模板字符串支持表达式插值，
-     * 例如:你好${$.agent}或你好${$$.agent}<p/>
+     * 获取或编译规则描述模板
+     * <p>
+     * 描述通过 {@code String.raw} 模板支持访问 {@code $.agent} 和 {@code $$.agent}
      *
-     * @param originDesc
-     * @return
+     * @param originDesc 规则描述模板
+     * @return 已验证的描述模板脚本
      */
     private Source compileDesc(String originDesc) {
         return compiledDesc.computeIfAbsent(originDesc,
@@ -142,10 +192,10 @@ public class RuleEngine {
 
 
     /**
-     * 编译JS脚本
+     * 创建并验证 JavaScript 脚本
      *
-     * @param expression
-     * @return
+     * @param expression JavaScript 源码
+     * @return 已通过语法解析的脚本
      */
     private Source doCompile(String expression) {
         Source source = JsRuntime.createSource(expression, "rule-" + Integer.toHexString(expression.hashCode()));

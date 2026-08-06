@@ -3,6 +3,7 @@ package com.skyfalling.mosika.ui.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skyfalling.mosika.suite.RuleSuite;
+import com.skyfalling.mosika.ui.web.common.RuleIds;
 import com.skyfalling.mosika.ui.web.service.RuleSuiteManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -61,9 +64,12 @@ class MosikaWebIntegrationTest {
 
     @BeforeEach
     void resetDatabase() {
-        jdbc.update("DELETE FROM flow_rule_ref");
+        jdbc.update("DELETE FROM flow_atomic_ref");
+        jdbc.update("DELETE FROM flow_flow_ref");
         jdbc.update("DELETE FROM rule_flow");
-        jdbc.update("DELETE FROM rule_definition");
+        jdbc.update("DELETE FROM atomic_rule");
+        jdbc.update("DELETE FROM udf_definition");
+        jdbc.update("DELETE FROM rule_namespace WHERE code<>'default'");
         suiteManager.refresh();
     }
 
@@ -77,8 +83,56 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM rule_definition", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
         assertSame(active, suiteManager.getSuite());
+    }
+
+    @Test
+    void namespaceRestrictsNewReferencesButDoesNotSplitRuleSuite() throws Exception {
+        mvc.perform(post("/api/namespaces")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("code", "sales", "name", "销售"))))
+                .andExpect(status().isOk());
+        String defaultRule = createRule("default-condition", "condition");
+        Map<String, Object> salesFlow = flowBody("sales-flow", judgeTree(defaultRule), null);
+        salesFlow.put("namespace", "sales");
+        JsonNode created = data(mvc.perform(post("/api/flows")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesFlow)))
+                .andExpect(status().isOk())
+                .andReturn());
+        String flowId = created.path("flowId").asText();
+        salesFlow.put("version", 0);
+
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesFlow)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("same namespace")));
+
+        String childFlowId = createFlow("default-child", EMPTY_TREE);
+        mvc.perform(post("/api/flows/{flowId}/publish", childFlowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("default-child", EMPTY_TREE, 0))))
+                .andExpect(status().isOk());
+        Map<String, Object> salesCaller = flowBody(
+                "sales-caller", compositeReferenceTree(childFlowId), null);
+        salesCaller.put("namespace", "sales");
+        String callerFlowId = data(mvc.perform(post("/api/flows")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesCaller)))
+                .andExpect(status().isOk())
+                .andReturn()).path("flowId").asText();
+        salesCaller.put("version", 0);
+        mvc.perform(post("/api/flows/{flowId}/publish", callerFlowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesCaller)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("same namespace")));
+
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
+        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM rule_flow", Integer.class));
+        assertTrue(suiteManager.getSuite() != null);
     }
 
     @Test
@@ -86,16 +140,16 @@ class MosikaWebIntegrationTest {
         Map<String, Object> body = ruleBody(
                 "extract-claims",
                 "{stage:'CLAIM_EXTRACTION',status:'completed',claimCount:$.claimCount}");
-        body.put("ruleKind", "action");
-        long id = data(mvc.perform(post("/api/rules")
+        body.put("kind", "action");
+        String ruleId = data(mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.expression")
                         .value("{stage:'CLAIM_EXTRACTION',status:'completed',claimCount:$.claimCount}"))
-                .andReturn()).path("id").asLong();
+                .andReturn()).path("ruleId").asText();
 
-        mvc.perform(post("/api/eval/rule/{id}", id)
+        mvc.perform(post("/api/eval/rule/{ruleId}", ruleId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"target\":{\"claimCount\":3}}"))
                 .andExpect(status().isOk())
@@ -105,30 +159,122 @@ class MosikaWebIntegrationTest {
     }
 
     @Test
+    void userCanRegisterUpdateDisableAndEnableParameterizedUdf() throws Exception {
+        Map<String, Object> create = udfBody("content.generation", "bindCitations",
+                "(target, prefix) => ({stage: prefix, citedClaimCount: target.citedClaimCount})");
+        JsonNode created = data(mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(create)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1))
+                .andReturn());
+        long id = created.path("id").asLong();
+
+        Map<String, Object> action = ruleBody("bind-citations",
+                "content.generation.bindCitations($, 'CITATION_BINDING')");
+        action.put("kind", "action");
+        String ruleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(action)))
+                .andExpect(status().isOk())
+                .andReturn()).path("ruleId").asText();
+
+        mvc.perform(post("/api/eval/rule/{ruleId}", ruleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"target\":{\"citedClaimCount\":7}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.stage").value("CITATION_BINDING"))
+                .andExpect(jsonPath("$.data.result.citedClaimCount").value(7));
+
+        Map<String, Object> update = udfBody("content.generation", "bindCitations", """
+                function bindCitations(target, prefix) {
+                    return {stage: prefix, citedClaimCount: target.citedClaimCount * 2};
+                }
+                """);
+        update.put("version", created.path("version").asLong());
+        JsonNode updated = data(mvc.perform(put("/api/udfs/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(update)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andReturn());
+
+        mvc.perform(post("/api/eval/rule/{ruleId}", ruleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"target\":{\"citedClaimCount\":7}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.stage").value("CITATION_BINDING"))
+                .andExpect(jsonPath("$.data.result.citedClaimCount").value(14));
+
+        mvc.perform(delete("/api/udfs/{id}", id).param("version", updated.path("version").asText()))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/udfs").param("status", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].id").value(id));
+
+        mvc.perform(post("/api/udfs/{id}/enable", id).param("version", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1));
+    }
+
+    @Test
+    void udfRegistrationRejectsInvalidReservedAndDuplicateDefinitions() throws Exception {
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("content", "notFunction", "1 + 2"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM udf_definition", Integer.class));
+
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("sys.flow", "custom", "() => true"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("$", "overrideTarget", "() => true"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("", "class", "() => true"))))
+                .andExpect(status().isBadRequest());
+
+        Map<String, Object> valid = udfBody("content", "normalize", "value => value");
+        mvc.perform(post("/api/udfs").contentType(MediaType.APPLICATION_JSON).content(json(valid)))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/udfs").contentType(MediaType.APPLICATION_JSON).content(json(valid)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
     void staleRuleVersionIsRejectedAndVersionIsRequiredForTransitions() throws Exception {
         JsonNode created = data(mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(ruleBody("r1", "true"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(1))
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.namespaceId").doesNotExist())
                 .andReturn());
-        long id = created.path("id").asLong();
+        String ruleId = created.path("ruleId").asText();
+        assertTrue(ruleId.startsWith("r"));
 
         Map<String, Object> update = ruleBody("r1-updated", "true");
         update.put("version", 0);
-        mvc.perform(put("/api/rules/{id}", id)
+        mvc.perform(put("/api/rules/{ruleId}", ruleId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.version").value(1));
 
-        mvc.perform(put("/api/rules/{id}", id)
+        mvc.perform(put("/api/rules/{ruleId}", ruleId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(update)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
 
-        mvc.perform(delete("/api/rules/{id}", id))
+        mvc.perform(delete("/api/rules/{ruleId}", ruleId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
     }
@@ -140,35 +286,38 @@ class MosikaWebIntegrationTest {
                         .content(json(flowBody("flow", EMPTY_TREE, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(0))
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.namespaceId").doesNotExist())
                 .andReturn());
-        long id = created.path("id").asLong();
+        String flowId = created.path("flowId").asText();
+        assertTrue(flowId.startsWith("f"));
 
-        mvc.perform(post("/api/flows/{id}/publish", id)
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", INVALID_DECISION_TREE, 0))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
-        mvc.perform(post("/api/flows/{id}/publish", id)
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", EMPTY_TREE, 0))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(1))
                 .andExpect(jsonPath("$.data.version").value(1));
 
-        mvc.perform(put("/api/flows/{id}", id)
+        mvc.perform(put("/api/flows/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", EMPTY_TREE, 0))))
                 .andExpect(status().isConflict());
 
-        mvc.perform(put("/api/flows/{id}", id)
+        mvc.perform(put("/api/flows/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", EMPTY_TREE, 1))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(0))
                 .andExpect(jsonPath("$.data.version").value(2));
 
-        mvc.perform(post("/api/eval/flow/{id}", id)
+        mvc.perform(post("/api/eval/flow/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isNotFound())
@@ -177,24 +326,131 @@ class MosikaWebIntegrationTest {
 
     @Test
     void publishAcceptsDecisionBranchesWithoutActions() throws Exception {
-        long id = createFlow("optional-actions", OPTIONAL_ACTION_DECISION_TREE);
+        String flowId = createFlow("optional-actions", OPTIONAL_ACTION_DECISION_TREE);
 
-        mvc.perform(post("/api/flows/{id}/publish", id)
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("optional-actions", OPTIONAL_ACTION_DECISION_TREE, 0))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(1))
                 .andExpect(jsonPath("$.data.version").value(1));
 
-        mvc.perform(post("/api/eval/flow/{id}", id)
+        mvc.perform(post("/api/eval/flow/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
     }
 
     @Test
+    void publishedReferenceKeepsCalleeDetailsForRendering() throws Exception {
+        String childTree = judgeTree("true");
+        String childFlowId = createFlow("child", childTree);
+        mvc.perform(post("/api/flows/{flowId}/publish", childFlowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("child", childTree, 0))))
+                .andExpect(status().isOk());
+
+        String callerTree = compositeReferenceTree(childFlowId);
+        String callerFlowId = createFlow("caller", callerTree);
+        mvc.perform(post("/api/flows/{flowId}/publish", callerFlowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("caller", callerTree, 0))))
+                .andExpect(status().isOk());
+
+        var result = suiteManager.evalFlow(callerFlowId, new Object(), Map.of());
+        assertEquals(true, result.getResult());
+        assertEquals(1, result.getDetails().size());
+        assertEquals(callerFlowId + "[" + childFlowId + "]",
+                result.getDetails().get(0).getExpr());
+        var reference = result.getDetails().get(0).getSubRules().get(0);
+        assertTrue(reference.getExpr().startsWith(childFlowId + "["));
+        assertFalse(reference.getSubRules().isEmpty());
+
+        mvc.perform(delete("/api/flows/{flowId}", childFlowId).param("version", "1"))
+                .andExpect(status().isOk());
+        assertEquals(true, suiteManager.evalFlow(callerFlowId, new Object(), Map.of()).getResult());
+        mvc.perform(post("/api/eval/flow/{flowId}", childFlowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+
+    }
+
+    @Test
+    void updatingDisabledReferencedRuleRefreshesRuntimeSuite() throws Exception {
+        Map<String, Object> action = ruleBody("action", "'before'");
+        action.put("kind", "action");
+        JsonNode created = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(action)))
+                .andExpect(status().isOk())
+                .andReturn());
+        String ruleId = created.path("ruleId").asText();
+
+        String tree = actionTree(ruleId);
+        String flowId = createFlow("flow", tree);
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("flow", tree, 0))))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete("/api/rules/{ruleId}", ruleId).param("version", "0"))
+                .andExpect(status().isOk());
+        assertEquals("before", suiteManager.evalFlow(flowId, new Object(), Map.of()).getResult());
+
+        Map<String, Object> update = ruleBody("action", "'after'");
+        update.put("kind", "action");
+        update.put("version", 1);
+        mvc.perform(put("/api/rules/{ruleId}", ruleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(update)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(0));
+
+        assertEquals("after", suiteManager.evalFlow(flowId, new Object(), Map.of()).getResult());
+    }
+
+    @Test
+    void splitTableIdsDoNotCollideInCoreRuleNamespace() {
+        long sharedId = 42;
+        jdbc.update("""
+                INSERT INTO atomic_rule
+                    (id, namespace_id, name, description, expression, kind, status, version)
+                VALUES (?, (SELECT id FROM rule_namespace WHERE code='default'),
+                        'same-id-rule', 'same-id-rule', 'false', 'condition', 1, 0)
+                """, sharedId);
+        jdbc.update("""
+                INSERT INTO rule_flow
+                    (id, namespace_id, name, description, rule_tree, status, version)
+                VALUES (?, (SELECT id FROM rule_namespace WHERE code='default'),
+                        'same-id-flow', 'same-id-flow', ?, 1, 0)
+                """, sharedId, judgeTree("true"));
+
+        suiteManager.refresh();
+
+        assertEquals(false, suiteManager.evalRule("r42", new Object()).getResult());
+        assertEquals(true, suiteManager.evalFlow("f42", new Object(), Map.of()).getResult());
+    }
+
+    @Test
+    void typedIdsRejectWrongPrefixAndPlainNumbers() throws Exception {
+        mvc.perform(get("/api/rules/f1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("invalid ruleId")));
+        mvc.perform(get("/api/rules/1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("invalid ruleId")));
+        mvc.perform(get("/api/flows/r1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("invalid flowId")));
+        mvc.perform(get("/api/flows/1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("invalid flowId")));
+    }
+
+    @Test
     void missingResourcesAndEntitiesUseHttp404() throws Exception {
-        mvc.perform(get("/api/flows/999999"))
+        mvc.perform(get("/api/flows/f999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
         mvc.perform(get("/favicon.ico"))
@@ -210,6 +466,9 @@ class MosikaWebIntegrationTest {
         mvc.perform(get("/ui/rules.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"newRuleBtn\"")));
+        mvc.perform(get("/ui/udfs.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"createBtn\"")));
         mvc.perform(get("/ui/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"treeRoot\"")));
@@ -220,7 +479,10 @@ class MosikaWebIntegrationTest {
         mvc.perform(get("/rules"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/ui/rules.html"));
-        mvc.perform(get("/flow/12"))
+        mvc.perform(get("/udfs"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/udfs.html"));
+        mvc.perform(get("/flow/f12"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/ui/index.html"));
     }
@@ -239,30 +501,30 @@ class MosikaWebIntegrationTest {
 
     @Test
     void publishRejectsUnknownReferencesAndInvalidStructures() throws Exception {
-        long unknownId = createFlow("unknown", judgeTree("bogus"));
-        mvc.perform(post("/api/flows/{id}/publish", unknownId)
+        String unknownFlowId = createFlow("unknown", judgeTree("bogus"));
+        mvc.perform(post("/api/flows/{flowId}/publish", unknownFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("unknown", judgeTree("bogus"), 0))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
-        long embeddedDslId = createFlow("embedded-dsl", judgeTree("true&&false"));
-        mvc.perform(post("/api/flows/{id}/publish", embeddedDslId)
+        String embeddedDslFlowId = createFlow("embedded-dsl", judgeTree("true&&false"));
+        mvc.perform(post("/api/flows/{flowId}/publish", embeddedDslFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("embedded-dsl", judgeTree("true&&false"), 0))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
-        long invalidBuiltinId = createFlow("invalid-builtin", actionTree("true"));
-        mvc.perform(post("/api/flows/{id}/publish", invalidBuiltinId)
+        String invalidBuiltinFlowId = createFlow("invalid-builtin", actionTree("true"));
+        mvc.perform(post("/api/flows/{flowId}/publish", invalidBuiltinFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("invalid-builtin", actionTree("true"), 0))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
         for (String invalidTree : java.util.List.of(EMPTY_SERIAL_TREE, SINGLE_LOGIC_TREE)) {
-            long id = createFlow("invalid", invalidTree);
-            mvc.perform(post("/api/flows/{id}/publish", id)
+            String flowId = createFlow("invalid", invalidTree);
+            mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(flowBody("invalid", invalidTree, 0))))
                     .andExpect(status().isBadRequest())
@@ -272,25 +534,25 @@ class MosikaWebIntegrationTest {
 
     @Test
     void publishEnforcesRuleKindAtNodePosition() throws Exception {
-        long actionRule = createRule("action", "action");
-        long conditionRule = createRule("condition", "condition");
+        String actionRule = createRule("action", "action");
+        String conditionRule = createRule("condition", "condition");
 
-        long wrongJudge = createFlow("wrong-judge", judgeTree(String.valueOf(actionRule)));
-        mvc.perform(post("/api/flows/{id}/publish", wrongJudge)
+        String wrongJudge = createFlow("wrong-judge", judgeTree(actionRule));
+        mvc.perform(post("/api/flows/{flowId}/publish", wrongJudge)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("wrong-judge", judgeTree(String.valueOf(actionRule)), 0))))
+                        .content(json(flowBody("wrong-judge", judgeTree(actionRule), 0))))
                 .andExpect(status().isBadRequest());
 
-        long wrongAction = createFlow("wrong-action", actionTree(String.valueOf(conditionRule)));
-        mvc.perform(post("/api/flows/{id}/publish", wrongAction)
+        String wrongAction = createFlow("wrong-action", actionTree(conditionRule));
+        mvc.perform(post("/api/flows/{flowId}/publish", wrongAction)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("wrong-action", actionTree(String.valueOf(conditionRule)), 0))))
+                        .content(json(flowBody("wrong-action", actionTree(conditionRule), 0))))
                 .andExpect(status().isBadRequest());
 
-        long valid = createFlow("valid", actionTree(String.valueOf(actionRule)));
-        mvc.perform(post("/api/flows/{id}/publish", valid)
+        String valid = createFlow("valid", actionTree(actionRule));
+        mvc.perform(post("/api/flows/{flowId}/publish", valid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("valid", actionTree(String.valueOf(actionRule)), 0))))
+                        .content(json(flowBody("valid", actionTree(actionRule), 0))))
                 .andExpect(status().isOk());
     }
 
@@ -312,20 +574,20 @@ class MosikaWebIntegrationTest {
     @Test
     void explicitRefreshReportsFailureAndKeepsPreviousSnapshot() throws Exception {
         RuleSuite active = suiteManager.getSuite();
-        long id = createFlow("broken-later", EMPTY_TREE);
-        mvc.perform(post("/api/flows/{id}/publish", id)
+        String flowId = createFlow("broken-later", EMPTY_TREE);
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("broken-later", EMPTY_TREE, 0))))
                 .andExpect(status().isOk());
         RuleSuite published = suiteManager.getSuite();
-        jdbc.update("UPDATE rule_flow SET rule_tree='not-json' WHERE id=?", id);
+        jdbc.update("UPDATE rule_flow SET rule_tree='not-json' WHERE id=?", RuleIds.parseFlowId(flowId));
 
         mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(ruleBody("must-rollback", "true"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM rule_definition", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
         assertSame(published, suiteManager.getSuite());
 
         mvc.perform(post("/api/system/refresh"))
@@ -338,29 +600,38 @@ class MosikaWebIntegrationTest {
     private Map<String, Object> ruleBody(String name, String expression) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", name);
+        body.put("namespace", "default");
         body.put("description", name);
         body.put("expression", expression);
-        body.put("useType", 0);
-        body.put("ruleKind", "condition");
+        body.put("kind", "condition");
         return body;
     }
 
-    private long createRule(String name, String kind) throws Exception {
+    private Map<String, Object> udfBody(String group, String name, String source) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("group", group);
+        body.put("name", name);
+        body.put("description", name);
+        body.put("source", source);
+        return body;
+    }
+
+    private String createRule(String name, String kind) throws Exception {
         Map<String, Object> body = ruleBody(name, "true");
-        body.put("ruleKind", kind);
+        body.put("kind", kind);
         return data(mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(body)))
                 .andExpect(status().isOk())
-                .andReturn()).path("id").asLong();
+                .andReturn()).path("ruleId").asText();
     }
 
-    private long createFlow(String name, String tree) throws Exception {
+    private String createFlow(String name, String tree) throws Exception {
         return data(mvc.perform(post("/api/flows")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody(name, tree, null))))
                 .andExpect(status().isOk())
-                .andReturn()).path("id").asLong();
+                .andReturn()).path("flowId").asText();
     }
 
     private String judgeTree(String ruleId) {
@@ -373,9 +644,15 @@ class MosikaWebIntegrationTest {
                 + ruleId + "\"}}";
     }
 
+    private String compositeReferenceTree(String flowId) {
+        return "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\""
+                + flowId + "\"}}";
+    }
+
     private Map<String, Object> flowBody(String name, String tree, Integer version) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", name);
+        body.put("namespace", "default");
         body.put("description", name);
         body.put("ruleTree", tree);
         if (version != null) {

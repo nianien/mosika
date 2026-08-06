@@ -19,7 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 规则节点执行
+ * 单次规则执行使用的节点访问器和规则上下文
+ * <p>
+ * 附加上下文保存在当前映射中，节点评估结果和执行树用于叶子复用及详情组装
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -27,38 +29,38 @@ import java.util.stream.Collectors;
 public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleContext {
 
     /**
-     * 执行引擎
+     * 当前执行使用的规则引擎
      */
     private RuleEngine ruleEngine;
     /**
-     * 待匹配对象
+     * 当前执行的目标对象
      */
     private Object data;
 
     /**
-     * 当前规则
+     * 当前线程正在评估的命名规则 ID
      */
     private ThreadLocal<String> currentRule = new ThreadLocal<>();
     /**
-     * 缓存评估结果
+     * 当前执行中按表达式保存的节点评估结果
      */
     private Map<String, EvalResult> evalCache = new ConcurrentHashMap<>();
 
     /**
-     * 执行规则根节点
+     * 当前执行树的虚拟根节点
      */
     private EvalNode rootEval = new EvalNode(null);
     /**
-     * 当前执行节点
+     * 当前线程正在访问的执行节点
      */
     private ThreadLocal<EvalNode> currentEval = ThreadLocal.withInitial(() -> rootEval);
 
 
     /**
-     * 指定执行引擎和评估对象
+     * 创建单次规则执行上下文
      *
-     * @param ruleEngine
-     * @param data
+     * @param ruleEngine 规则引擎
+     * @param data       目标对象
      */
     public RuleVisitor(RuleEngine ruleEngine, Object data) {
         this.ruleEngine = ruleEngine;
@@ -67,7 +69,10 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     /**
-     * 访问规则节点
+     * 访问规则节点并记录执行层级和评估结果
+     *
+     * @param node 规则节点
+     * @return 节点评估结果
      */
     @Override
     public EvalResult visit(RuleNode node) {
@@ -85,22 +90,23 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         try {
             EvalResult result = node.eval(this);
             if (!isExprNode) {
-                //缓存非叶子节点的执行结果
+                // 缓存非叶子节点结果以组装执行详情
                 this.cache(node.expr(), result);
             }
             return result;
         } finally {
             if (!isExprNode) {
-                // 异常路径也必须回溯，避免复用同一 visitor 时把后续节点挂到错误父节点。
+                // 异常路径同样回溯到父节点
                 currentEval.set(parent);
             }
         }
     }
 
     /**
-     * 评估叶子规则
+     * 按规则 ID 评估叶子规则并复用当前执行中的已有结果
      *
-     * @param ruleId 规则ID
+     * @param ruleId 规则 ID
+     * @return 叶子规则评估结果
      */
     @Override
     public EvalResult eval(String ruleId) {
@@ -153,9 +159,11 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     /**
-     * 执行规则评估
+     * 调用规则引擎执行叶子规则并发送评估事件
      *
-     * @param ruleId 规则ID
+     * @param ruleId 规则 ID
+     * @return 叶子规则评估结果
+     * @throws RuleEvalException 规则未注册或执行失败时抛出
      */
     private EvalResult doEval(String ruleId) {
         long begin = System.currentTimeMillis();
@@ -173,10 +181,10 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
     }
 
     /**
-     * 转换规则执行结果
+     * 把执行树节点转换为递归规则详情
      *
-     * @param node
-     * @return
+     * @param node 执行树节点
+     * @return 规则详情
      */
     private RuleResult transform(EvalNode node) {
         RuleNode ruleNode = node.getRuleNode();
@@ -191,10 +199,10 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     /**
-     * 评估规则描述
+     * 计算命名规则描述并恢复当前规则 ID
      *
-     * @param ruleId
-     * @return
+     * @param ruleId 规则 ID
+     * @return 完成表达式插值的规则描述
      */
     private String evalDesc(String ruleId) {
         String previousRule = currentRule.get();
@@ -212,10 +220,10 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     /**
-     * 缓存评估结果
+     * 按节点表达式保存评估结果
      *
-     * @param expr
-     * @param result
+     * @param expr 节点表达式
+     * @param result 节点评估结果
      */
     private void cache(String expr, EvalResult result) {
         evalCache.put(expr, result);

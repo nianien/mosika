@@ -3,9 +3,9 @@
 
     // 画布页必须依附一条规则流程。通过 HTTP 访问且无 flowId（bench 基准除外）时，
     // 回到场景列表，避免正式服务里裸开画布展示内置演示假数据造成困惑。
-    // flowId 取自路径 /flow/{id}（正式路由）或查询串 ?flowId=（向后兼容）。
+    // flowId 取自路径 /flow/{flowId}（正式路由）或查询串 ?flowId=（向后兼容）。
     function resolveFlowId() {
-        const m = location.pathname.match(/\/flow\/(\d+)/);
+        const m = location.pathname.match(/\/flow\/(f[1-9]\d*)/);
         if (m) return m[1];
         return new URLSearchParams(location.search).get("flowId");
     }
@@ -31,33 +31,39 @@
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
         R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
         C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断条件，可连接一个可选的后续流程。" },
-        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作，执行后可连接一个可选的下一步。" },
+        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，执行后可连接一个可选的下一步。" },
         PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
     };
 
     // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
     // expr 只保存稳定的 ruleId 引用；desc 供展示。动作与条件同源于规则池。
     let RULE_DEFINITIONS = Array.from({ length: 12 }, (_, index) => ({
-        ruleId: `c${index + 1}`, desc: `业务判断条件${index + 1}`, useType: 0
+        ruleId: `c${index + 1}`, desc: `业务判断条件${index + 1}`, kind: "condition"
     }));
     let ACTION_DEFINITIONS = Array.from({ length: 13 }, (_, index) => ({
-        ruleId: `a${index + 1}`, desc: `业务操作${index + 1}`, useType: 0
+        ruleId: `a${index + 1}`, desc: `业务操作${index + 1}`, kind: "action"
     }));
     let RULE_DEFINITION_BY_ID = new Map(RULE_DEFINITIONS.map((d) => [d.ruleId, d]));
     let ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
 
-    // 接入后端时用真实 RuleDefinition 列表覆盖演示数据，并按 ruleKind 拆分：
+    // 接入后端时用真实 AtomicRule/RuleFlow 引用覆盖演示数据，并按 kind 拆分：
     // 判断条件(condition) 供判断/条件节点引用；执行动作(action) 供动作节点引用。
-    function applyRuleDefinitions(list) {
+    function applyRuleDefinitions(list, flows) {
         const toDef = (r) => ({
-            ruleId: String(r.id ?? r.ruleId),
-            desc: r.name || r.description || String(r.id ?? r.ruleId),
-            useType: r.useType ?? 0,
-            ruleKind: r.ruleKind === "action" ? "action" : "condition"
+            ruleId: String(r.ruleId),
+            desc: r.name || r.description || String(r.ruleId),
+            kind: r.kind === "action" ? "action" : "condition"
         });
         const defs = (list || []).map(toDef);
-        RULE_DEFINITIONS = defs.filter((d) => d.ruleKind !== "action");
-        ACTION_DEFINITIONS = defs.filter((d) => d.ruleKind === "action");
+        RULE_DEFINITIONS = defs.filter((d) => d.kind !== "action");
+        ACTION_DEFINITIONS = defs.filter((d) => d.kind === "action").concat(
+            (flows || []).map((flow) => ({
+                ruleId: String(flow.flowId),
+                desc: flow.name || flow.description || String(flow.flowId),
+                kind: "action",
+                composite: true
+            }))
+        );
         RULE_DEFINITION_BY_ID = new Map(RULE_DEFINITIONS.map((d) => [d.ruleId, d]));
         ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
     }
@@ -242,6 +248,10 @@
         return ["T", "S", "P", "D"].includes(type);
     }
 
+    function isCompositeReference(node) {
+        return node.type === "A" && /^f[1-9]\d*$/.test(String(node.expr || ""));
+    }
+
     function flowNodeDisplayName(node) {
         if (node.type === "T") return "开始";
         const name = flowNodeName(node);
@@ -249,6 +259,7 @@
         if (isStructuralFlowType(node.type)) return TYPES[node.type].name;
         if (node.type === "J") return ruleDisplayName(node);
         if (node.type === "A") {
+            if (isCompositeReference(node)) return `复合规则 ${node.expr}`;
             return actionDefinitionById(node.expr)?.desc || TYPES[node.type].name;
         }
         if (node.type === "C") {
@@ -1257,7 +1268,7 @@
     // 判断节点是否处于“待配置”：占位 PH，或动作/条件/判断尚未选择引用规则（J 规则为空或空原子）。
     function isUnconfigured(node) {
         if (node.type === "PH") return true;
-        if (node.type === "A" || node.type === "C") return !((node.expr || "").trim());
+        if (["A", "C"].includes(node.type)) return !((node.expr || "").trim());
         if (node.type === "J") { const r = jrule(node); return !r || (r.type === "R" && !((r.expr || "").trim())); }
         return false;
     }
@@ -1617,12 +1628,13 @@
         savingFlow = true; setSaveBusy(true);
         try {
             const payload = {
-                id: flowMeta.id, name: flowMeta.name, description: flowMeta.description,
+                flowId: flowMeta.flowId, namespace: flowMeta.namespace,
+                name: flowMeta.name, description: flowMeta.description,
                 ruleTree: JSON.stringify(T.serialize(tree)), version: flowMeta.version
             };
             const updated = makeFormal
-                ? await window.MosikaApi.publishFlow(flowMeta.id, payload)
-                : await window.MosikaApi.updateFlow(flowMeta.id, payload);
+                ? await window.MosikaApi.publishFlow(flowMeta.flowId, payload)
+                : await window.MosikaApi.updateFlow(flowMeta.flowId, payload);
             if (updated) { flowMeta.version = updated.version; flowMeta.name = updated.name; flowMeta.description = updated.description; }
             docStatus = makeFormal ? "formal" : "draft";
             dirty = false;
@@ -2288,19 +2300,18 @@
         // 无 flowId = 独立演示，保留内置示例与演示规则定义，不触碰后端。
         if (!flowId) return;
         try {
-            const all = await window.MosikaApi.listRuleReferences();
-            applyRuleDefinitions(all);
-            $("#loadErrorBanner").hidden = true;
-            render({ preserveView: true });
-        } catch (e) {
-            console.error("加载规则失败", e);
-            showLoadError(`规则加载失败：${e.message}。规则选择暂不可用。`);
-        }
-
-        try {
             const flow = await window.MosikaApi.getFlow(flowId);
             if (!flow) throw new Error("场景不存在");
-            flowMeta = { id: flow.id, name: flow.name, description: flow.description, version: flow.version };
+            flowMeta = {
+                flowId: flow.flowId, namespace: flow.namespace,
+                name: flow.name, description: flow.description, version: flow.version
+            };
+            const [atomics, flows] = await Promise.all([
+                window.MosikaApi.listRuleReferences(flow.namespace),
+                window.MosikaApi.listFlowReferences(flow.namespace)
+            ]);
+            applyRuleDefinitions(atomics, flows.filter((candidate) => candidate.flowId !== flow.flowId));
+            $("#loadErrorBanner").hidden = true;
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = flow.name || "流程画布";
             const crumbEl = document.getElementById("flowCrumbName");

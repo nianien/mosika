@@ -2,16 +2,15 @@ package com.skyfalling.mosika;
 
 import com.skyfalling.mosika.eval.node.HitsNode;
 import com.skyfalling.mosika.eval.node.AndNode;
+import com.skyfalling.mosika.eval.node.CaseNode;
 import com.skyfalling.mosika.eval.node.ExprNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.node.ParNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
-import com.skyfalling.mosika.exception.RuleParseException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import static com.skyfalling.mosika.eval.parser.NodeBuilder.build;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -21,6 +20,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class NodeBuilderTest {
+
+    private final NodeBuilder builder = new NodeBuilder();
+
+    private RuleNode build(String expr) {
+        return builder.build(expr);
+    }
+
+    private RuleNode build(String expr, String lhs) {
+        return new CaseNode(builder.build(expr), builder.build(lhs), null);
+    }
+
+    private RuleNode build(String expr, String lhs, String rhs) {
+        return new CaseNode(builder.build(expr), builder.build(lhs), builder.build(rhs));
+    }
 
 
     @ParameterizedTest
@@ -54,16 +67,16 @@ public class NodeBuilderTest {
 
     @Test
     public void testBuild() {
-        assertEquals(NodeBuilder.build("1", "2?a:b", "3?c:d").expr(), "1?(2?a:b):(3?c:d)");
-        assertEquals(NodeBuilder.build("1", "2?a:b").expr(), "1?(2?a:b)");
-        System.out.println(NodeBuilder.build("1?2?a:b:c").expr());
+        assertEquals(build("1", "2?a:b", "3?c:d").expr(), "1?(2?a:b):(3?c:d)");
+        assertEquals(build("1", "2?a:b").expr(), "1?(2?a:b)");
+        System.out.println(build("1?2?a:b:c").expr());
     }
 
 
     @Test
     public void testSer() {
-        System.out.println(NodeBuilder.build("∅->(1001?1002)->1004").expr());
-        System.out.println(NodeBuilder.build("f3?t1:f4?t2:t3").expr());
+        System.out.println(build("∅->(1001?1002)->1004").expr());
+        System.out.println(build("f3?t1:f4?t2:t3").expr());
     }
 
     @Test
@@ -81,13 +94,15 @@ public class NodeBuilderTest {
 
     @Test
     public void testInvalidExpression() {
-        assertThrows(RuleParseException.class, () -> build(""));
-        assertThrows(RuleParseException.class, () -> build("a&&"));
-        assertThrows(RuleParseException.class, () -> build("a b"));
-        assertThrows(RuleParseException.class, () -> build("hits(_,_,a,b)"));
-        assertThrows(RuleParseException.class, () -> build("hits(3,2,a,b,c)"));
-        assertThrows(RuleParseException.class, () -> build("hits(0,4,a,b,c)"));
-        assertThrows(RuleParseException.class, () -> build("limit('2','2',a,b)"));
+        assertThrows(IllegalStateException.class, () -> build(""));
+        assertThrows(IllegalStateException.class, () -> build("a&&"));
+        assertThrows(IllegalStateException.class, () -> build("a b"));
+        assertThrows(IllegalArgumentException.class, () -> build("hits(_,_,a,b)"));
+        assertThrows(IllegalArgumentException.class, () -> build("hits(3,2,a,b,c)"));
+        assertThrows(IllegalArgumentException.class, () -> build("hits(0,4,a,b,c)"));
+        assertThrows(IllegalStateException.class, () -> build("limit('2','2',a,b)"));
+        assertThrows(IllegalStateException.class, () -> build("@a"));
+        assertThrows(IllegalStateException.class, () -> build("call(a)"));
     }
 
     @Test

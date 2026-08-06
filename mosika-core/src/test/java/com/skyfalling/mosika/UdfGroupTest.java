@@ -9,7 +9,7 @@ import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
 import com.skyfalling.mosika.eval.result.NodeResult;
-import com.skyfalling.mosika.suite.RuleEvaluator;
+import com.skyfalling.mosika.suite.RuleSuite;
 import com.skyfalling.mosika.udf.*;
 import com.skyfalling.mosika.utils.JsonUtils;
 import org.junit.jupiter.api.Test;
@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Udf
 public class UdfGroupTest {
 
+    private final NodeBuilder nodeBuilder = new NodeBuilder();
+
 
     @Test
     public void testSayHello() {
@@ -40,8 +42,8 @@ public class UdfGroupTest {
                 )).build();
 
         String arg = "China";
-        RuleNode decisionNode = NodeBuilder.build("1");
-        NodeResult eval = new RuleEvaluator(engine).eval(decisionNode, arg);
+        RuleNode decisionNode = nodeBuilder.build("1");
+        NodeResult eval = new RuleSuite(engine).eval(decisionNode, arg);
         System.out.println(eval);
         assertEquals(eval.toString(),
                 "NodeResult(expr=1, result=China, details=[RuleResult(expr=1,result=China,desc='sys say')])");
@@ -62,11 +64,11 @@ public class UdfGroupTest {
         Map map = JsonUtils.toMap(json, String.class, Object.class);
         System.out.println(map);
         {
-            NodeResult result = new RuleEvaluator(engine).eval(NodeBuilder.build("1"), map);
+            NodeResult result = new RuleSuite(engine).eval(nodeBuilder.build("1"), map);
             System.out.println(result);
         }
         {
-            NodeResult result = new RuleEvaluator(engine).eval(NodeBuilder.build("2"), map);
+            NodeResult result = new RuleSuite(engine).eval(nodeBuilder.build("2"), map);
             System.out.println(result);
         }
 
@@ -81,8 +83,8 @@ public class UdfGroupTest {
                         new UdfDefinition("sys", "sayHello", new HelloWithGenericUdf())
                 )).build();
         String arg = "China";
-        RuleNode decisionNode = NodeBuilder.build("1");
-        NodeResult result = new RuleEvaluator(engine).eval(decisionNode, arg);
+        RuleNode decisionNode = nodeBuilder.build("1");
+        NodeResult result = new RuleSuite(engine).eval(decisionNode, arg);
         System.out.println(result);
         assertEquals(result.toString(),
                 "NodeResult(expr=1, result=This is China k:river v:ChangJiang;, " +
@@ -103,7 +105,7 @@ public class UdfGroupTest {
                 .build();
 
         String arg = "China";
-        NodeResult result = new RuleEvaluator(engine).eval(NodeBuilder.build("1"), arg);
+        NodeResult result = new RuleSuite(engine).eval(nodeBuilder.build("1"), arg);
         System.out.println(result);
         assertEquals("NodeResult(expr=1, result=This is China Outstanding person : [qi] k:river v:ChangJiang;, " +
                         "details=[RuleResult(expr=1,result=This is China Outstanding person : [qi] k:river v:ChangJiang;,desc='sys.helloWithGeneric')])",
@@ -121,7 +123,7 @@ public class UdfGroupTest {
                         new UdfDefinition("sys", "checkArguments", new CheckArgumentsUdf())
                 )).build();
         String arg = "China";
-        NodeResult result = new RuleEvaluator(engine).eval(NodeBuilder.build("1"), arg);
+        NodeResult result = new RuleSuite(engine).eval(nodeBuilder.build("1"), arg);
         System.out.println(result);
         assertEquals("NodeResult(expr=1, result=success, " +
                         "details=[RuleResult(expr=1,result=success,desc='sys.checkArguments')])",
@@ -145,7 +147,7 @@ public class UdfGroupTest {
                         new UdfDefinition("sys", "sayHello", new HelloWithGenericUdf())
                 ));
         String arg = "China";
-        NodeResult result = new RuleEvaluator(builder.build()).eval(NodeBuilder.build("1"), arg);
+        NodeResult result = new RuleSuite(builder.build()).eval(nodeBuilder.build("1"), arg);
         System.out.println(result);
     }
 

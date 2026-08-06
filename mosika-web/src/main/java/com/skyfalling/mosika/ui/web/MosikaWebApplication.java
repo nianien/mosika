@@ -12,22 +12,28 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * mosika-web 启动类。
+ * mosika-web 启动入口
  * <p>
  * 提供规则定义与规则流（RuleFlow）的持久化与 REST 能力，
  * 存储采用嵌入式 SQLite；核心执行引擎沿用 {@code mosika-core} 的
- * {@link com.skyfalling.mosika.suite.RuleSuite}。
+ * {@link com.skyfalling.mosika.suite.RuleSuite}
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @SpringBootApplication
 public class MosikaWebApplication {
 
+    /** 应用启动和访问入口日志 */
     private static final Logger log = LoggerFactory.getLogger(MosikaWebApplication.class);
 
-    /** 默认 SQLite 文件路径；与 application.yml 中的 {@code mosika.db.path} 保持一致。 */
+    /** 默认 SQLite 文件路径，与 application.yml 中的 {@code mosika.db.path} 保持一致 */
     static final String DEFAULT_DB_PATH = "./mosika-web/data/mosika.db";
 
+    /**
+     * 创建数据库父目录并启动 Spring Boot 应用
+     *
+     * @param args Spring Boot 命令行参数
+     */
     public static void main(String[] args) {
         ensureDbDirectory();
         ConfigurableApplicationContext context = SpringApplication.run(MosikaWebApplication.class, args);
@@ -35,7 +41,9 @@ public class MosikaWebApplication {
     }
 
     /**
-     * 启动完成后，打印可访问的前端入口与 API 基址，方便直接点开。
+     * 根据实际监听配置打印前端入口和 API 基址
+     *
+     * @param env 已启动 Spring 应用的运行环境
      */
     private static void logAccessUrls(Environment env) {
         String port = env.getProperty("server.port", "8080");
@@ -50,16 +58,21 @@ public class MosikaWebApplication {
                         "  Mosika 规则编排已启动，可访问：\n" +
                         "  规则流控制台   : {}/\n" +
                         "  原子规则库     : {}/rules\n" +
+                        "  JavaScript UDF : {}/udfs\n" +
                         "  规则画布       : {}/flow/{{id}}\n" +
                         "  API 基址       : {}/api\n" +
                         "  监听地址       : {}\n" +
                         "----------------------------------------------------------",
-                base, base, base, base, address);
+                base, base, base, base, base, address);
     }
 
     /**
-     * xerial 的 SQLite JDBC 驱动不会自动创建父目录，这里在 Spring 启动前
-     * 先按 env → system property → 默认值的顺序解析目标路径，然后 mkdir -p 父目录。
+     * 在 Spring 启动前确保 SQLite 文件的父目录存在
+     * <p>
+     * 路径优先读取 {@code MOSIKA_DB_PATH} 环境变量，其次读取 {@code mosika.db.path}
+     * 系统属性，最后回退到 {@link #DEFAULT_DB_PATH}
+     * <p>
+     * 目录创建失败只记录标准错误，后续由数据源初始化给出最终启动异常
      */
     private static void ensureDbDirectory() {
         String path = System.getenv("MOSIKA_DB_PATH");

@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 节点执行结果, 规则集的分支结果
+ * 一次根节点执行的对外结果
+ * <p>
+ * 业务返回值和规则详情分别保存，详情为空不影响业务返回值
+ *
  * Created on 2022/8/2
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -19,15 +22,15 @@ import java.util.List;
 public class NodeResult {
 
     /**
-     * 节点表达式
+     * 根节点表达式
      */
     private String expr;
     /**
-     * 是否匹配
+     * 根节点业务返回值
      */
     private Object result;
     /**
-     * 节点评估结果
+     * 递归规则执行详情
      */
     private List<RuleResult> details;
 

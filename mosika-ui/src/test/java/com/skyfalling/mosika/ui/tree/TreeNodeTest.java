@@ -1,8 +1,8 @@
 package com.skyfalling.mosika.ui.tree;
 
+import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
-import com.skyfalling.mosika.eval.parser.NodeGenerator;
 import com.skyfalling.mosika.ui.tree.node.TreeNode;
 import com.skyfalling.mosika.ui.tree.node.define.FlowNode;
 import com.skyfalling.mosika.ui.tree.node.flow.ANode;
@@ -16,7 +16,7 @@ import com.skyfalling.mosika.ui.tree.node.rule.LNode;
 import com.skyfalling.mosika.ui.tree.node.rule.RNode;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -146,6 +146,26 @@ public class TreeNodeTest {
         assertTrue(json.contains("\"label\":\"TreeNode\""));
         assertTrue(json.contains("\"label\":\"ANode\""));
         assertJsonAndRuleRoundTrip(tree);
+    }
+
+    @Test
+    public void testCompositeReferenceUsesOrdinaryActionNode() {
+        ANode reference = a("flow_child_flow");
+        reference.setNext(a("a1"));
+        ANode before = a("a0");
+        before.setNext(reference);
+        TreeNode tree = tree(before);
+
+        String json = tree.toJson();
+        assertTrue(json.contains("\"type\":\"A\""));
+        TreeNode restored = TreeNode.fromJson(json);
+        ANode restoredReference = assertInstanceOf(ANode.class,
+                assertInstanceOf(ANode.class, restored.getNext()).getNext());
+
+        assertEquals("flow_child_flow", restoredReference.getExpr());
+        assertEquals("a0->flow_child_flow->a1", restored.toRule().expr());
+        assertEquals(Set.of("a0", "flow_child_flow", "a1"), restored.collect());
+        assertJsonAndRuleRoundTrip(restored);
     }
 
     @Test
@@ -302,13 +322,12 @@ public class TreeNodeTest {
     }
 
     @Test
-    public void testUiCompilationIgnoresGlobalCompositeGenerator() {
-        NodeBuilder.setGenerator(NodeGenerator.create(Map.of("c1", "c2&&c3")));
-        try {
-            assertEquals("c1", tree(j(r("c1"), null)).toRule().expr());
-        } finally {
-            NodeBuilder.setGenerator(NodeGenerator.create());
-        }
+    public void testUiCompilationUsesIndependentNodeBuilder() {
+        NodeBuilder compositeBuilder = new NodeBuilder(List.of(new RuleDefinition(
+                "c1", "c2&&c3", "", RuleDefinition.RULE_TYPE_COMPOSITE)));
+
+        assertEquals("c1[c2&&c3]", compositeBuilder.build("c1").toString());
+        assertEquals("c1", tree(j(r("c1"), null)).toRule().expr());
     }
 
     private void assertTopLevelRule(RNode rule, String expression) {

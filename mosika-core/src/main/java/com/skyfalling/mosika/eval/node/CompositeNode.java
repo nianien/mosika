@@ -6,18 +6,31 @@ import com.skyfalling.mosika.eval.result.EvalResult;
 import lombok.Getter;
 
 /**
- * 复合节点
+ * 保留命名规则边界的复合规则节点
+ * <p>
+ * 节点表达式保存复合规则 ID，内部节点保存该规则递归展开后的规则树
+ * 执行时保留内部节点详情，并沿用内部节点的业务结果和匹配状态
+ *
  * Created on 2023/3/30
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class CompositeNode extends ExprNode {
 
+    /**
+     * 复合规则递归展开后的内部规则节点
+     */
     @Getter
     private final RuleNode ruleNode;
 
-    public CompositeNode(String expression, RuleNode ruleNode) {
-        super(expression);
+    /**
+     * 创建命名复合规则节点
+     *
+     * @param ruleId   复合规则 ID
+     * @param ruleNode 递归展开后的内部规则节点
+     */
+    public CompositeNode(String ruleId, RuleNode ruleNode) {
+        super(ruleId);
         this.ruleNode = ruleNode;
     }
 

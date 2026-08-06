@@ -14,8 +14,6 @@ import com.skyfalling.mosika.eval.parser.NodeBuilder;
 import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.eval.result.NodeResult;
 import com.skyfalling.mosika.exception.RuleEvalException;
-import com.skyfalling.mosika.suite.RuleEvaluator;
-import com.skyfalling.mosika.suite.RuleFlowDefinition;
 import com.skyfalling.mosika.suite.RuleSuite;
 import com.skyfalling.mosika.udf.SayHelloUdf;
 import com.skyfalling.mosika.utils.Constants;
@@ -54,7 +52,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-public class RuleNodeFlowTest {
+public class RuleNodeExecutionTest {
+
+    private final NodeBuilder nodeBuilder = new NodeBuilder();
 
 
     private RuleEngine ruleEngine;
@@ -80,9 +80,9 @@ public class RuleNodeFlowTest {
     @Test
     public void testNop() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("(∅->a1)->(∅->a2->a3)");
+        RuleNode node = nodeBuilder.build("(∅->a1)->(∅->a2->a3)");
         System.out.println(node.expr());
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
+        NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         System.out.println(nodeResult);
     }
 
@@ -95,9 +95,9 @@ public class RuleNodeFlowTest {
     }, delimiter = '#')
     public void testEval(String expr, String expected) {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build(expr);
+        RuleNode node = nodeBuilder.build(expr);
         System.out.println(node.expr());
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
+        NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         System.out.println(nodeResult);
         assertEquals(expected, node.expr());
 
@@ -106,9 +106,9 @@ public class RuleNodeFlowTest {
     @Test
     public void testIfNode() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("(t1&&t4?t2:t3)?(a1->a2->t1?a3):(a3->a4)");
+        RuleNode node = nodeBuilder.build("(t1&&t4?t2:t3)?(a1->a2->t1?a3):(a3->a4)");
         System.out.println(node.toString());
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
+        NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         System.out.println(nodeResult);
 
     }
@@ -117,7 +117,7 @@ public class RuleNodeFlowTest {
     @Test
     public void testSerNodeExecutesAllNodesWithoutBusinessResult() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("a1->a2->a3->a4");
+        RuleNode node = nodeBuilder.build("a1->a2->a3->a4");
         RuleVisitor context = new RuleVisitor(ruleEngine, root);
 
         EvalResult result = context.visit(node);
@@ -130,7 +130,7 @@ public class RuleNodeFlowTest {
     @Test
     public void testSerNodeContinuesAfterUnmatchedNode() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("a1->f1->a2");
+        RuleNode node = nodeBuilder.build("a1->f1->a2");
         RuleVisitor context = new RuleVisitor(ruleEngine, root);
 
         EvalResult result = context.visit(node);
@@ -156,9 +156,9 @@ public class RuleNodeFlowTest {
     @Test
     public void tesParNode() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("f1=>a1=>a2");
+        RuleNode node = nodeBuilder.build("f1=>a1=>a2");
         assertInstanceOf(ParNode.class, node);
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
+        NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         assertNull(nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
     }
@@ -214,7 +214,7 @@ public class RuleNodeFlowTest {
                 .build();
 
         RuleEvalException exception = assertThrows(RuleEvalException.class,
-                () -> new RuleEvaluator(engine).eval(NodeBuilder.build("boom=>true"), null));
+                () -> new RuleSuite(engine).eval(nodeBuilder.build("boom=>true"), null));
 
         assertEquals("boom", exception.getRuleId());
     }
@@ -272,30 +272,30 @@ public class RuleNodeFlowTest {
                 List.of(
                         new RuleDefinition("a", "true", "desc-rule=${$$.rule}"),
                         new RuleDefinition("b", "true", "desc-rule=${$$.rule}"),
-                        composite),
-                List.of(),
-                List.of(
-                        new RuleFlowDefinition("serial", "a->b"),
-                        new RuleFlowDefinition("parallel", "a=>b"),
-                        new RuleFlowDefinition("composite", "composite")));
+                        composite,
+                        new RuleDefinition("serial", "a->b", "serial",
+                                RuleDefinition.RULE_TYPE_COMPOSITE),
+                        new RuleDefinition("parallel", "a=>b", "parallel",
+                                RuleDefinition.RULE_TYPE_COMPOSITE)),
+                List.of());
 
-        Map<String, String> serialDescriptions = suite.evalFlow("serial", null)
-                .getDetails().get(0).getSubRules().stream()
+        Map<String, String> serialDescriptions = suite.evalRule("serial", null)
+                .getDetails().get(0).getSubRules().get(0).getSubRules().stream()
                 .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
-        Map<String, String> parallelDescriptions = suite.evalFlow("parallel", null)
-                .getDetails().get(0).getSubRules().stream()
+        Map<String, String> parallelDescriptions = suite.evalRule("parallel", null)
+                .getDetails().get(0).getSubRules().get(0).getSubRules().stream()
                 .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
 
         assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), serialDescriptions);
         assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), parallelDescriptions);
-        assertEquals("desc-rule=composite", suite.evalFlow("composite", null)
+        assertEquals("desc-rule=composite", suite.evalRule("composite", null)
                 .getDetails().get(0).getDesc());
     }
 
     @Test
     public void testParNodeIgnoresBranchMatchResults() {
         RuleVisitor context = new RuleVisitor(ruleEngine, null);
-        RuleNode node = NodeBuilder.build("f1=>f2");
+        RuleNode node = nodeBuilder.build("f1=>f2");
 
         EvalResult result = context.visit(node);
 
@@ -327,11 +327,11 @@ public class RuleNodeFlowTest {
         assertTrue(ruleContext.containsKey("nullable"));
         assertNull(ruleContext.getProperty("nullable"));
 
-        RuleEvaluator evaluator = new RuleEvaluator(ruleEngine);
+        RuleSuite ruleSuite = new RuleSuite(ruleEngine);
         Map<String, Object> context = new HashMap<>();
         context.put("nullable", null);
 
-        evaluator.eval(new ExprNode("t1"), null, context);
+        ruleSuite.eval(new ExprNode("t1"), null, context);
 
         assertTrue(context.containsKey("nullable"));
         assertNull(context.get("nullable"));
@@ -357,42 +357,42 @@ public class RuleNodeFlowTest {
     @Test
     public void testHitsNodeDetails() {
         User root = new User("jack", 19);
-        RuleNode node = NodeBuilder.build("hits(2,2,t1,f1,t2)");
-        NodeResult nodeResult = new RuleEvaluator(ruleEngine).eval(node, root);
+        RuleNode node = nodeBuilder.build("hits(2,2,t1,f1,t2)");
+        NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         assertEquals(true, nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
 
-        assertEquals(true, new RuleEvaluator(ruleEngine)
-                .eval(NodeBuilder.build("hits(2,_,t1,f1,t2)"), root).getResult());
-        assertEquals(true, new RuleEvaluator(ruleEngine)
-                .eval(NodeBuilder.build("hits(_,2,t1,f1,t2)"), root).getResult());
-        assertEquals(true, new RuleEvaluator(ruleEngine)
-                .eval(NodeBuilder.build("hits(1,2,t1,f1,t2)"), root).getResult());
-        assertEquals(false, new RuleEvaluator(ruleEngine)
-                .eval(NodeBuilder.build("hits(_,1,t1,f1,t2)"), root).getResult());
+        assertEquals(true, new RuleSuite(ruleEngine)
+                .eval(nodeBuilder.build("hits(2,_,t1,f1,t2)"), root).getResult());
+        assertEquals(true, new RuleSuite(ruleEngine)
+                .eval(nodeBuilder.build("hits(_,2,t1,f1,t2)"), root).getResult());
+        assertEquals(true, new RuleSuite(ruleEngine)
+                .eval(nodeBuilder.build("hits(1,2,t1,f1,t2)"), root).getResult());
+        assertEquals(false, new RuleSuite(ruleEngine)
+                .eval(nodeBuilder.build("hits(_,1,t1,f1,t2)"), root).getResult());
     }
 
     @Test
     public void testHitsNodeShortCircuit() {
         User root = new User("jack", 19);
-        RuleEvaluator evaluator = new RuleEvaluator(ruleEngine);
+        RuleSuite ruleSuite = new RuleSuite(ruleEngine);
 
-        NodeResult minReached = evaluator.eval(NodeBuilder.build("hits(1,_,t1,f1,t2)"), root);
+        NodeResult minReached = ruleSuite.eval(nodeBuilder.build("hits(1,_,t1,f1,t2)"), root);
         assertEquals(true, minReached.getResult());
         assertEquals(1, minReached.getDetails().get(0).getSubRules().size());
 
-        NodeResult maxExceeded = evaluator.eval(NodeBuilder.build("hits(_,1,t1,t2,f1)"), root);
+        NodeResult maxExceeded = ruleSuite.eval(nodeBuilder.build("hits(_,1,t1,t2,f1)"), root);
         assertEquals(false, maxExceeded.getResult());
         assertEquals(2, maxExceeded.getDetails().get(0).getSubRules().size());
 
-        NodeResult minUnreachable = evaluator.eval(NodeBuilder.build("hits(3,3,f1,t1,f1)"), root);
+        NodeResult minUnreachable = ruleSuite.eval(nodeBuilder.build("hits(3,3,f1,t1,f1)"), root);
         assertEquals(false, minUnreachable.getResult());
         assertEquals(1, minUnreachable.getDetails().get(0).getSubRules().size());
     }
 
     @Test
     public void tesIfElse() {
-        RuleNode actionNode = NodeBuilder.build("a?b:c");
+        RuleNode actionNode = nodeBuilder.build("a?b:c");
         System.out.println(actionNode.toString());
         RuleEngine.RuleEngineBuilder builder = RuleEngine.builder()
                 .ruleDefinitions(Arrays.asList(
@@ -405,7 +405,7 @@ public class RuleNodeFlowTest {
                         new UdfDefinition("sayHello", new SayHelloUdf())
                 ));
         User root = new User("jack", 19);
-        NodeResult nodeResult = new RuleEvaluator(builder.build()).eval(actionNode, root);
+        NodeResult nodeResult = new RuleSuite(builder.build()).eval(actionNode, root);
         System.out.println(nodeResult);
 
     }

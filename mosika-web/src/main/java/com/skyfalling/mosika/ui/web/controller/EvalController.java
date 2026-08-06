@@ -38,7 +38,7 @@ public class EvalController {
 
     /** 执行一条规则流：POST /api/eval/flow/{flowId} */
     @PostMapping("/flow/{flowId}")
-    public ApiResponse<NodeResult> evalFlow(@PathVariable long flowId,
+    public ApiResponse<NodeResult> evalFlow(@PathVariable String flowId,
                                             @RequestBody(required = false) EvalRequest req) {
         EvalRequest r = req == null ? new EvalRequest() : req;
         return ApiResponse.ok(suiteManager.evalFlow(flowId, r.getTarget(), r.getContext()));
@@ -46,7 +46,7 @@ public class EvalController {
 
     /** 执行一条原子规则：POST /api/eval/rule/{ruleId} */
     @PostMapping("/rule/{ruleId}")
-    public ApiResponse<NodeResult> evalRule(@PathVariable long ruleId,
+    public ApiResponse<NodeResult> evalRule(@PathVariable String ruleId,
                                             @RequestBody(required = false) EvalRequest req) {
         EvalRequest r = req == null ? new EvalRequest() : req;
         return ApiResponse.ok(suiteManager.evalRule(ruleId, r.getTarget()));

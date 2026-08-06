@@ -3,7 +3,9 @@ package com.skyfalling.mosika.engine;
 import lombok.*;
 
 /**
- * UDF定义
+ * 注册到规则引擎的 UDF 定义
+ * <p>
+ * UDF 对象支持 Java 对象或 JavaScript 源码字符串
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -14,16 +16,16 @@ import lombok.*;
 public class UdfDefinition {
 
     /**
-     * udf分组
+     * 点分隔的 UDF 分组，可为空
      */
     private String group;
     /**
-     * udf名称
+     * UDF 名称
      */
     @NonNull
     private String name;
     /**
-     * udf对象
+     * Java UDF 对象或 JavaScript 源码字符串
      */
     @NonNull
     private Object udf;

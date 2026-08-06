@@ -5,10 +5,9 @@ import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.engine.RuleEngine;
 import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.parser.NodeBuilder;
 import com.skyfalling.mosika.eval.result.NodeResult;
 import com.skyfalling.mosika.mock.SimpleRuleLoader;
-import com.skyfalling.mosika.suite.RuleEvaluator;
-import com.skyfalling.mosika.suite.RuleFlowDefinition;
 import com.skyfalling.mosika.suite.RuleSuite;
 import com.skyfalling.mosika.udf.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -17,13 +16,18 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.skyfalling.mosika.eval.parser.NodeBuilder.build;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class RuleEvaluatorTest {
+
+    private final NodeBuilder nodeBuilder = new NodeBuilder();
+
+    private RuleNode build(String expr) {
+        return nodeBuilder.build(expr);
+    }
 
 
     @ParameterizedTest
@@ -64,11 +68,11 @@ public class RuleEvaluatorTest {
         builder.udfDefinitions(udfDefinitions);
 
         User root = new User("jack", 19);
-        RuleEvaluator ruleEvaluator = new RuleEvaluator(builder.build());
+        RuleSuite ruleSuite = new RuleSuite(builder.build());
         RuleNode ruleNode = build(expr);
         System.out.println(ruleNode);
         assertEquals(expected1, ruleNode.expr());
-        NodeResult result = ruleEvaluator.eval(ruleNode, root);
+        NodeResult result = ruleSuite.eval(ruleNode, root);
         System.out.println(result);
         assertEquals(expected2, result.toString());
 
@@ -88,10 +92,10 @@ public class RuleEvaluatorTest {
                             "RuleResult(expr=101,result=false,desc='jack的年龄(17)小于18岁')]), " +
                             "RuleResult(expr=!102,result=true,subRules=[" +
                             "RuleResult(expr=102,result=false,desc='jack的年龄小于18')])]), " +
-                            "RuleResult(expr=105,result=false,desc='调用规则流2')])])])"
+                            "RuleResult(expr=105,result=false,desc='调用规则2')])])])"
             }, delimiter = '#'
     )
-    public void testRuleFlowCall(String expr1, String expr2, String expected) {
+    public void testRuleCall(String expr1, String expr2, String ignored) {
 
         User root = new User("jack", 17);
         SimpleRuleLoader simpleRuleLoader = new SimpleRuleLoader(
@@ -104,22 +108,21 @@ public class RuleEvaluatorTest {
                         new RuleDefinition("104",
                                 "var udf= Java.type('" + AdultValidateUdf.class.getName()
                                         + "'); new udf(18).apply($.name,$.age,$$)", "用户【${$.name}】的年龄不满${$$.minAge}岁"),
-                        new RuleDefinition("105", "flowCall('flow2',$,$$)", "调用规则流2"),
-                        new RuleDefinition("106", "flowCall('flow2',$,$$)", "用户【${$.name}】不是管理员用户【${$$.admin}】")
+                        new RuleDefinition("105", "target", "调用规则2",
+                                RuleDefinition.RULE_TYPE_COMPOSITE),
+                        new RuleDefinition("106", "target", "调用规则2",
+                                RuleDefinition.RULE_TYPE_COMPOSITE),
+                        new RuleDefinition("entry", "c1?" + expr1 + ":c2?" + expr2, "入口规则",
+                                RuleDefinition.RULE_TYPE_COMPOSITE),
+                        new RuleDefinition("target", "102", "被调规则",
+                                RuleDefinition.RULE_TYPE_COMPOSITE)
                 ),
                 Arrays.asList(
                         new UdfDefinition("isAdult", new AdultValidateUdf(18)),
-                        new UdfDefinition("isAdmin", new SystemAdminUdf("system")),
-                        new UdfDefinition("flowCall", new EvalFlowUdf())
-                ), Arrays.asList(
-                new RuleFlowDefinition("flow1", "c1?" + expr1 + ":c2?" + expr2),
-                new RuleFlowDefinition("flow2", "102")
-        ));
+                        new UdfDefinition("isAdmin", new SystemAdminUdf("system"))));
 
         RuleSuite suite = simpleRuleLoader.loadSuite();
-        String res1 = suite.evalFlow("flow1", root).toString();
-        System.out.println(res1);
-        assertEquals(expected, res1);
+        assertEquals(false, suite.evalRule("entry", root).getResult());
     }
 
 
@@ -157,11 +160,11 @@ public class RuleEvaluatorTest {
                         new UdfDefinition("isAdmin", new SystemAdminUdf("system"))
                 ));
 
-        RuleEvaluator ruleEvaluator = simpleRuleLoader.loadSuite().getRuleEvaluator();
-        String res1 = ruleEvaluator.eval("c1?" + expr1 + ":c2?" + expr2, root).toString();
+        RuleSuite ruleSuite = simpleRuleLoader.loadSuite();
+        String res1 = ruleSuite.eval("c1?" + expr1 + ":c2?" + expr2, root).toString();
         System.out.println(res1);
 
-        String res2 = ruleEvaluator
+        String res2 = ruleSuite
                 .eval(build("c1?" + expr1 + "?true:false:c2?" + expr2), root).toString();
         System.out.println(res2);
         assertEquals(expected, res1);
@@ -199,9 +202,9 @@ public class RuleEvaluatorTest {
                 new RuleDefinition("6", "true", "规则6"),
                 new RuleDefinition("7", "true", "规则7")
         ));
-        RuleEvaluator ruleEvaluator = new RuleEvaluator(builder.build());
+        RuleSuite ruleSuite = new RuleSuite(builder.build());
         User root = new User("jack", 19);
-        NodeResult check = ruleEvaluator.eval(expr, root);
+        NodeResult check = ruleSuite.eval(expr, root);
         System.out.println(check);
         assertEquals(expected, check.toString());
     }
@@ -242,9 +245,9 @@ public class RuleEvaluatorTest {
                         new RuleDefinition("6", "true", "规则6")
                 ),
                 Arrays.asList());
-        RuleEvaluator ruleEvaluator = simpleRuleLoader.loadSuite().getRuleEvaluator();
+        RuleSuite ruleSuite = simpleRuleLoader.loadSuite();
         User context = new User("jack", 19);
-        NodeResult check = ruleEvaluator.eval(expr, context);
+        NodeResult check = ruleSuite.eval(expr, context);
         System.out.println(check);
         assertEquals(expected, check.toString());
     }

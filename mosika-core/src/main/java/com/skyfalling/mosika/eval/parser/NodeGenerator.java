@@ -1,17 +1,17 @@
 package com.skyfalling.mosika.eval.parser;
 
 
-import com.skyfalling.mosika.eval.node.CompositeNode;
-import com.skyfalling.mosika.eval.node.ExprNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
 
-import java.util.Map;
-import java.util.Stack;
 import java.util.function.Function;
 
 
 /**
- * 节点生成器
+ * 规则 DSL 解析过程中的命名规则节点生成器
+ * <p>
+ * 输入是解析器识别出的单个规则 ID，不是完整 DSL 表达式
+ * 节点类型和复用策略由创建该生成器的 {@link NodeBuilder} 决定
+ *
  * Created on 2022/6/17
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -19,51 +19,11 @@ import java.util.function.Function;
 public interface NodeGenerator extends Function<String, RuleNode> {
 
     /**
-     * 支持规则解析
-     */
-    static NodeGenerator create() {
-        return expr -> new ExprNode(expr);
-    }
-
-
-    /**
-     * 支持复合规则递归解析
+     * 生成指定规则 ID 对应的规则节点
      *
-     * @param compositeRules 复合规则定义
+     * @param ruleId 规则 ID
+     * @return 命名规则节点
      */
-    static NodeGenerator create(Map<String, String> compositeRules) {
-        return compositeRules == null || compositeRules.isEmpty() ? create() :
-                new NodeGenerator() {
-                    @Override
-                    public RuleNode apply(String s) {
-                        return Antlr4Parser.parse(s, expr -> parseRecursively(expr, new Stack<>()));
-                    }
-
-                    /**
-                     *
-                     * @param expr 当前表达式
-                     * @param resolved 已经解析的表达式
-                     * @return
-                     */
-                    private RuleNode parseRecursively(String expr, Stack<String> resolved) {
-                        //expr是一个复合规则
-                        if (compositeRules.containsKey(expr)) {
-                            try {
-                                resolved.push(expr);
-                                return new CompositeNode(expr, Antlr4Parser.parse(compositeRules.get(expr), s -> {
-                                    if (resolved.contains(s)) {
-                                        throw new IllegalStateException(
-                                                "circular dependency between composite rules [" + expr + "] and [" + s + "]");
-                                    }
-                                    return parseRecursively(s, resolved);
-                                }));
-                            } finally {
-                                //回溯算法,出栈
-                                resolved.pop();
-                            }
-                        }
-                        return new ExprNode(expr);
-                    }
-                };
-    }
+    @Override
+    RuleNode apply(String ruleId);
 }

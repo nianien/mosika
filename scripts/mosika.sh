@@ -411,6 +411,7 @@ cmd_start() {
         info "启动成功：PID ${new_pid}，端口 ${PORT}"
         printf '  规则流列表： http://127.0.0.1:%s/\n' "$PORT"
         printf '  原子规则库： http://127.0.0.1:%s/rules\n' "$PORT"
+        printf '  UDF 注册中心：http://127.0.0.1:%s/udfs\n' "$PORT"
         printf '  API 基址：   http://127.0.0.1:%s/api\n' "$PORT"
         printf '  日志：       %s\n' "$DEFAULT_LOG_FILE"
         return 0

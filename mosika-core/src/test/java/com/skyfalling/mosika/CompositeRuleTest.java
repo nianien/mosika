@@ -3,10 +3,8 @@ package com.skyfalling.mosika;
 import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
-import com.skyfalling.mosika.eval.parser.NodeGenerator;
 import com.skyfalling.mosika.mock.SimpleRuleLoader;
-import com.skyfalling.mosika.suite.RuleEvaluator;
-import org.junit.jupiter.api.AfterAll;
+import com.skyfalling.mosika.suite.RuleSuite;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -23,6 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class CompositeRuleTest {
 
+    private NodeBuilder builder(Map<String, String> compositeRules) {
+        return new NodeBuilder(compositeRules.entrySet().stream()
+                .map(entry -> new RuleDefinition(entry.getKey(), entry.getValue(), "",
+                        RuleDefinition.RULE_TYPE_COMPOSITE))
+                .toList());
+    }
+
 
     /**
      * 测试复合规则解析
@@ -34,8 +39,8 @@ public class CompositeRuleTest {
         compositeRules.put("b", "2?3:4");
         compositeRules.put("c", "5?d");
         compositeRules.put("d", "4||b");
-        NodeBuilder.setGenerator(NodeGenerator.create(compositeRules));
-        RuleNode node = NodeBuilder.build("a");
+        NodeBuilder builder = builder(compositeRules);
+        RuleNode node = builder.build("a");
         System.out.println(node);
         assertEquals("a[1||(b[2?3:4]&&c[5?d[4||b[2?3:4]]])]", node.toString());
 
@@ -52,15 +57,7 @@ public class CompositeRuleTest {
         compositeRules.put("b", "2&&c");
         compositeRules.put("c", "3||d");
         compositeRules.put("d", "4||b");
-        NodeBuilder.setGenerator(NodeGenerator.create(compositeRules));
-        assertThrows(IllegalStateException.class, () -> {
-            try {
-                NodeBuilder.build("a");
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw e.getCause();
-            }
-        });
+        assertThrows(IllegalStateException.class, () -> builder(compositeRules));
 
 
     }
@@ -75,14 +72,8 @@ public class CompositeRuleTest {
                         new RuleDefinition("1004", "false", "1004描述")
                 ),
                 Arrays.asList());
-        RuleEvaluator ruleEvaluator = simpleRuleLoader.loadSuite().getRuleEvaluator();
-        String res1 = ruleEvaluator.eval("1002->1001&&1003", null).toString();
+        RuleSuite ruleSuite = simpleRuleLoader.loadSuite();
+        String res1 = ruleSuite.eval("1002->1001&&1003", null).toString();
         System.out.println(res1);
     }
-
-    @AfterAll
-    public static void tearDown() {
-        NodeBuilder.setGenerator(NodeGenerator.create());
-    }
-
 }

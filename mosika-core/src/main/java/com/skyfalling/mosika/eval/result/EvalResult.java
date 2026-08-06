@@ -8,7 +8,9 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * 表达式评估结果
+ * 单个规则节点的评估结果
+ * <p>
+ * {@link #result} 保存业务返回值，{@link #matched} 保存条件判断使用的匹配状态
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -16,25 +18,38 @@ import java.util.Map;
 public class EvalResult {
 
     /**
-     * 待评估表达式
+     * 被评估节点表达式
      */
     protected String expr;
     /**
-     * 引擎计算返回值
+     * 节点业务返回值
      */
     protected final Object result;
     /**
-     * 当作为判断条件时,返回值转boolean值
+     * 作为判断条件时使用的匹配状态
      */
     private final boolean matched;
 
 
+    /**
+     * 根据业务返回值计算匹配状态
+     *
+     * @param expr   被评估节点表达式
+     * @param result 节点业务返回值
+     */
     public EvalResult(String expr, Object result) {
         this.expr = expr;
         this.result = result;
         this.matched = parseBoolean(result);
     }
 
+    /**
+     * 使用指定业务返回值和匹配状态创建评估结果
+     *
+     * @param expr    被评估节点表达式
+     * @param result  节点业务返回值
+     * @param matched 匹配状态
+     */
     public EvalResult(String expr, Object result, boolean matched) {
         this.expr = expr;
         this.result = result;
@@ -43,10 +58,10 @@ public class EvalResult {
 
 
     /**
-     * boolean值解析
+     * 把业务返回值转换为匹配状态
      *
-     * @param res
-     * @return
+     * @param res 业务返回值
+     * @return 匹配状态
      */
     private boolean parseBoolean(Object res) {
         if (res == null) {

@@ -55,12 +55,14 @@ class ContentGenerationDemoDataTest {
     void contentGenerationFixtureIsIdempotentBuildableAndExecutable() {
         importDemoData();
 
-        assertEquals(64, count("rule_definition"));
+        assertEquals(58, count("atomic_rule"));
+        assertEquals(3, count("udf_definition"));
         assertEquals(7, count("rule_flow"));
-        assertEquals(127, count("flow_rule_ref"));
+        assertEquals(115, count("flow_atomic_ref"));
+        assertEquals(12, count("flow_flow_ref"));
         assertEquals(
-                "{stage:\"CLAIM_EXTRACTION\",status:\"completed\",claimCount:$.claimCount}",
-                jdbc.queryForObject("SELECT expression FROM rule_definition WHERE id=10118", String.class));
+                "content.generation.extractClaims($)",
+                jdbc.queryForObject("SELECT expression FROM atomic_rule WHERE id=10118", String.class));
         assertEquals(0, flowVersionSum());
         assertTrue(flowDepth(20002) >= 11);
         assertTrue(flowDepth(20003) >= 10);
@@ -74,40 +76,42 @@ class ContentGenerationDemoDataTest {
         suiteManager.refresh();
 
         Map<String, Object> target = validTarget("ARTICLE");
-        assertExecuted(suiteManager.evalFlow(20001, target, Map.of()));
-        assertExecuted(suiteManager.evalFlow(20002, target, Map.of()));
-        assertExecuted(suiteManager.evalFlow(20005, target, Map.of()));
-        assertExecuted(suiteManager.evalFlow(20006, target, Map.of()));
-        assertExecuted(suiteManager.evalFlow(20007, target, Map.of()));
-        assertExecutedRule(suiteManager.evalFlow(20005, target, Map.of()), "10108");
+        assertExecuted(suiteManager.evalFlow("f20001", target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20002", target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20005", target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20006", target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20007", target, Map.of()));
+        assertExecutedRule(suiteManager.evalFlow("f20005", target, Map.of()), "r10108");
 
         target.put("regulatedTopic", true);
-        assertExecutedRule(suiteManager.evalFlow(20005, target, Map.of()), "10130");
+        assertExecutedRule(suiteManager.evalFlow("f20005", target, Map.of()), "r10130");
         target.put("regulatedTopic", false);
         target.put("exposureLevel", "HIGH");
-        assertExecutedRule(suiteManager.evalFlow(20005, target, Map.of()), "10131");
+        assertExecutedRule(suiteManager.evalFlow("f20005", target, Map.of()), "r10131");
         target.put("exposureLevel", "NORMAL");
         target.put("requiresHumanReview", true);
-        assertExecutedRule(suiteManager.evalFlow(20005, target, Map.of()), "10107");
+        assertExecutedRule(suiteManager.evalFlow("f20005", target, Map.of()), "r10107");
         target.put("requiresHumanReview", false);
 
         target.put("citedClaimCount", 5);
-        assertExecutedRule(suiteManager.evalFlow(20006, target, Map.of()), "10129");
+        assertExecutedRule(suiteManager.evalFlow("f20006", target, Map.of()), "r10129");
         target.put("citedClaimCount", 10);
         target.put("channel", "APP");
-        assertExecutedRule(suiteManager.evalFlow(20007, target, Map.of()), "10126");
+        assertExecutedRule(suiteManager.evalFlow("f20007", target, Map.of()), "r10126");
         target.put("channel", "WECHAT");
 
         target.put("contentType", "NEWS_FLASH");
-        assertExecuted(suiteManager.evalFlow(20003, target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20003", target, Map.of()));
 
         target.put("contentType", "MARKETING");
-        assertExecuted(suiteManager.evalFlow(20004, target, Map.of()));
+        assertExecuted(suiteManager.evalFlow("f20004", target, Map.of()));
 
         importDemoData();
-        assertEquals(64, count("rule_definition"));
+        assertEquals(58, count("atomic_rule"));
+        assertEquals(3, count("udf_definition"));
         assertEquals(7, count("rule_flow"));
-        assertEquals(127, count("flow_rule_ref"));
+        assertEquals(115, count("flow_atomic_ref"));
+        assertEquals(12, count("flow_flow_ref"));
         assertEquals(0, flowVersionSum());
     }
 
