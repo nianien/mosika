@@ -1,6 +1,7 @@
 package com.skyfalling.mosika.eval.context;
 
 import com.skyfalling.mosika.eval.EvalNode;
+import com.skyfalling.mosika.eval.node.ExprNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.eval.result.RuleResult;
@@ -15,12 +16,12 @@ import java.util.List;
 public interface RuleContext extends UdfContext {
 
     /**
-     * 评估叶子规则
+     * 评估已经解析调用参数的叶子节点
      *
-     * @param ruleId 规则 ID
+     * @param node 叶子节点
      * @return 叶子规则评估结果
      */
-    EvalResult eval(String ruleId);
+    EvalResult eval(ExprNode node);
 
     /**
      * 执行规则节点

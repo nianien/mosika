@@ -9,6 +9,7 @@
 <p align="center">
   <a href="#为什么是-mosika">技术价值</a> ·
   <a href="#规则流是什么样的">核心能力</a> ·
+  <a href="#模板参数化规则">模板参数</a> ·
   <a href="./docs/规则编辑器.md">参考 Web UI</a> ·
   <a href="./docs/核心设计.md">内核设计</a> ·
   <a href="./docs/技术演进规划-v1.md">技术演进</a> ·
@@ -52,49 +53,16 @@ Mosika 从一开始就把**规则的生成**与**规则的编排**作为两个�
 
 ### 一次建模，全链路一致
 
-```mermaid
-flowchart LR
-    subgraph AUTHORING[规则创作]
-        EDITOR[拖拽编辑]
-        TEST[在线编译与测试]
-    end
+<p align="center">
+  <img src="./docs/images/model-to-runtime.svg" alt="Mosika 从规则创作到统一语义内核和执行生态的全链路" width="100%">
+</p>
 
-    subgraph KERNEL[统一语义内核]
-        AST[UI AST / DSL]
-        COMPILER[校验与编译]
-        SUITE[RuleSuite 运行快照]
-        EVAL[RuleEvaluator]
-    end
-
-    subgraph ECOSYSTEM[执行生态]
-        PLUGIN[插件 / UDF]
-        LOCAL[本地执行]
-        REMOTE[远程执行]
-        TRACE[追踪]
-        REPLAY[实时回放]
-    end
-
-    EDITOR --> AST
-    TEST --> COMPILER
-    AST --> COMPILER --> SUITE --> EVAL
-    PLUGIN --> SUITE
-    EVAL --> LOCAL
-    EVAL --> REMOTE
-    EVAL --> TRACE --> REPLAY
-
-    classDef input fill:#f0fdfa,stroke:#14b8a6,color:#0f172a;
-    classDef core fill:#ecfeff,stroke:#0891b2,color:#0f172a;
-    classDef output fill:#fff7ed,stroke:#f59e0b,color:#0f172a;
-    class EDITOR,TEST input;
-    class AST,COMPILER,SUITE,EVAL core;
-    class PLUGIN,LOCAL,REMOTE,TRACE,REPLAY output;
-```
-
-### 七个核心主张
+### 八个核心主张
 
 | 核心主张 | Mosika 的回答 |
 | --- | --- |
 | **生成与编排解耦** | 原子规则是具有稳定业务语义的最小单元；规则流只引用稳定 `ruleId`，让规则实现与产品策略分别演进 |
+| **一条规则，多组参数** | 原子规则可以声明 `$args` 模板参数，同一个 `ruleId` 在一棵规则树中按节点绑定不同 JSON 参数，无需为阈值差异复制规则定义 |
 | **图即源代码** | UI AST 及其 JSON 是编辑和持久化的唯一事实来源，不从执行树反推模型，也不存在与画布分离的第二套流程语义 |
 | **规则与流程分域** | `Rule` 只负责求值，`Flow` 负责执行；两者通过固定的 `JNode` 单向连接，从类型上阻止动作越过规则边界 |
 | **作用域显式可组合** | 串行、并行、判断和决策都是可递归嵌套的结构节点，不依赖坐标、连线方向、隐式汇合或通用 DAG 推断 |
@@ -148,6 +116,42 @@ Mosika 不试图替代 BPM、通用 DAG 或企业平台基础设施。它专注�
 
 串行、并行、条件和决策都是显式结构节点，可以递归嵌套；布局方向只负责展示，不参与执行语义。
 
+## 模板参数化规则
+
+> **一条规则定义可以作为模板，在同一规则树中绑定不同参数重复使用。**
+
+过去只有阈值不同的判断需要复制成多条规则：
+
+```text
+r1 = $.input > 100
+r2 = $.input > 200
+r3 = $.input > 300
+```
+
+现在可以只定义一条模板规则：
+
+```text
+threshold = $.input > $args.limit
+```
+
+在规则 ID DSL 中按节点绑定 JSON 参数：
+
+```text
+threshold("""{"limit":100}""") || threshold("""{"limit":300}""")
+```
+
+执行环境保持三个稳定入口：
+
+| 名称 | 含义 |
+| --- | --- |
+| `$` | 本次执行的业务输入 |
+| `$$` | 本次执行共享的可变上下文 |
+| `$args` | 当前规则节点绑定的模板参数 |
+
+ANTLR4 只负责识别三引号参数块的安全边界，`RuleArguments` 在 `ExprNode` 构造时一次性解析参数并生成规范化 JSON 与字段有序的 `Map<String,Object>`，JavaScript 源码不做字符串替换。执行时直接使用解析结果绑定 `$args`，使用 `ruleId + canonical JSON` 不可变缓存键复用结果：对象字段在所有嵌套层级递归排序，数组元素顺序保留。相同参数组合在一次顶层执行中只真正求值一次，不同参数组合分别求值；每次出现仍保留各自的执行节点、结果和动态描述。未传参数的规则保持原有语义，并收到空的 `$args` 对象。
+
+完整语法、执行缓存和当前边界见[模板参数化规则](./docs/模板参数化规则.md)。
+
 ## 完整 UI 树
 
 <p align="center">
@@ -158,28 +162,16 @@ Mosika 不试图替代 BPM、通用 DAG 或企业平台基础设施。它专注�
 
 ## 从定义到执行
 
-```mermaid
-flowchart LR
-    AR[RuleDefinition 原子规则] --> RE[RuleEngine]
-    CR[RuleDefinition 复合规则] --> RS[RuleSuite]
-    UD[UdfDefinition] --> RE
-    RE --> RS[RuleSuite]
-    RS --> RN[RuleNode]
-    RN --> NR[NodeResult]
-
-    classDef source fill:#f0fdfa,stroke:#14b8a6,color:#0f172a;
-    classDef engine fill:#ecfeff,stroke:#0891b2,color:#0f172a;
-    classDef result fill:#fff7ed,stroke:#f59e0b,color:#0f172a;
-    class AR,CR,UD source;
-    class RE,RS,RN engine;
-    class NR result;
-```
+<p align="center">
+  <img src="./docs/images/definition-to-execution.svg" alt="Mosika 从规则定义和 UDF 到 RuleSuite、RuleNode 与执行结果的链路" width="100%">
+</p>
 
 - `RuleDefinition.useType=0` 描述 JavaScript 原子规则，`useType=2` 描述规则 ID DSL 复合规则。
 - `RuleSuite` 只装配规则和 Java/JS UDF；产品层规则流在边界处编译为复合规则。
 - `RuleEngine` 注册全部规则并预编译原子 JavaScript，是规则注册状态的唯一事实来源；`NodeGenerator` 只接收复合规则表，不维护第二份规则 ID 集合。
 - 裸 `ruleId` 在命中复合规则定义时递归编译为 `CompositeNode`，保留完整执行详情并统一检测循环引用；系统不提供独立调用节点、特殊调用语法或 `sys.flow.eval`。
 - `matched` 表达匹配或控制状态，`result` 只传递节点具有明确语义的业务返回值。
+- 原子规则可以使用 `$args` 声明模板参数，并通过 `ruleId("""{...}""")` 在 DSL 节点上绑定 JSON 对象；不同参数组合独立求值，结构相同的参数复用结果。
 
 ## 模块边界
 
@@ -244,6 +236,7 @@ UDF 是进程内可执行代码，不是面向不受信任用户的普通配置�
 
 - [文档索引](./docs/README.md)：全部有效文档及其适用边界。
 - [Core 核心设计](./docs/核心设计.md)：内核设计、运行链路与核心不变量。
+- [模板参数化规则](./docs/模板参数化规则.md)：参数语法、`$args` 绑定、缓存语义、执行详情和使用边界。
 - [UI 树与 Web 编辑器](./docs/规则编辑器.md)：UI AST、画布投影、编辑与持久化契约。
 - [技术演进规划 v1](./docs/技术演进规划-v1.md)：内核契约、运行时解耦、SPI、回放和模块化路线。
 - [开发与运行](./docs/开发与运行.md)：构建、测试、服务脚本和运行配置。

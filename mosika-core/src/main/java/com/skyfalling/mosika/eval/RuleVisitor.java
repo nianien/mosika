@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 /**
  * 单次规则执行使用的节点访问器和规则上下文
  * <p>
- * 附加上下文保存在当前映射中，节点评估结果和执行树用于叶子复用及详情组装
+ * 附加上下文保存在当前映射中，无参数叶子结果按规则 ID 复用
+ * 参数化叶子结果按规则 ID 和规范化参数复用，每个执行节点独立保存实际评估结果
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -42,7 +43,7 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      */
     private ThreadLocal<String> currentRule = new ThreadLocal<>();
     /**
-     * 当前执行中按表达式保存的节点评估结果
+     * 当前执行中的叶子评估结果缓存
      */
     private Map<String, EvalResult> evalCache = new ConcurrentHashMap<>();
 
@@ -76,8 +77,8 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      */
     @Override
     public EvalResult visit(RuleNode node) {
-        if (node instanceof ExprNode) {
-            this.currentRule.set(node.expr());
+        if (node instanceof ExprNode exprNode) {
+            this.currentRule.set(exprNode.getRuleId());
         }
         EvalNode evalNode = new EvalNode(node);
         boolean isExprNode = node.getClass() == ExprNode.class;
@@ -89,10 +90,7 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         }
         try {
             EvalResult result = node.eval(this);
-            if (!isExprNode) {
-                // 缓存非叶子节点结果以组装执行详情
-                this.cache(node.expr(), result);
-            }
+            evalNode.setResult(result);
             return result;
         } finally {
             if (!isExprNode) {
@@ -103,14 +101,17 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
     }
 
     /**
-     * 按规则 ID 评估叶子规则并复用当前执行中的已有结果
+     * 使用节点中已经解析和规范化的参数评估叶子规则
      *
-     * @param ruleId 规则 ID
+     * @param node 叶子节点
      * @return 叶子规则评估结果
      */
     @Override
-    public EvalResult eval(String ruleId) {
-        return evalCache.computeIfAbsent(ruleId, this::doEval);
+    public EvalResult eval(ExprNode node) {
+        String expression = node.expr();
+        return evalCache.computeIfAbsent(expression,
+                ignored -> doEval(node.getRuleId(),
+                        expression, node.getArguments()));
     }
 
 
@@ -159,23 +160,29 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     /**
-     * 调用规则引擎执行叶子规则并发送评估事件
+     * 调用规则引擎执行单次叶子规则并发送评估事件
      *
-     * @param ruleId 规则 ID
+     * @param ruleId     规则 ID
+     * @param expression 完整节点表达式
+     * @param arguments  当前规则调用参数
      * @return 叶子规则评估结果
      * @throws RuleEvalException 规则未注册或执行失败时抛出
      */
-    private EvalResult doEval(String ruleId) {
+    private EvalResult doEval(String ruleId,
+                              String expression,
+                              Map<String, Object> arguments) {
         long begin = System.currentTimeMillis();
         try {
-            EvalResult result = new EvalResult(ruleId, ruleEngine.evalRule(ruleId, data, this));
+            Object value = ruleEngine.evalRule(ruleId, data, this, arguments);
+            EvalResult result = new EvalResult(expression, value);
             long end = System.currentTimeMillis();
-            ListenerProvider.DEFAULT.onEval(new RuleEvent(EventType.EVAL_SUCCEED, ruleId, result, end - begin));
+            ListenerProvider.DEFAULT.onEval(
+                    new RuleEvent(EventType.EVAL_SUCCEED, expression, result, end - begin));
             return result;
         } catch (Exception e) {
             long end = System.currentTimeMillis();
             ListenerProvider.DEFAULT.onEval(
-                    new RuleEvent(EventType.EVAL_FAIL, ruleId, e, end - begin));
+                    new RuleEvent(EventType.EVAL_FAIL, expression, e, end - begin));
             throw new RuleEvalException(ruleId, e.getMessage(), e);
         }
     }
@@ -188,9 +195,11 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      */
     private RuleResult transform(EvalNode node) {
         RuleNode ruleNode = node.getRuleNode();
-        String expr = ruleNode.expr();
-        EvalResult result = evalCache.get(expr);
-        RuleResult ruleResult = new RuleResult(result, ruleNode instanceof ExprNode ? evalDesc(expr) : "");
+        EvalResult result = node.getResult();
+        String desc = ruleNode instanceof ExprNode exprNode
+                ? evalDesc(exprNode.getRuleId(), exprNode.getArguments())
+                : "";
+        RuleResult ruleResult = new RuleResult(result, desc);
         for (EvalNode subNode : node.getChildren()) {
             ruleResult.getSubRules().add(transform(subNode));
         }
@@ -201,14 +210,15 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
     /**
      * 计算命名规则描述并恢复当前规则 ID
      *
-     * @param ruleId 规则 ID
+     * @param ruleId    规则 ID
+     * @param arguments 当前规则调用参数
      * @return 完成表达式插值的规则描述
      */
-    private String evalDesc(String ruleId) {
+    private String evalDesc(String ruleId, Map<String, Object> arguments) {
         String previousRule = currentRule.get();
         currentRule.set(ruleId);
         try {
-            return ruleEngine.evalRuleDesc(ruleId, data, this);
+            return ruleEngine.evalRuleDesc(ruleId, data, this, arguments);
         } finally {
             if (previousRule == null) {
                 currentRule.remove();
@@ -218,14 +228,4 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
         }
     }
 
-
-    /**
-     * 按节点表达式保存评估结果
-     *
-     * @param expr 节点表达式
-     * @param result 节点评估结果
-     */
-    private void cache(String expr, EvalResult result) {
-        evalCache.put(expr, result);
-    }
 }

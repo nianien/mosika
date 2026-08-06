@@ -171,7 +171,8 @@ public class RuleNodeExecutionTest {
         CyclicBarrier evaluations = new CyclicBarrier(concurrency);
         RuleEngine engine = new RuleEngine(List.of(), List.of()) {
             @Override
-            public Object evalRule(String ruleId, Object root, Object context) {
+            public Object evalRule(String ruleId, Object root, Object context,
+                                   Map<String, Object> arguments) {
                 executions.incrementAndGet();
                 try {
                     evaluations.await(1, TimeUnit.SECONDS);
@@ -187,13 +188,14 @@ public class RuleNodeExecutionTest {
             }
         };
         RuleVisitor context = new RuleVisitor(engine, null);
+        ExprNode shared = new ExprNode("shared");
         ExecutorService executor = Executors.newFixedThreadPool(concurrency);
 
         try {
             List<Future<EvalResult>> results = IntStream.range(0, concurrency)
                     .mapToObj(i -> executor.submit(() -> {
                         callers.await(5, TimeUnit.SECONDS);
-                        return context.eval("shared");
+                        return context.eval(shared);
                     }))
                     .collect(Collectors.toList());
             for (Future<EvalResult> result : results) {

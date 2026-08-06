@@ -236,6 +236,10 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/api/udfs")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("$args", "overrideArguments", "() => true"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content(json(udfBody("", "class", "() => true"))))
                 .andExpect(status().isBadRequest());
 

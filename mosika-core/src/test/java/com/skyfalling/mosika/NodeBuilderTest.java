@@ -1,19 +1,26 @@
 package com.skyfalling.mosika;
 
-import com.skyfalling.mosika.eval.node.HitsNode;
+import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.eval.node.AndNode;
 import com.skyfalling.mosika.eval.node.CaseNode;
+import com.skyfalling.mosika.eval.node.CompositeNode;
 import com.skyfalling.mosika.eval.node.ExprNode;
-import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.node.HitsNode;
 import com.skyfalling.mosika.eval.node.ParNode;
+import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -113,6 +120,62 @@ public class NodeBuilderTest {
         assertEquals(3, node.getNodes().size());
         assertEquals("hits(2,_,1,a,3)", node.expr());
         assertEquals(node.expr(), build(node.expr()).expr());
+    }
+
+    @Test
+    public void testRuleArguments() {
+        String firstExpr = "r1(\"\"\"{\"min\":18,\"text\":\"a && b -> c\"}\"\"\")";
+        String secondExpr = "r1(\"\"\"{\"min\":60}\"\"\")";
+
+        ExprNode first = assertInstanceOf(ExprNode.class, build(firstExpr));
+        ExprNode second = assertInstanceOf(ExprNode.class, build(secondExpr));
+
+        assertEquals("r1", first.getRuleId());
+        assertEquals(Map.of("min", 18, "text", "a && b -> c"), first.getArguments());
+        assertEquals(firstExpr, first.expr());
+        assertEquals(Map.of("min", 60), second.getArguments());
+        assertEquals(secondExpr, second.expr());
+        assertNotSame(first, second);
+        assertEquals("r1", build("r1").expr());
+
+        RuleNode combined = build(firstExpr + "||" + secondExpr);
+        assertEquals(firstExpr + "||" + secondExpr, combined.expr());
+    }
+
+    @Test
+    public void testMultilineRuleArguments() {
+        String arguments = "{\n  \"min\": 18,\n  \"enabled\": true\n}";
+        String expression = "r1(\"\"\"" + arguments + "\"\"\")";
+
+        ExprNode node = assertInstanceOf(ExprNode.class, build(expression));
+
+        assertEquals(Map.of("min", 18, "enabled", true), node.getArguments());
+        assertEquals("r1(\"\"\"{\"enabled\":true,\"min\":18}\"\"\")", node.expr());
+    }
+
+    @Test
+    public void testCompositeRuleArgumentsReuseCompiledRule() {
+        NodeBuilder compositeBuilder = new NodeBuilder(List.of(
+                new RuleDefinition("composite", "a&&b", "", RuleDefinition.RULE_TYPE_COMPOSITE)));
+
+        CompositeNode compiled = assertInstanceOf(CompositeNode.class,
+                compositeBuilder.build("composite"));
+        CompositeNode parameterized = assertInstanceOf(CompositeNode.class,
+                compositeBuilder.build("composite(\"\"\"{\"min\":18}\"\"\")"));
+
+        assertSame(compiled.getRuleNode(), parameterized.getRuleNode());
+        assertEquals(Map.of("min", 18), parameterized.getArguments());
+        assertEquals("composite(\"\"\"{\"min\":18}\"\"\")", parameterized.expr());
+    }
+
+    @Test
+    public void testInvalidRuleArguments() {
+        assertThrows(IllegalStateException.class, () -> build("r1()"));
+        assertThrows(IllegalStateException.class, () -> build("r1(\"{\\\"min\\\":18}\")"));
+        assertThrows(IllegalStateException.class, () -> build("r1(\"\"\"{\"min\":18}\"\")"));
+        assertThrows(IllegalArgumentException.class, () -> build("r1(\"\"\"{\"min\":}\"\"\")"));
+        assertThrows(IllegalArgumentException.class, () -> build("r1(\"\"\"[1,2]\"\"\")"));
+        assertThrows(IllegalArgumentException.class, () -> build("r1(\"\"\"\"\"\")"));
     }
 
     @Test

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentMap;
  * 规则定义和 UDF 的注册执行引擎
  * <p>
  * 构造阶段注册内置规则和输入定义，预编译原子规则脚本、规则描述模板和 UDF
- * 执行阶段为每次调用创建独立的 JavaScript 上下文并绑定目标对象、规则上下文和 UDF
+ * 执行阶段为每次调用创建独立的 JavaScript 上下文并绑定目标对象、规则上下文、节点参数和 UDF
  * 复合规则 DSL 由 {@link com.skyfalling.mosika.eval.parser.NodeBuilder NodeBuilder} 编译
  * 本类只负责其中普通规则 ID 的脚本求值
  *
@@ -76,11 +76,25 @@ public class RuleEngine {
      * @throws IllegalArgumentException 规则未注册时抛出
      */
     public Object evalRule(String ruleId, Object root, Object context) {
+        return evalRule(ruleId, root, context, null);
+    }
+
+    /**
+     * 使用当前节点参数执行已注册定义中的 JavaScript 表达式
+     *
+     * @param ruleId   规则 ID
+     * @param root     规则计算的目标对象，通过 {@code $} 访问
+     * @param context  规则执行上下文，通过 {@code $$} 访问
+     * @param arguments 当前规则调用绑定的参数对象，通过 {@code $args} 访问
+     * @return JavaScript 表达式返回值
+     * @throws IllegalArgumentException 规则未注册时抛出
+     */
+    public Object evalRule(String ruleId, Object root, Object context, Map<String, Object> arguments) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
         if (ruleDefinition == null) {
             throw new IllegalArgumentException("unregistered rule:" + ruleId);
         }
-        return doEval(compile(ruleDefinition.getExpression()), root, context);
+        return doEval(compile(ruleDefinition.getExpression()), root, context, arguments);
     }
 
     /**
@@ -93,11 +107,25 @@ public class RuleEngine {
      * @throws IllegalArgumentException 规则未注册时抛出
      */
     public String evalRuleDesc(String ruleId, Object root, Object context) {
+        return evalRuleDesc(ruleId, root, context, null);
+    }
+
+    /**
+     * 使用当前节点参数计算指定规则的描述模板
+     *
+     * @param ruleId   规则 ID
+     * @param root     规则计算的目标对象，通过 {@code $} 访问
+     * @param context  规则执行上下文，通过 {@code $$} 访问
+     * @param arguments 当前规则调用绑定的参数对象，通过 {@code $args} 访问
+     * @return 完成表达式插值的规则描述
+     * @throws IllegalArgumentException 规则未注册时抛出
+     */
+    public String evalRuleDesc(String ruleId, Object root, Object context, Map<String, Object> arguments) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
         if (ruleDefinition == null) {
             throw new IllegalArgumentException("unregistered rule:" + ruleId);
         }
-        return (String) doEval(compileDesc(ruleDefinition.getDesc()), root, context);
+        return (String) doEval(compileDesc(ruleDefinition.getDesc()), root, context, arguments);
     }
 
     /**
@@ -109,7 +137,7 @@ public class RuleEngine {
      * @return JavaScript 表达式返回值
      */
     public Object evalExpr(String expression, Object root, Object context) {
-        return doEval(compile(expression), root, context);
+        return doEval(compile(expression), root, context, null);
     }
 
 
@@ -119,14 +147,16 @@ public class RuleEngine {
      * @param script      已编译脚本
      * @param root        规则计算的目标对象
      * @param ruleContext 规则执行上下文
+     * @param arguments   当前规则调用绑定的参数对象
      * @return 转换为 Java 对象的脚本返回值
      */
-    private Object doEval(Source script, Object root, Object ruleContext) {
+    private Object doEval(Source script, Object root, Object ruleContext, Map<String, Object> arguments) {
         try (Context context = JsRuntime.createContext()) {
             Value bindings = context.getBindings(JsRuntime.LANGUAGE_ID);
             bindings.putMember("$", root);
             bindings.putMember("$$", ruleContext);
             compiledUdfs.forEach(bindings::putMember);
+            bindings.putMember("$args", arguments == null ? Map.of() : arguments);
             return JsRuntime.toJava(context.eval(script));
         }
     }
@@ -180,7 +210,7 @@ public class RuleEngine {
     /**
      * 获取或编译规则描述模板
      * <p>
-     * 描述通过 {@code String.raw} 模板支持访问 {@code $.agent} 和 {@code $$.agent}
+     * 描述通过 {@code String.raw} 模板支持访问 {@code $.agent}、{@code $$.agent} 和 {@code $args.agent}
      *
      * @param originDesc 规则描述模板
      * @return 已验证的描述模板脚本

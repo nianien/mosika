@@ -3,6 +3,7 @@ package com.skyfalling.mosika.eval.parser;
 import com.nianien.antlr4.RuleBaseVisitor;
 import com.nianien.antlr4.RuleParser;
 import com.skyfalling.mosika.eval.node.CaseNode;
+import com.skyfalling.mosika.eval.node.ExprNode;
 import com.skyfalling.mosika.eval.node.HitsNode;
 import com.skyfalling.mosika.eval.node.ParNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
@@ -92,7 +93,17 @@ public class DefaultRuleVisitor extends RuleBaseVisitor {
 
     @Override
     public Object visitID(RuleParser.IDContext ctx) {
-        return generator.apply(ctx.getText());
+        String ruleId = ctx.ID() == null ? ctx.NUMBER().getText() : ctx.ID().getText();
+        RuleNode ruleNode = generator.apply(ruleId);
+        RuleParser.RuleArgumentsContext arguments = ctx.ruleArguments();
+        if (arguments == null) {
+            return ruleNode;
+        }
+        if (!(ruleNode instanceof ExprNode exprNode)) {
+            throw new IllegalStateException("rule arguments require a named rule node: " + ruleId);
+        }
+        String rawArguments = arguments.RULE_ARGUMENT().getText();
+        return exprNode.withArguments(rawArguments.substring(3, rawArguments.length() - 3));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.skyfalling.mosika.eval;
 
 import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.result.EvalResult;
 import lombok.Data;
 
 import java.util.List;
@@ -23,6 +24,11 @@ public class EvalNode {
      * 父执行节点
      */
     private EvalNode parent;
+
+    /**
+     * 当前执行路径上该节点的独立评估结果
+     */
+    private EvalResult result;
 
     /**
      * 子执行节点<br>

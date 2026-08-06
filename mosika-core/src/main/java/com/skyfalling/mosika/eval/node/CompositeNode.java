@@ -30,12 +30,31 @@ public class CompositeNode extends ExprNode {
      * @param ruleNode 递归展开后的内部规则节点
      */
     public CompositeNode(String ruleId, RuleNode ruleNode) {
-        super(ruleId);
+        this(ruleId, ruleNode, null);
+    }
+
+    /**
+     * 创建带调用参数的命名复合规则节点
+     *
+     * @param ruleId    复合规则 ID
+     * @param ruleNode  递归展开后的内部规则节点
+     * @param arguments 当前规则调用绑定的 JSON 参数
+     */
+    public CompositeNode(String ruleId, RuleNode ruleNode, String arguments) {
+        super(ruleId, arguments);
         this.ruleNode = ruleNode;
     }
 
     @Override
+    public CompositeNode withArguments(String arguments) {
+        return new CompositeNode(getRuleId(), ruleNode, arguments);
+    }
+
+    @Override
     public EvalResult eval(RuleContext context) {
+        if (getArguments() != null) {
+            throw new UnsupportedOperationException("parameterized rule execution is not supported");
+        }
         EvalResult result = context.visit(ruleNode);
         EvalResult evalResult = new EvalResult(this.toString(), result.getResult(), result.isMatched());
         return evalResult;

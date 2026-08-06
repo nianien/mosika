@@ -13,7 +13,11 @@ expr
  | expr '->' expr #SER
  | expr '=>' expr #PAR
  | HITS LP bound ',' bound ',' arguments RP #HITS
- | (ID | NUMBER) #ID
+ | (ID | NUMBER) ruleArguments? #ID
+ ;
+
+ruleArguments
+ : LP RULE_ARGUMENT RP
  ;
 
 arguments
@@ -28,6 +32,7 @@ bound
 LP:'(';
 RP:')';
 HITS: 'hits';
+RULE_ARGUMENT: '"""' .*? '"""';
 STRING:'"'(ESC|.)*?':';
 fragment ESC:'\\'[btnr"\\];
 
@@ -39,7 +44,6 @@ fragment ID_LETTER:'a'..'z'|'A'..'Z'|'_';
 fragment DIGIT:'0'..'9';
 
 WS: [ \t\r\n]+ -> skip;
-
 
 
 

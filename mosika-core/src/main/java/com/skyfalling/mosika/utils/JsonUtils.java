@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -46,6 +47,10 @@ public class JsonUtils {
                 // 允许未知的属性
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                // POJO字段按字母顺序序列化
+                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                // Map字段按key顺序序列化
+                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
                 //空字段不序列化
                 .defaultPropertyInclusion(JsonInclude.Value.construct(Include.NON_NULL, Include.NON_NULL))
                 .visibility(PropertyAccessor.FIELD, Visibility.ANY)

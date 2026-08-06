@@ -7,7 +7,9 @@ import com.skyfalling.mosika.exception.RuleEvalException;
 import com.skyfalling.mosika.suite.RuleSuite;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -98,6 +100,84 @@ class RuleSuiteTest {
                         new RuleDefinition("duplicate", "true", "first"),
                         new RuleDefinition("duplicate", "false", "second")),
                 List.of()));
+    }
+
+    @Test
+    void parameterizedRuleBindsArgumentsForEachInvocation() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "threshold",
+                        "$.input > $args.limit",
+                        "input=${$.input},limit=${$args.limit}")),
+                List.of());
+
+        NodeResult result = suite.eval(
+                "threshold(\"\"\"{\"limit\":100}\"\"\")||threshold(\"\"\"{\"limit\":20}\"\"\")",
+                Map.of("input", 50));
+
+        assertEquals(true, result.getResult());
+        List<RuleResult> invocations = result.getDetails().get(0).getSubRules();
+        assertEquals(2, invocations.size());
+        assertEquals("threshold(\"\"\"{\"limit\":100}\"\"\")", invocations.get(0).getExpr());
+        assertEquals(false, invocations.get(0).getResult());
+        assertEquals("input=50,limit=100", invocations.get(0).getDesc());
+        assertEquals("threshold(\"\"\"{\"limit\":20}\"\"\")", invocations.get(1).getExpr());
+        assertEquals(true, invocations.get(1).getResult());
+        assertEquals("input=50,limit=20", invocations.get(1).getDesc());
+    }
+
+    @Test
+    void repeatedParameterizedRuleReusesLeafResultByArguments() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "increment",
+                        "$$.setProperty('count', ($$.getProperty('count') || 0) + $args.step)",
+                        "increment")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+        String expression =
+                "increment(\"\"\"{\"step\":1}\"\"\")->increment(\"\"\"{\"step\":1}\"\"\")";
+
+        suite.eval(expression, null, context);
+        NodeResult detailedResult = suite.eval(expression, null);
+
+        assertEquals(1, context.get("count"));
+        assertEquals(2, detailedResult.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    void parameterizedRuleCacheComparesNestedJsonStructure() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "increment",
+                        "$$.setProperty('count', ($$.getProperty('count') || 0) + $args.step)",
+                        "increment")),
+                List.of());
+        String first = "increment(\"\"\"{\"step\":1,\"user\":{\"name\":\"Tom\","
+                + "\"address\":{\"city\":\"Hangzhou\",\"code\":310000}},"
+                + "\"roles\":[{\"name\":\"admin\",\"level\":1}]}\"\"\")";
+        String reordered = "increment(\"\"\"{\"roles\":[{\"level\":1,\"name\":\"admin\"}],"
+                + "\"user\":{\"address\":{\"code\":310000,\"city\":\"Hangzhou\"},"
+                + "\"name\":\"Tom\"},\"step\":1}\"\"\")";
+        String reversedArray = "increment(\"\"\"{\"step\":1,\"items\":[1,2]}\"\"\")"
+                + "->increment(\"\"\"{\"items\":[2,1],\"step\":1}\"\"\")";
+        Map<String, Object> reorderedContext = new HashMap<>();
+        Map<String, Object> reversedArrayContext = new HashMap<>();
+
+        suite.eval(first + "->" + reordered, null, reorderedContext);
+        suite.eval(reversedArray, null, reversedArrayContext);
+
+        assertEquals(1, reorderedContext.get("count"));
+        assertEquals(2, reversedArrayContext.get("count"));
+    }
+
+    @Test
+    void unparameterizedRuleReceivesEmptyArguments() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition("plain", "$args.limit == null", "plain")),
+                List.of());
+
+        assertEquals(true, suite.evalRule("plain", null).getResult());
     }
 
     private static RuleDefinition composite(String ruleId, String expression) {

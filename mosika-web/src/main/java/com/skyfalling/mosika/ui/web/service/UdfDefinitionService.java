@@ -232,7 +232,7 @@ public class UdfDefinitionService {
      * @throws IllegalArgumentException 名称属于保留字时抛出
      */
     private static void validateTopLevelName(String name) {
-        if ("$".equals(name) || "$$".equals(name) || "sys".equals(name)
+        if ("$".equals(name) || "$$".equals(name) || "$args".equals(name) || "sys".equals(name)
                 || RESERVED_TOP_LEVEL_NAMES.contains(name)) {
             throw new IllegalArgumentException("udf top-level name is reserved: " + name);
         }
