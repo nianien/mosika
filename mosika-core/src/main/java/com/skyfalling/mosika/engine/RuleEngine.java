@@ -155,8 +155,8 @@ public class RuleEngine {
             Value bindings = context.getBindings(JsRuntime.LANGUAGE_ID);
             bindings.putMember("$", root);
             bindings.putMember("$$", ruleContext);
-            compiledUdfs.forEach(bindings::putMember);
             bindings.putMember("$args", arguments == null ? Map.of() : arguments);
+            compiledUdfs.forEach(bindings::putMember);
             return JsRuntime.toJava(context.eval(script));
         }
     }

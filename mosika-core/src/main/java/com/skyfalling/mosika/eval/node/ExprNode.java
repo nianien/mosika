@@ -32,7 +32,7 @@ public class ExprNode implements RuleNode {
     private final String expression;
 
     /**
-     * 创建普通叶子节点
+     * 创建带调用参数的普通叶子节点
      *
      * @param ruleId 规则 ID
      */
@@ -43,26 +43,15 @@ public class ExprNode implements RuleNode {
     /**
      * 创建带调用参数的普通叶子节点
      *
-     * @param ruleId 规则 ID
-     * @param arguments  当前规则调用绑定的 JSON 参数
+     * @param ruleId    规则 ID
+     * @param arguments 当前规则调用绑定的 JSON 参数
      */
     public ExprNode(String ruleId, String arguments) {
         this.ruleId = ruleId;
         this.arguments = arguments == null ? null : parseArguments(arguments);
-        this.expression = this.arguments == null
-                ? null
-                : ruleId + "(\"\"\"" + JsonUtils.toJson(this.arguments) + "\"\"\")";
+        this.expression = this.arguments == null ? ruleId : ruleId + "(\"\"\"" + JsonUtils.toJson(this.arguments) + "\"\"\")";
     }
 
-    /**
-     * 使用指定调用参数复制当前命名规则节点
-     *
-     * @param arguments 当前规则调用绑定的 JSON 参数
-     * @return 带调用参数的命名规则节点
-     */
-    public ExprNode withArguments(String arguments) {
-        return new ExprNode(ruleId, arguments);
-    }
 
     @Override
     public EvalResult eval(RuleContext context) {
@@ -71,7 +60,7 @@ public class ExprNode implements RuleNode {
 
     @Override
     public String expr() {
-        return expression == null ? ruleId : expression;
+        return expression;
     }
 
     /**

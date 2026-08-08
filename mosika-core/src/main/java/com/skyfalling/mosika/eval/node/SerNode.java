@@ -5,6 +5,7 @@ import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.utils.Constants;
 import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -24,7 +25,7 @@ public class SerNode implements RuleNode {
     /**
      * 按执行顺序保存的子节点。
      */
-    private final List<RuleNode> nodes;
+    private final List<RuleNode> nodes = new ArrayList<>();
 
 
     /**
@@ -33,7 +34,7 @@ public class SerNode implements RuleNode {
      * @param nodes 按执行顺序排列的子节点
      */
     public SerNode(RuleNode... nodes) {
-        this.nodes = List.copyOf(Arrays.asList(nodes));
+        this.nodes.addAll(Arrays.asList(nodes));
     }
 
 
@@ -44,9 +45,8 @@ public class SerNode implements RuleNode {
      * @return 当前串行节点
      */
     public SerNode next(RuleNode node) {
-        RuleNode[] combined = Arrays.copyOf(nodes.toArray(new RuleNode[0]), nodes.size() + 1);
-        combined[combined.length - 1] = node;
-        return new SerNode(combined);
+        nodes.add(node);
+        return this;
     }
 
     /**

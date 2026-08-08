@@ -8,7 +8,7 @@ import lombok.Getter;
 import java.util.stream.Collectors;
 
 /**
- * 命中数量组合规则节点，对应{@code hits(min,max,...)}。
+ * 命中数量组合规则节点，对应{@code some(min,max,...)}
  * <p>
  * 子规则保存在继承的有序{@code rules}列表中；{@code minHits}或{@code maxHits}
  * 为{@code null}时，对应DSL中的无边界符号{@code _}。节点继承的{@code name}
@@ -38,13 +38,13 @@ public class HNode extends LNode {
     @JsonCreator(mode = Mode.PROPERTIES)
     public HNode(@JsonProperty("minHits") Integer minHits,
                  @JsonProperty("maxHits") Integer maxHits) {
-        super("hits");
+        super("some");
         this.minHits = minHits;
         this.maxHits = maxHits;
     }
 
     /**
-     * 生成{@code hits}组合DSL，并应用当前节点的取反状态。
+     * 生成{@code some}组合DSL，并应用当前节点的取反状态
      *
      * @return 命中数量组合DSL表达式
      */
@@ -53,7 +53,7 @@ public class HNode extends LNode {
         String rules = getRules().stream()
                 .map(RNode::ruleExpr)
                 .collect(Collectors.joining(","));
-        String expression = "hits(" + boundExpr(minHits) + "," + boundExpr(maxHits) + "," + rules + ")";
+        String expression = "some(" + boundExpr(minHits) + "," + boundExpr(maxHits) + "," + rules + ")";
         return (isNegative() ? "!" : "") + expression;
     }
 
@@ -66,7 +66,7 @@ public class HNode extends LNode {
      */
     public void validate() {
         if (getRules().isEmpty()) {
-            throw new IllegalStateException("hits rules cannot be empty");
+            throw new IllegalStateException("some rules cannot be empty");
         }
         if (minHits == null && maxHits == null) {
             throw new IllegalStateException("minHits and maxHits cannot both be unbounded");
@@ -74,7 +74,7 @@ public class HNode extends LNode {
         int min = minHits == null ? 0 : minHits;
         int max = maxHits == null ? getRules().size() : maxHits;
         if (min < 0 || min > max || max > getRules().size()) {
-            throw new IllegalStateException("invalid hits bounds: " + min + "," + max);
+            throw new IllegalStateException("invalid some bounds: " + min + "," + max);
         }
     }
 

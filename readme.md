@@ -118,7 +118,7 @@ Mosika 不试图替代 BPM、通用 DAG 或企业平台基础设施。它专注�
 
 ## 模板参数化规则
 
-> **一条规则定义可以作为模板，在同一规则树中绑定不同参数重复使用。**
+> **一条原子规则定义可以作为模板，在同一规则树中绑定不同参数重复使用。**
 
 过去只有阈值不同的判断需要复制成多条规则：
 
@@ -134,7 +134,7 @@ r3 = $.input > 300
 threshold = $.input > $args.limit
 ```
 
-在规则 ID DSL 中按节点绑定 JSON 参数：
+在规则 ID DSL 的原子规则节点上绑定 JSON 参数：
 
 ```text
 threshold("""{"limit":100}""") || threshold("""{"limit":300}""")
@@ -146,9 +146,9 @@ threshold("""{"limit":100}""") || threshold("""{"limit":300}""")
 | --- | --- |
 | `$` | 本次执行的业务输入 |
 | `$$` | 本次执行共享的可变上下文 |
-| `$args` | 当前规则节点绑定的模板参数 |
+| `$args` | 当前原子规则节点绑定的模板参数 |
 
-ANTLR4 只负责识别三引号参数块的安全边界，`RuleArguments` 在 `ExprNode` 构造时一次性解析参数并生成规范化 JSON 与字段有序的 `Map<String,Object>`，JavaScript 源码不做字符串替换。执行时直接使用解析结果绑定 `$args`，使用 `ruleId + canonical JSON` 不可变缓存键复用结果：对象字段在所有嵌套层级递归排序，数组元素顺序保留。相同参数组合在一次顶层执行中只真正求值一次，不同参数组合分别求值；每次出现仍保留各自的执行节点、结果和动态描述。未传参数的规则保持原有语义，并收到空的 `$args` 对象。
+ANTLR4 只负责识别三引号参数块的安全边界，`ExprNode` 在构造时通过 `JsonUtils` 把参数解析为 `Map<String,Object>`，并用规范化 JSON 生成稳定的 `expr()`；JavaScript 源码不做字符串替换。`NodeBuilder` 不缓存原子节点或参数变体，单次顶层执行由 `RuleVisitor` 直接按 `ExprNode.expr()` 复用叶子结果：对象字段在所有嵌套层级递归排序，数组元素顺序保留。相同参数组合只真正求值一次，不同参数组合分别求值；每次出现仍保留各自的执行节点、结果和动态描述。未传参数的规则保持原有语义，并收到空的 `$args` 对象。
 
 完整语法、执行缓存和当前边界见[模板参数化规则](./docs/模板参数化规则.md)。
 
@@ -166,10 +166,11 @@ ANTLR4 只负责识别三引号参数块的安全边界，`RuleArguments` 在 `E
   <img src="./docs/images/definition-to-execution.svg" alt="Mosika 从规则定义和 UDF 到 RuleSuite、RuleNode 与执行结果的链路" width="100%">
 </p>
 
-- `RuleDefinition.useType=0` 描述 JavaScript 原子规则，`useType=2` 描述规则 ID DSL 复合规则。
+- `RuleDefinition.ruleType=0` 描述 JavaScript 原子规则，`ruleType=2` 描述规则 ID DSL 复合规则。
 - `RuleSuite` 只装配规则和 Java/JS UDF；产品层规则流在边界处编译为复合规则。
 - `RuleEngine` 注册全部规则并预编译原子 JavaScript，是规则注册状态的唯一事实来源；`NodeGenerator` 只接收复合规则表，不维护第二份规则 ID 集合。
-- 裸 `ruleId` 在命中复合规则定义时递归编译为 `CompositeNode`，保留完整执行详情并统一检测循环引用；系统不提供独立调用节点、特殊调用语法或 `sys.flow.eval`。
+- 裸 `ruleId` 在命中复合规则定义时递归编译为 `CompositeNode`，保留完整执行详情并统一检测循环引用；复合规则只按唯一 `ruleId` 识别和复用，不存在 `f1("""...""")` 形式的参数化复合规则变体，参数只属于其内部原子规则调用。
+- 规则 ID DSL 使用 `&&`、`||` 表达有序短路；`AllNode` 继承 `AndNode`，`AnyNode` 继承 `OrNode`，使 `all(...)`、`any(...)` 复用当前求值实现并保留独立语法身份；`some(min,max,...)` 表达命中数量约束。
 - `matched` 表达匹配或控制状态，`result` 只传递节点具有明确语义的业务返回值。
 - 原子规则可以使用 `$args` 声明模板参数，并通过 `ruleId("""{...}""")` 在 DSL 节点上绑定 JSON 对象；不同参数组合独立求值，结构相同的参数复用结果。
 

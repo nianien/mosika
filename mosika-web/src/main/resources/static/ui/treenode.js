@@ -15,7 +15,7 @@
  *   D 决策      : { type:"D", expr:"D",    branches:[], action? }   // action = 默认分支
  *   R 原子规则  : { type:"R", expr,        negative, name? }
  *   L 逻辑与/或 : { type:"L", expr:"&&"|"||", negative, name?, rules:[] }
- *   H 命中数    : { type:"H", expr:"hits", negative, name?, rules:[], minHits?, maxHits? }
+ *   H 命中数    : { type:"H", expr:"some", negative, name?, rules:[], minHits?, maxHits? }
  *
  * relation 只是 childEdges() 遍历/布局时临时生成的“边视图”，不落到节点字段上：
  *   T/A.next→"next"  C.action→"action"  J.rule→"rule" J.action→"action"
@@ -200,7 +200,7 @@
                 node.rules = (o.rules || []).map(fromObject);
                 break;
             case "H":
-                node.expr = "hits";
+                node.expr = "some";
                 node.rules = (o.rules || []).map(fromObject);
                 if (o.minHits != null) node.minHits = o.minHits;
                 if (o.maxHits != null) node.maxHits = o.maxHits;
@@ -227,7 +227,7 @@
         decision: () => ({ type: "D", expr: "D", branches: [], action: null }),
         atom: (expr, name) => ({ type: "R", expr, negative: false, name: name || "" }),
         logic: (op) => ({ type: "L", expr: op === "||" ? "||" : "&&", negative: false, name: "", rules: [] }),
-        hits: (minHits, maxHits) => ({ type: "H", expr: "hits", negative: false, name: "", rules: [], minHits: minHits ?? null, maxHits: maxHits ?? null }),
+        some: (minHits, maxHits) => ({ type: "H", expr: "some", negative: false, name: "", rules: [], minHits: minHits ?? null, maxHits: maxHits ?? null }),
         // 编辑期占位空槽（无后端表示，保存前须被配置替换）。slot: branch|decision|default
         placeholder: (slot) => ({ type: "PH", expr: "", slot: slot || "branch" })
     };

@@ -6,14 +6,15 @@ parse
 
 expr
  : '(' expr ')' #PAREN
- | <assoc=right> '!' expr #NOT
+ | '!' expr #NOT
  | expr '&&' expr #AND
  | expr '||' expr #OR
  | expr '?'  expr (':' expr)? #IF
- | expr '->' expr #SER
- | expr '=>' expr #PAR
- | HITS LP bound ',' bound ',' arguments RP #HITS
- | (ID | NUMBER) ruleArguments? #ID
+ | expr op=(SER_OP | PAR_OP) expr #SEQ
+ | ANY LP arguments RP #ANY
+ | ALL LP arguments RP #ALL
+ | SOME LP bound ',' bound ',' arguments RP #SOME
+ | (ID | NUMBER | ANY | ALL | SOME) ruleArguments? #ID
  ;
 
 ruleArguments
@@ -31,10 +32,12 @@ bound
 
 LP:'(';
 RP:')';
-HITS: 'hits';
+SER_OP: '->';
+PAR_OP: '=>';
+ANY: 'any';
+ALL: 'all';
+SOME: 'some';
 RULE_ARGUMENT: '"""' .*? '"""';
-STRING:'"'(ESC|.)*?':';
-fragment ESC:'\\'[btnr"\\];
 
 UNBOUNDED: '_';
 NUMBER: DIGIT+;
@@ -44,8 +47,6 @@ fragment ID_LETTER:'a'..'z'|'A'..'Z'|'_';
 fragment DIGIT:'0'..'9';
 
 WS: [ \t\r\n]+ -> skip;
-
-
 
 
 

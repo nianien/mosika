@@ -44,10 +44,11 @@ public class TreeNodeTest {
 
         String json = tree.toJson();
         assertTrue(json.contains("\"type\":\"H\""));
+        assertTrue(json.contains("\"expr\":\"some\""));
         assertFalse(json.contains("\"minHits\""));
         assertTrue(json.contains("\"maxHits\":2"));
         assertJsonAndRuleRoundTrip(tree);
-        assertEquals("hits(_,2,101,102,103)?104:105", tree.toRule().expr());
+        assertEquals("some(_,2,101,102,103)?104:105", tree.toRule().expr());
     }
 
     @Test
@@ -60,10 +61,17 @@ public class TreeNodeTest {
         logic.setNegative(true);
         assertTopLevelRule(logic, "!(c1&&c2)");
 
+        assertTopLevelRule(
+                LNode.and().addRule(r("c1")).addRule(r("c2")).addRule(r("c3")),
+                "(c1&&c2&&c3)", "c1&&c2&&c3");
+        assertTopLevelRule(
+                LNode.or().addRule(r("c1")).addRule(r("c2")).addRule(r("c3")),
+                "(c1||c2||c3)", "c1||c2||c3");
+
         HNode hits = new HNode(1, 2);
         hits.addRule(r("c1")).addRule(r("c2")).addRule(r("c3"));
         hits.setNegative(true);
-        assertTopLevelRule(hits, "!hits(1,2,c1,c2,c3)");
+        assertTopLevelRule(hits, "!some(1,2,c1,c2,c3)");
     }
 
     @Test
@@ -331,9 +339,13 @@ public class TreeNodeTest {
     }
 
     private void assertTopLevelRule(RNode rule, String expression) {
+        assertTopLevelRule(rule, expression, expression);
+    }
+
+    private void assertTopLevelRule(RNode rule, String uiExpression, String compiledExpression) {
         TreeNode tree = tree(j(rule, null));
-        assertEquals(expression, rule.ruleExpr());
-        assertEquals(expression, tree.toRule().expr());
+        assertEquals(uiExpression, rule.ruleExpr());
+        assertEquals(compiledExpression, tree.toRule().expr());
         assertJsonAndRuleRoundTrip(tree);
     }
 

@@ -36,7 +36,7 @@ public class NodeBuilder {
     private NodeGenerator generator;
 
     /**
-     * 按规则 ID 缓存普通命名规则和命名复合规则节点
+     * 按规则 ID 缓存命名复合规则节点
      */
     private final ConcurrentMap<String, RuleNode> compiledNodes =
             new ConcurrentHashMap<>();
@@ -48,7 +48,7 @@ public class NodeBuilder {
      *
      * @param rules 当前套件的完整规则定义
      * @throws IllegalArgumentException 复合规则参数不合法时抛出
-     * @throws IllegalStateException 复合规则语法错误或存在循环引用时抛出
+     * @throws IllegalStateException    复合规则语法错误或存在循环引用时抛出
      */
     public NodeBuilder(List<RuleDefinition> rules) {
         Map<String, String> compositeRules = rules.stream()
@@ -80,7 +80,7 @@ public class NodeBuilder {
      * @param expr 规则 ID 或 DSL 表达式
      * @return 规则节点
      * @throws IllegalArgumentException DSL 节点参数不合法时抛出
-     * @throws IllegalStateException DSL 词法或语法错误时抛出
+     * @throws IllegalStateException    DSL 词法或语法错误时抛出
      */
     public RuleNode build(String expr) {
         RuleNode compiled = compiledNodes.get(expr);
@@ -102,13 +102,12 @@ public class NodeBuilder {
      */
     private NodeGenerator create(Map<String, String> compositeRules) {
         if (compositeRules == null || compositeRules.isEmpty()) {
-            return this::exprNode;
+            return (ruleId, arguments) -> new ExprNode(ruleId, arguments);
         }
         return new NodeGenerator() {
-
             @Override
-            public RuleNode apply(String ruleId) {
-                return parseRecursively(ruleId, new ArrayDeque<>());
+            public RuleNode apply(String ruleId, String arguments) {
+                return parseRecursively(ruleId, arguments, new ArrayDeque<>());
             }
 
             /**
@@ -119,15 +118,19 @@ public class NodeBuilder {
              * @return 命名规则节点
              * @throws IllegalStateException 当前解析路径出现重复复合规则时抛出
              */
-            private RuleNode parseRecursively(String ruleId, Deque<String> resolving) {
+            private RuleNode parseRecursively(String ruleId, String arguments, Deque<String> resolving) {
+                //复合规则只有ID，可以复用复
                 RuleNode compiled = compiledNodes.get(ruleId);
                 if (compiled != null) {
                     return compiled;
                 }
                 String expr = compositeRules.get(ruleId);
+                //不是复合规则，则按原子规则处理
                 if (expr == null) {
-                    return exprNode(ruleId);
+                    return new ExprNode(ruleId, arguments);
                 }
+
+                //判断是否存在循环
                 if (resolving.contains(ruleId)) {
                     throw new IllegalStateException(
                             "circular dependency between composite rules ["
@@ -137,7 +140,7 @@ public class NodeBuilder {
                     resolving.push(ruleId);
                     RuleNode ruleNode = new CompositeNode(ruleId,
                             parse(expr,
-                                    nested -> parseRecursively(nested, resolving)));
+                                    (subExpr, args) -> parseRecursively(subExpr, args, resolving)));
                     RuleNode existing = compiledNodes.putIfAbsent(ruleId, ruleNode);
                     return existing == null ? ruleNode : existing;
                 } finally {
@@ -149,23 +152,13 @@ public class NodeBuilder {
 
 
     /**
-     * 获取或创建普通命名规则节点
-     *
-     * @param ruleId 规则 ID
-     * @return 普通命名规则节点
-     */
-    private RuleNode exprNode(String ruleId) {
-        return compiledNodes.computeIfAbsent(ruleId, ExprNode::new);
-    }
-
-    /**
      * 使用指定节点生成器解析完整 DSL 表达式
      *
      * @param expression DSL 表达式
      * @param generator  规则 ID 节点生成器
      * @return 解析生成的规则节点
      * @throws IllegalArgumentException DSL 节点参数不合法时抛出
-     * @throws IllegalStateException DSL 词法或语法错误时抛出
+     * @throws IllegalStateException    DSL 词法或语法错误时抛出
      */
     private static RuleNode parse(String expression, NodeGenerator generator) {
         BaseErrorListener errorListener = new BaseErrorListener() {
@@ -186,6 +179,5 @@ public class NodeBuilder {
         RuleParser.ParseContext context = parser.parse();
         return (RuleNode) visitor.visit(context.expr());
     }
-
 
 }

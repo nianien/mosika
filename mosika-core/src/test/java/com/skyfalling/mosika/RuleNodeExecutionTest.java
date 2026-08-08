@@ -6,7 +6,11 @@ import com.skyfalling.mosika.engine.RuleEngine;
 import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.RuleVisitor;
 import com.skyfalling.mosika.eval.context.RuleContext;
+import com.skyfalling.mosika.eval.node.AllNode;
+import com.skyfalling.mosika.eval.node.AndNode;
+import com.skyfalling.mosika.eval.node.AnyNode;
 import com.skyfalling.mosika.eval.node.ExprNode;
+import com.skyfalling.mosika.eval.node.OrNode;
 import com.skyfalling.mosika.eval.node.ParNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.node.SerNode;
@@ -357,37 +361,59 @@ public class RuleNodeExecutionTest {
     }
 
     @Test
-    public void testHitsNodeDetails() {
+    public void testSomeNodeDetails() {
         User root = new User("jack", 19);
-        RuleNode node = nodeBuilder.build("hits(2,2,t1,f1,t2)");
+        RuleNode node = nodeBuilder.build("some(2,2,t1,f1,t2)");
         NodeResult nodeResult = new RuleSuite(ruleEngine).eval(node, root);
         assertEquals(true, nodeResult.getResult());
         assertEquals(3, nodeResult.getDetails().get(0).getSubRules().size());
 
         assertEquals(true, new RuleSuite(ruleEngine)
-                .eval(nodeBuilder.build("hits(2,_,t1,f1,t2)"), root).getResult());
+                .eval(nodeBuilder.build("some(2,_,t1,f1,t2)"), root).getResult());
         assertEquals(true, new RuleSuite(ruleEngine)
-                .eval(nodeBuilder.build("hits(_,2,t1,f1,t2)"), root).getResult());
+                .eval(nodeBuilder.build("some(_,2,t1,f1,t2)"), root).getResult());
         assertEquals(true, new RuleSuite(ruleEngine)
-                .eval(nodeBuilder.build("hits(1,2,t1,f1,t2)"), root).getResult());
+                .eval(nodeBuilder.build("some(1,2,t1,f1,t2)"), root).getResult());
         assertEquals(false, new RuleSuite(ruleEngine)
-                .eval(nodeBuilder.build("hits(_,1,t1,f1,t2)"), root).getResult());
+                .eval(nodeBuilder.build("some(_,1,t1,f1,t2)"), root).getResult());
     }
 
     @Test
-    public void testHitsNodeShortCircuit() {
+    public void testAnyAndAllReuseLogicalNodeSemantics() {
         User root = new User("jack", 19);
         RuleSuite ruleSuite = new RuleSuite(ruleEngine);
 
-        NodeResult minReached = ruleSuite.eval(nodeBuilder.build("hits(1,_,t1,f1,t2)"), root);
+        RuleNode anyNode = nodeBuilder.build("any(f1,t1,f2)");
+        assertInstanceOf(AnyNode.class, anyNode);
+        assertInstanceOf(OrNode.class, anyNode);
+        NodeResult any = ruleSuite.eval(anyNode, root);
+        assertEquals(true, any.getResult());
+        assertEquals("any(f1,t1,f2)", any.getExpr());
+        assertEquals(2, any.getDetails().get(0).getSubRules().size());
+
+        RuleNode allNode = nodeBuilder.build("all(t1,f1,t2)");
+        assertInstanceOf(AllNode.class, allNode);
+        assertInstanceOf(AndNode.class, allNode);
+        NodeResult all = ruleSuite.eval(allNode, root);
+        assertEquals(false, all.getResult());
+        assertEquals("all(t1,f1,t2)", all.getExpr());
+        assertEquals(2, all.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testSomeNodeShortCircuit() {
+        User root = new User("jack", 19);
+        RuleSuite ruleSuite = new RuleSuite(ruleEngine);
+
+        NodeResult minReached = ruleSuite.eval(nodeBuilder.build("some(1,_,t1,f1,t2)"), root);
         assertEquals(true, minReached.getResult());
         assertEquals(1, minReached.getDetails().get(0).getSubRules().size());
 
-        NodeResult maxExceeded = ruleSuite.eval(nodeBuilder.build("hits(_,1,t1,t2,f1)"), root);
+        NodeResult maxExceeded = ruleSuite.eval(nodeBuilder.build("some(_,1,t1,t2,f1)"), root);
         assertEquals(false, maxExceeded.getResult());
         assertEquals(2, maxExceeded.getDetails().get(0).getSubRules().size());
 
-        NodeResult minUnreachable = ruleSuite.eval(nodeBuilder.build("hits(3,3,f1,t1,f1)"), root);
+        NodeResult minUnreachable = ruleSuite.eval(nodeBuilder.build("some(3,3,f1,t1,f1)"), root);
         assertEquals(false, minUnreachable.getResult());
         assertEquals(1, minUnreachable.getDetails().get(0).getSubRules().size());
     }

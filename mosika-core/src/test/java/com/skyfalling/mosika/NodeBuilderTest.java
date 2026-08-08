@@ -1,13 +1,17 @@
 package com.skyfalling.mosika;
 
 import com.skyfalling.mosika.engine.RuleDefinition;
+import com.skyfalling.mosika.eval.node.AllNode;
 import com.skyfalling.mosika.eval.node.AndNode;
+import com.skyfalling.mosika.eval.node.AnyNode;
 import com.skyfalling.mosika.eval.node.CaseNode;
 import com.skyfalling.mosika.eval.node.CompositeNode;
 import com.skyfalling.mosika.eval.node.ExprNode;
-import com.skyfalling.mosika.eval.node.HitsNode;
+import com.skyfalling.mosika.eval.node.OrNode;
 import com.skyfalling.mosika.eval.node.ParNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.node.SerNode;
+import com.skyfalling.mosika.eval.node.SomeNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -51,7 +55,10 @@ public class NodeBuilderTest {
                     "c1?!101&&!102?true:false:null,c1?((!101&&!102)?true:false):null",
                     "1?((2||3)&&(4||5)?6:7):(8&&9?10&&11:12),1?(((2||3)&&(4||5))?6:7):((8&&9)?(10&&11):12)",
                     "(!(!(1&&2)||(4&&5))&&((6||7))),!(!(1&&2)||(4&&5))&&(6||7)",
-                    "(((1&&2&&3))||((a||b||c))),(1&&2&&3)||(a||b||c)"
+                    "(((1&&2&&3))||((a||b||c))),(1&&2&&3)||(a||b||c)",
+                    "a?b:c?d:e,a?b:(c?d:e)",
+                    "a?b:c->d,a?b:(c->d)",
+                    "a?b,a?b"
             }
     )
     public void testParse(String expr, String expected) {
@@ -84,6 +91,10 @@ public class NodeBuilderTest {
     public void testSer() {
         System.out.println(build("∅->(1001?1002)->1004").expr());
         System.out.println(build("f3?t1:f4?t2:t3").expr());
+
+        SerNode serNode = assertInstanceOf(SerNode.class, build("a->b->c"));
+        assertEquals(3, serNode.getNodes().size());
+        assertEquals("a->b->c", serNode.expr());
     }
 
     @Test
@@ -97,6 +108,14 @@ public class NodeBuilderTest {
         assertEquals(2, nested.getNodes().size());
         assertInstanceOf(ParNode.class, nested.getNodes().get(1));
         assertEquals("a=>(b=>c)", nested.expr());
+
+        SerNode parThenSer = assertInstanceOf(SerNode.class, build("a=>b->c"));
+        assertInstanceOf(ParNode.class, parThenSer.getNodes().get(0));
+        assertEquals("(a=>b)->c", parThenSer.expr());
+
+        ParNode serThenPar = assertInstanceOf(ParNode.class, build("a->b=>c"));
+        assertInstanceOf(SerNode.class, serThenPar.getNodes().get(0));
+        assertEquals("(a->b)=>c", serThenPar.expr());
     }
 
     @Test
@@ -104,22 +123,57 @@ public class NodeBuilderTest {
         assertThrows(IllegalStateException.class, () -> build(""));
         assertThrows(IllegalStateException.class, () -> build("a&&"));
         assertThrows(IllegalStateException.class, () -> build("a b"));
-        assertThrows(IllegalArgumentException.class, () -> build("hits(_,_,a,b)"));
-        assertThrows(IllegalArgumentException.class, () -> build("hits(3,2,a,b,c)"));
-        assertThrows(IllegalArgumentException.class, () -> build("hits(0,4,a,b,c)"));
+        assertThrows(IllegalStateException.class, () -> build("hits(1,_,a,b)"));
         assertThrows(IllegalStateException.class, () -> build("limit('2','2',a,b)"));
         assertThrows(IllegalStateException.class, () -> build("@a"));
         assertThrows(IllegalStateException.class, () -> build("call(a)"));
     }
 
     @Test
-    public void testHits() {
-        HitsNode node = assertInstanceOf(HitsNode.class, build("hits(2,_,1,a,3)"));
+    public void testLogicalFunctions() {
+        AnyNode any = assertInstanceOf(AnyNode.class, build("any(a,b,c)"));
+        assertInstanceOf(OrNode.class, any);
+        assertEquals(3, any.getNodes().size());
+        assertEquals("any(a,b,c)", any.expr());
+        assertEquals("any(a,b)", build("any(a,b)").expr());
+        AnyNode singleAny = assertInstanceOf(AnyNode.class, build("any(a)"));
+        assertEquals(1, singleAny.getNodes().size());
+        assertEquals("any(a)", singleAny.expr());
+
+        AllNode all = assertInstanceOf(AllNode.class, build("all(a,b,c)"));
+        assertInstanceOf(AndNode.class, all);
+        assertEquals(3, all.getNodes().size());
+        assertEquals("all(a,b,c)", all.expr());
+        assertEquals("all(a,b)", build("all(a,b)").expr());
+        AllNode singleAll = assertInstanceOf(AllNode.class, build("all(a)"));
+        assertEquals(1, singleAll.getNodes().size());
+        assertEquals("all(a)", singleAll.expr());
+
+        assertInstanceOf(OrNode.class, build("a||b"));
+        assertInstanceOf(AndNode.class, build("a&&b"));
+        assertEquals("a||b||c", build("a||b||c").expr());
+        assertEquals("a&&b&&c", build("a&&b&&c").expr());
+
+        SomeNode node = assertInstanceOf(SomeNode.class, build("some(2,_,1,a,3)"));
         assertEquals(2, node.getMinHits());
         assertNull(node.getMaxHits());
         assertEquals(3, node.getNodes().size());
-        assertEquals("hits(2,_,1,a,3)", node.expr());
+        assertEquals("some(2,_,1,a,3)", node.expr());
         assertEquals(node.expr(), build(node.expr()).expr());
+        assertEquals("some(1,_,a,b)", build("some(1,_,a,b)").expr());
+
+        SomeNode unbounded = assertInstanceOf(SomeNode.class, build("some(_,_,a,b)"));
+        assertNull(unbounded.getMinHits());
+        assertNull(unbounded.getMaxHits());
+        SomeNode inverted = assertInstanceOf(SomeNode.class, build("some(3,2,a,b,c)"));
+        assertEquals(3, inverted.getMinHits());
+        assertEquals(2, inverted.getMaxHits());
+        SomeNode oversized = assertInstanceOf(SomeNode.class, build("some(0,4,a,b,c)"));
+        assertEquals(0, oversized.getMinHits());
+        assertEquals(4, oversized.getMaxHits());
+
+        assertEquals("all(a,any(b,c,d),some(1,2,e,f))",
+                build("all(a,any(b,c,d),some(1,2,e,f))").expr());
     }
 
     @Test
@@ -140,6 +194,15 @@ public class NodeBuilderTest {
 
         RuleNode combined = build(firstExpr + "||" + secondExpr);
         assertEquals(firstExpr + "||" + secondExpr, combined.expr());
+
+        for (String ruleId : List.of("123", "any", "all", "some")) {
+            ExprNode rule = assertInstanceOf(ExprNode.class, build(ruleId));
+            assertEquals(ruleId, rule.getRuleId());
+        }
+
+        ExprNode keywordRule = assertInstanceOf(ExprNode.class, build("any(\"\"\"{}\"\"\")"));
+        assertEquals("any", keywordRule.getRuleId());
+        assertEquals(Map.of(), keywordRule.getArguments());
     }
 
     @Test
@@ -148,24 +211,24 @@ public class NodeBuilderTest {
         String expression = "r1(\"\"\"" + arguments + "\"\"\")";
 
         ExprNode node = assertInstanceOf(ExprNode.class, build(expression));
+        ExprNode reordered = assertInstanceOf(ExprNode.class,
+                build("r1(\"\"\"{\"enabled\":true,\"min\":18}\"\"\")"));
 
         assertEquals(Map.of("min", 18, "enabled", true), node.getArguments());
         assertEquals("r1(\"\"\"{\"enabled\":true,\"min\":18}\"\"\")", node.expr());
+        assertNotSame(node, reordered);
+        assertEquals(node.expr(), reordered.expr());
     }
 
     @Test
-    public void testCompositeRuleArgumentsReuseCompiledRule() {
+    public void testOnlyCompositeRulesAreCached() {
         NodeBuilder compositeBuilder = new NodeBuilder(List.of(
                 new RuleDefinition("composite", "a&&b", "", RuleDefinition.RULE_TYPE_COMPOSITE)));
 
         CompositeNode compiled = assertInstanceOf(CompositeNode.class,
                 compositeBuilder.build("composite"));
-        CompositeNode parameterized = assertInstanceOf(CompositeNode.class,
-                compositeBuilder.build("composite(\"\"\"{\"min\":18}\"\"\")"));
-
-        assertSame(compiled.getRuleNode(), parameterized.getRuleNode());
-        assertEquals(Map.of("min", 18), parameterized.getArguments());
-        assertEquals("composite(\"\"\"{\"min\":18}\"\"\")", parameterized.expr());
+        assertSame(compiled, compositeBuilder.build("composite"));
+        assertNotSame(compositeBuilder.build("a"), compositeBuilder.build("a"));
     }
 
     @Test
@@ -179,15 +242,14 @@ public class NodeBuilderTest {
     }
 
     @Test
-    public void parsedNodesCannotPolluteLaterBuilds() {
+    public void parsedNodeMutationDoesNotPolluteLaterBuilds() {
         AndNode parsed = assertInstanceOf(AndNode.class, build("a&&b"));
         RuleNode extended = parsed.and(new ExprNode("c"));
 
+        assertSame(parsed, extended);
         assertEquals("a&&b&&c", extended.expr());
-        assertEquals("a&&b", parsed.expr());
+        assertEquals("a&&b&&c", parsed.expr());
         assertEquals("a&&b", build("a&&b").expr());
-        assertThrows(UnsupportedOperationException.class,
-                () -> parsed.getNodes().add(new ExprNode("d")));
     }
 
 

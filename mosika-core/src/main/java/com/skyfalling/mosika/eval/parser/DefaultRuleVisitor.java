@@ -2,15 +2,11 @@ package com.skyfalling.mosika.eval.parser;
 
 import com.nianien.antlr4.RuleBaseVisitor;
 import com.nianien.antlr4.RuleParser;
-import com.skyfalling.mosika.eval.node.CaseNode;
-import com.skyfalling.mosika.eval.node.ExprNode;
-import com.skyfalling.mosika.eval.node.HitsNode;
-import com.skyfalling.mosika.eval.node.ParNode;
-import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.node.*;
 import lombok.AllArgsConstructor;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 默认规则计算
@@ -18,96 +14,103 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @AllArgsConstructor
-public class DefaultRuleVisitor extends RuleBaseVisitor {
+public class DefaultRuleVisitor extends RuleBaseVisitor<RuleNode> {
+    private static final String QUOTE = "\"\"\"";
 
-    private NodeGenerator generator;
+    /**
+     * 节点生成器
+     */
+    private final NodeGenerator generator;
 
     @Override
-    public Object visitPAR(RuleParser.PARContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
-        RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
-        if (r1 instanceof ParNode) {
-            return r1.next(r2);
+    public RuleNode visitSEQ(RuleParser.SEQContext ctx) {
+        RuleNode r1 = ctx.expr(0).accept(this);
+        RuleNode r2 = ctx.expr(1).accept(this);
+        if (ctx.op.getType() == RuleParser.SER_OP) {
+            return r1 instanceof SerNode ? r1.next(r2) : new SerNode(r1, r2);
         }
-        return new ParNode(r1, r2);
+        return r1 instanceof ParNode ? r1.next(r2) : new ParNode(r1, r2);
     }
 
     @Override
-    public Object visitSER(RuleParser.SERContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
-        RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
-        return r1.next(r2);
-    }
-
-    @Override
-    public Object visitOR(RuleParser.ORContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
-        RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
+    public RuleNode visitOR(RuleParser.ORContext ctx) {
+        RuleNode r1 = ctx.expr(0).accept(this);
+        RuleNode r2 = ctx.expr(1).accept(this);
         return r1.or(r2);
     }
 
 
     @Override
-    public Object visitAND(RuleParser.ANDContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
-        RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
+    public RuleNode visitAND(RuleParser.ANDContext ctx) {
+        RuleNode r1 = ctx.expr(0).accept(this);
+        RuleNode r2 = ctx.expr(1).accept(this);
         return r1.and(r2);
     }
 
     @Override
-    public Object visitIF(RuleParser.IFContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr(0).accept(this);
-        RuleNode r2 = (RuleNode) ctx.expr(1).accept(this);
+    public RuleNode visitIF(RuleParser.IFContext ctx) {
+        RuleNode r1 = ctx.expr(0).accept(this);
+        RuleNode r2 = ctx.expr(1).accept(this);
         RuleParser.ExprContext expr = ctx.expr(2);
-        RuleNode r3 = expr == null ? null : (RuleNode) expr.accept(this);
+        RuleNode r3 = expr == null ? null : expr.accept(this);
         return new CaseNode(r1, r2, r3);
     }
 
 
     @Override
-    public Object visitNOT(RuleParser.NOTContext ctx) {
-        RuleNode r1 = (RuleNode) ctx.expr().accept(this);
+    public RuleNode visitNOT(RuleParser.NOTContext ctx) {
+        RuleNode r1 = ctx.expr().accept(this);
         return r1.not();
     }
 
 
     @Override
-    public Object visitHITS(RuleParser.HITSContext ctx) {
-        List<RuleNode> nodes = (List<RuleNode>) ctx.arguments().accept(this);
+    public RuleNode visitANY(RuleParser.ANYContext ctx) {
+        List<RuleNode> nodes = visitExpressions(ctx.arguments().expr());
+        return new AnyNode(nodes.toArray(RuleNode[]::new));
+    }
+
+    @Override
+    public RuleNode visitALL(RuleParser.ALLContext ctx) {
+        List<RuleNode> nodes = visitExpressions(ctx.arguments().expr());
+        return new AllNode(nodes.toArray(RuleNode[]::new));
+    }
+
+    @Override
+    public RuleNode visitSOME(RuleParser.SOMEContext ctx) {
+        List<RuleNode> nodes = visitExpressions(ctx.arguments().expr());
         Integer minHits = parseBound(ctx.bound(0));
         Integer maxHits = parseBound(ctx.bound(1));
-        return new HitsNode(minHits, maxHits, nodes);
+        return new SomeNode(minHits, maxHits, nodes.toArray(RuleNode[]::new));
     }
 
     private Integer parseBound(RuleParser.BoundContext ctx) {
-        return ctx.UNBOUNDED() == null ? Integer.parseInt(ctx.NUMBER().getText()) : null;
+        return ctx.NUMBER() == null ? null : Integer.parseInt(ctx.NUMBER().getText());
+    }
+
+    private List<RuleNode> visitExpressions(List<RuleParser.ExprContext> expressions) {
+        return expressions.stream()
+                .map(this::visit)
+                .toList();
     }
 
     @Override
-    public Object visitArguments(RuleParser.ArgumentsContext ctx) {
-        return ctx.expr().stream()
-                .map(e -> (RuleNode) e.accept(this))
-                .collect(Collectors.toList());
-    }
-
-
-    @Override
-    public Object visitID(RuleParser.IDContext ctx) {
-        String ruleId = ctx.ID() == null ? ctx.NUMBER().getText() : ctx.ID().getText();
-        RuleNode ruleNode = generator.apply(ruleId);
-        RuleParser.RuleArgumentsContext arguments = ctx.ruleArguments();
-        if (arguments == null) {
-            return ruleNode;
-        }
-        if (!(ruleNode instanceof ExprNode exprNode)) {
-            throw new IllegalStateException("rule arguments require a named rule node: " + ruleId);
-        }
-        String rawArguments = arguments.RULE_ARGUMENT().getText();
-        return exprNode.withArguments(rawArguments.substring(3, rawArguments.length() - 3));
-    }
-
-    @Override
-    public Object visitPAREN(RuleParser.PARENContext ctx) {
+    public RuleNode visitPAREN(RuleParser.PARENContext ctx) {
         return ctx.expr().accept(this);
+    }
+
+
+    @Override
+    public RuleNode visitID(RuleParser.IDContext ctx) {
+        RuleParser.RuleArgumentsContext arguments = ctx.ruleArguments();
+        String rawArguments = arguments == null ? null
+                : trimQuotes(arguments.RULE_ARGUMENT().getText());
+        String ruleId = ctx.getStart().getText();
+        return generator.apply(ruleId, rawArguments);
+    }
+
+
+    private static String trimQuotes(String text) {
+        return text.substring(QUOTE.length(), text.length() - QUOTE.length());
     }
 }

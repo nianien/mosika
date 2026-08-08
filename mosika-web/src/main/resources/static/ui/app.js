@@ -28,7 +28,7 @@
         D: { name: "分支节点", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
         J: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的纯规则树，并连接可选的后续流程。" },
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
-        H: { name: "命中数", kind: "structure", short: "H", help: "表达 hits(min,max,...)；例如至少命中 2 项。" },
+        H: { name: "命中数", kind: "structure", short: "H", help: "表达 some(min,max,...)；例如至少命中 2 项。" },
         R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
         C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断条件，可连接一个可选的后续流程。" },
         A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，执行后可连接一个可选的下一步。" },

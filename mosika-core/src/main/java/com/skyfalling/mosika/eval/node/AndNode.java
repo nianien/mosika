@@ -4,6 +4,7 @@ import com.skyfalling.mosika.eval.context.RuleContext;
 import com.skyfalling.mosika.eval.result.EvalResult;
 import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -17,20 +18,19 @@ import java.util.stream.Collectors;
 @Getter
 public class AndNode implements RuleNode {
 
-    private final List<RuleNode> nodes;
+    private final List<RuleNode> nodes = new ArrayList<>();
 
     /**
      * 多个节点条件取且
      */
     public AndNode(RuleNode... nodes) {
-        this.nodes = List.copyOf(Arrays.asList(nodes));
+        this.nodes.addAll(Arrays.asList(nodes));
     }
 
     @Override
     public RuleNode and(RuleNode node) {
-        RuleNode[] combined = Arrays.copyOf(nodes.toArray(new RuleNode[0]), nodes.size() + 1);
-        combined[combined.length - 1] = node;
-        return new AndNode(combined);
+        this.nodes.add(node);
+        return this;
     }
 
     @Override
