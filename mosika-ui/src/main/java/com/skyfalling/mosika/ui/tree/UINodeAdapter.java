@@ -1,144 +1,117 @@
 package com.skyfalling.mosika.ui.tree;
 
-import com.skyfalling.mosika.eval.node.*;
+import com.skyfalling.mosika.eval.node.CaseNode;
+import com.skyfalling.mosika.eval.node.ExprNode;
+import com.skyfalling.mosika.eval.node.ParNode;
+import com.skyfalling.mosika.eval.node.RuleNode;
+import com.skyfalling.mosika.eval.node.SerNode;
 import com.skyfalling.mosika.eval.parser.NodeBuilder;
-import com.skyfalling.mosika.ui.tree.node.define.FlowNode;
-import com.skyfalling.mosika.ui.tree.node.flow.*;
+import com.skyfalling.mosika.ui.tree.node.define.UINode;
+import com.skyfalling.mosika.ui.tree.node.flow.ANode;
+import com.skyfalling.mosika.ui.tree.node.flow.CNode;
+import com.skyfalling.mosika.ui.tree.node.flow.DNode;
+import com.skyfalling.mosika.ui.tree.node.flow.PNode;
+import com.skyfalling.mosika.ui.tree.node.flow.SNode;
 import com.skyfalling.mosika.utils.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
- * 将UI树单向转换为内核执行树。
+ * 将 UITree 中的可视化执行节点单向编译为内核执行树
  * <p>
- * UI树及其JSON是编辑和持久化的唯一事实来源；转换过程只保留执行语义，
- * 不传递{@code label}、规则{@code name}等UI元数据，也不提供逆向转换。
- *
- * Created on 2023/5/2
+ * 编译过程只读取执行结构和规则表达式，不修改 UITree，也不保留节点名称等展示信息
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class UINodeAdapter {
 
-    /** UI AST 只保留规则 ID 结构，不展开任何进程级复合规则配置 */
     private static final NodeBuilder UI_NODE_BUILDER = new NodeBuilder();
 
     /**
-     * 将流程节点编译为内核规则节点。
+     * 编译指定的可视化执行节点
      *
-     * @param un UI流程节点
-     * @return 仅包含执行语义的内核规则树
+     * @param node 待编译的执行节点
+     * @return 对应的内核执行树
+     * @throws UnsupportedOperationException 节点类型不受支持
      */
-    public RuleNode toRule(FlowNode un) {
-        Objects.requireNonNull(un, "ui node cannot be null!");
-        if (un instanceof ANode) {
-            ANode an = (ANode) un;
-            return aNode2Rule(an, new ArrayList<>());
+    public RuleNode toRule(UINode node) {
+        if (node instanceof ANode action) {
+            return aNode2Rule(action, new ArrayList<>());
         }
-        if (un instanceof CNode) {/*include JNode*/
-            return cNode2Rule((CNode) un);
+        if (node instanceof CNode condition) {
+            return cNode2Rule(condition);
         }
-        if (un instanceof DNode) {
-            return dNode2Rule((DNode) un);
+        if (node instanceof DNode decision) {
+            return dNode2Rule(decision);
         }
-        if (un instanceof SNode) {
-            return sNode2Rule((SNode) un);
+        if (node instanceof SNode serial) {
+            return sNode2Rule(serial);
         }
-        if (un instanceof PNode) {
-            return pNode2Rule((PNode) un);
+        if (node instanceof PNode parallel) {
+            return pNode2Rule(parallel);
         }
-        throw new UnsupportedOperationException("not support node type:" + un.getClass().getSimpleName());
+        throw new UnsupportedOperationException("not support node type:"
+                + node.getClass().getSimpleName());
     }
 
-    /**
-     * PNode转Rule
-     *
-     * @param pn
-     * @return
-     */
-    private RuleNode pNode2Rule(PNode pn) {
-        List<RuleNode> rules = pn.getBranches().stream().map(this::toRule).collect(Collectors.toList());
-        rules.add(0, new ExprNode(Constants.NOP));
+    private RuleNode pNode2Rule(PNode node) {
+        List<RuleNode> rules = new ArrayList<>(node.getBranches().size() + 1);
+        rules.add(new ExprNode(Constants.NOP));
+        for (UINode branch : node.getBranches()) {
+            rules.add(toRule(branch));
+        }
         return new ParNode(rules.toArray(new RuleNode[0]));
     }
 
-    /**
-     * SNode转Rule
-     *
-     * @param sn
-     * @return
-     */
-    private RuleNode sNode2Rule(SNode sn) {
-        List<RuleNode> rules = sn.getBranches().stream().map(this::toRule).collect(Collectors.toList());
-        rules.add(0, new ExprNode(Constants.NOP));
+    private RuleNode sNode2Rule(SNode node) {
+        List<RuleNode> rules = new ArrayList<>(node.getBranches().size() + 1);
+        rules.add(new ExprNode(Constants.NOP));
+        for (UINode branch : node.getBranches()) {
+            rules.add(toRule(branch));
+        }
         return new SerNode(rules.toArray(new RuleNode[0]));
     }
 
-    /**
-     * CNode转Rule
-     *
-     * @param cn
-     * @return
-     */
-    private RuleNode cNode2Rule(CNode cn) {
-        if (cn.getAction() == null) {
-            return parse(cn.ruleExpr());
+    private RuleNode cNode2Rule(CNode node) {
+        RuleNode condition = parse(node.getRule().ruleExpr());
+        if (node.getNext() == null) {
+            return condition;
         }
-        return new CaseNode(parse(cn.ruleExpr()), toRule(cn.getAction()));
+        return new CaseNode(condition, toRule(node.getNext()));
     }
 
-
-    /**
-     * DNode转Rule
-     *
-     * @param dn
-     * @return
-     */
-    private RuleNode dNode2Rule(DNode dn) {
-        if (dn.getBranches().isEmpty()
-                || dn.getBranches().size() == 1 && dn.getAction() == null) {
+    private RuleNode dNode2Rule(DNode node) {
+        if (node.getBranches().isEmpty()
+                || node.getBranches().size() == 1 && node.getDefaultBranch() == null) {
             throw new IllegalArgumentException("DNode requires at least two outcomes!");
         }
-        List<CNode> branches = new ArrayList<>(dn.getBranches());
-        RuleNode fallback = dn.getAction() == null ? null : toRule(dn.getAction());
-        for (int i = branches.size() - 1; i >= 0; i--) {
-            CNode branch = branches.get(i);
-            // 分支 action 可选：命中纯条件分支时以 NOP 表示“已选择但无后续动作”，
-            // 从而停止继续检查后面的互斥分支，并保持 matched=true。
-            RuleNode matched = branch.getAction() == null
+        RuleNode fallback = node.getDefaultBranch() == null
+                ? null
+                : toRule(node.getDefaultBranch());
+        for (int i = node.getBranches().size() - 1; i >= 0; i--) {
+            CNode branch = node.getBranches().get(i);
+            RuleNode matched = branch.getNext() == null
                     ? new ExprNode(Constants.NOP)
-                    : toRule(branch.getAction());
-            fallback = new CaseNode(parse(branch.ruleExpr()), matched, fallback);
+                    : toRule(branch.getNext());
+            fallback = new CaseNode(parse(branch.getRule().ruleExpr()), matched, fallback);
         }
         return fallback;
     }
 
-    /**
-     * ANode转Rule
-     *
-     * @param an
-     * @param nodes
-     * @return
-     */
-    private RuleNode aNode2Rule(ANode an, List<RuleNode> nodes) {
-        nodes.add(parse(an.getExpr()));
-        FlowNode next = an.getNext();
+    private RuleNode aNode2Rule(ANode node, List<RuleNode> rules) {
+        rules.add(parse(node.getRule().ruleExpr()));
+        UINode next = node.getNext();
         if (next != null) {
-            if (next instanceof ANode) {
-                return aNode2Rule((ANode) next, nodes);
-            } else {
-                nodes.add(toRule(next));
+            if (next instanceof ANode action) {
+                return aNode2Rule(action, rules);
             }
+            rules.add(toRule(next));
         }
-        return nodes.size() == 1 ? nodes.get(0) : new SerNode(nodes.toArray(new RuleNode[0]));
+        return rules.size() == 1 ? rules.get(0) : new SerNode(rules.toArray(new RuleNode[0]));
     }
 
     private RuleNode parse(String expression) {
         return UI_NODE_BUILDER.build(expression);
     }
-
-
 }

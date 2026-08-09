@@ -19,19 +19,19 @@
 
     // 语义模型核心（唯一事实来源 = 后端 TreeNode JSON）。编辑器只在其上做视图与瞬时状态。
     const T = window.MosikaTree;
-    const { childEdges, childNodes, make } = T;
+    const { childEdges, childNodes, executionEdges, make } = T;
 
     const TYPES = {
         T: { name: "根节点", kind: "root", short: "开始", help: "规则树入口，仅承担根节点定位。" },
         S: { name: "串行节点", kind: "structure", short: "串", help: "子节点按顺序执行，顺序由树中从左到右的位置表达。" },
         P: { name: "并行节点", kind: "structure", short: "并", help: "多个子节点并发执行；结构节点本身不承载业务结果。" },
         D: { name: "分支节点", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
-        J: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的纯规则树，并连接可选的后续流程。" },
+        C: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的布尔规则树，next 表示条件命中分支。" },
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 some(min,max,...)；例如至少命中 2 项。" },
-        R: { name: "规则", kind: "condition", short: "R", help: "只参与规则匹配的原子表达式，不连接业务动作。" },
-        C: { name: "条件节点", kind: "condition", short: "条件", help: "引用一条后台判断条件，可连接一个可选的后续流程。" },
-        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，执行后可连接一个可选的下一步。" },
+        R: { name: "动作规则", kind: "action", short: "R", help: "动作节点内部引用的原子规则。" },
+        B: { name: "条件规则", kind: "condition", short: "B", help: "条件节点内部引用的可取反原子规则。" },
+        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，next 表示无条件后继。" },
         PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
     };
 
@@ -52,18 +52,19 @@
         const toDef = (r) => ({
             ruleId: String(r.ruleId),
             desc: r.name || r.description || String(r.ruleId),
-            kind: r.kind === "action" ? "action" : "condition"
+            kind: r.kind === "action" ? "action" : "condition",
+            // 模板参数定义，供画布在引用该规则的节点上渲染 $args 录入表单；缺省为无参
+            params: Array.isArray(r.params) ? r.params : []
         });
         const defs = (list || []).map(toDef);
         RULE_DEFINITIONS = defs.filter((d) => d.kind !== "action");
-        ACTION_DEFINITIONS = defs.filter((d) => d.kind === "action").concat(
-            (flows || []).map((flow) => ({
+        ACTION_DEFINITIONS = defs.filter((d) => d.kind === "action")
+            .concat((flows || []).map((flow) => ({
                 ruleId: String(flow.flowId),
                 desc: flow.name || flow.description || String(flow.flowId),
                 kind: "action",
                 composite: true
-            }))
-        );
+            })));
         RULE_DEFINITION_BY_ID = new Map(RULE_DEFINITIONS.map((d) => [d.ruleId, d]));
         ACTION_DEFINITION_BY_ID = new Map(ACTION_DEFINITIONS.map((d) => [d.ruleId, d]));
     }
@@ -83,33 +84,33 @@
         const l1 = make.logic("||"); l1.name = "业务复合规则1";
         const l1b = make.logic("&&"); l1b.rules.push(make.atom("c2"), make.atom("c3"));
         l1.rules.push(make.atom("c1"), l1b);
-        const j8 = make.judge(l1);
+        const j8 = make.condition(l1);
         const s14 = make.serial();
         const d15 = make.decision();
-        const j16 = make.judge(make.atom("c1")); j16.action = make.action("a1");
+        const j16 = make.condition(make.atom("c1")); j16.next = make.action("a1");
         const l18 = make.logic("&&"); l18.name = "业务复合规则2"; l18.rules.push(make.atom("c2"), make.atom("c3"));
-        const j18 = make.judge(l18); j18.action = make.action("a3");
+        const j18 = make.condition(l18); j18.next = make.action("a3");
         d15.branches.push(j16, j18);
         s14.branches.push(d15);
-        const j23 = make.judge(make.atom("c4")); j23.action = make.action("a4");
+        const j23 = make.condition(make.atom("c4")); j23.next = make.action("a4");
         s14.branches.push(j23);
-        j8.action = s14;
+        j8.next = s14;
 
-        const j25 = make.judge(make.atom("c5"));
+        const j25 = make.condition(make.atom("c5"));
         const d26 = make.decision();
-        const j27 = make.judge(make.atom("c6")); j27.action = make.action("a6");
-        const j29 = make.judge(make.atom("c7")); j29.action = make.action("a7");
+        const j27 = make.condition(make.atom("c6")); j27.next = make.action("a6");
+        const j29 = make.condition(make.atom("c7")); j29.next = make.action("a7");
         d26.branches.push(j27, j29);
-        d26.action = make.action("a5");
-        j25.action = d26;
+        d26.defaultBranch = make.action("a5");
+        j25.next = d26;
 
         const s32 = make.serial();
-        const j33 = make.judge(make.atom("c8")); j33.action = make.action("a8");
-        const j35 = make.judge(make.atom("c9")); j35.action = make.action("a9");
+        const j33 = make.condition(make.atom("c8")); j33.next = make.action("a8");
+        const j35 = make.condition(make.atom("c9")); j35.next = make.action("a9");
         s32.branches.push(j33, j35);
 
         d.branches.push(j8, j25);
-        d.action = s32;
+        d.defaultBranch = s32;
         s.branches.push(d);
         return root;
     };
@@ -117,7 +118,7 @@
     // ---- 语义树 + 旁路编辑器状态（选中/折叠/临时 id 不进语义树）----
     // 真实流程（带 flowId）初始为空白根，等待后端加载替换，避免把内置演示假数据当成真实流程闪现；
     // 独立演示 / bench 才用 sampleTree。
-    const emptyTree = () => ({ type: "T", expr: "", next: null });
+    const emptyTree = () => make.root();
     let tree = resolveFlowId() ? emptyTree() : sampleTree();
     let flowLoadFailed = false;
     let idSeq = 0;
@@ -151,14 +152,14 @@
     let savingFlow = false;
     let dirty = false;
 
-    const FLOW_TYPES = ["A", "S", "P", "D", "J"];
+    const FLOW_TYPES = T.FLOW_TYPES;
     // 各真实递归边允许的可创建节点类型。
     const RELATIONS = {
         next: { types: FLOW_TYPES },
-        action: { types: FLOW_TYPES },
+        matched: { types: FLOW_TYPES },
         branch: { types: FLOW_TYPES },
-        decision: { types: ["J"] },
-        default: { types: FLOW_TYPES }
+        decision: { types: ["C"] },
+        default: { types: ["A", "S", "P", "D"] }
     };
 
     const TREE_LIMITS = { maxDepth: 128, maxNodes: 2000 };
@@ -203,34 +204,26 @@
         return found;
     }
 
-    // J 的规则子树与命中流程拆分。
-    function jrule(node) { return node.type === "J" ? (node.rule || null) : null; }
-    function jflows(node) {
-        return node.type === "J"
-            ? childEdges(node).filter((edge) => edge.relation === "action").map((edge) => edge.node)
-            : [];
-    }
+    // 条件节点的规则子树与命中流程拆分
+    function conditionRule(node) { return node.type === "C" ? (node.rule || null) : null; }
 
     function countNodes(node) {
         return 1 + childNodes(node).reduce((sum, child) => sum + countNodes(child), 0);
     }
 
-    function countFlowNodes(node) {
-        if (node.type === "J") {
-            return 1 + jflows(node).reduce((sum, child) => sum + countFlowNodes(child), 0);
-        }
-        return 1 + childNodes(node).reduce((sum, child) => sum + countFlowNodes(child), 0);
+    function countFlowNodes(node, includeNaturalNext = true) {
+        const children = childEdges(node).filter((edge) => edge.relation !== "rule"
+            && (includeNaturalNext || edge.relation !== "next"));
+        return 1 + children.reduce((sum, edge) => sum + countFlowNodes(edge.node), 0);
     }
 
-    // ---- 名称解析：流程节点用 label（可选展示名），规则节点用 name ----
+    // ---- 名称解析：所有 UITree 节点统一使用 name ----
     function flowNodeName(node) {
-        if (node.type === "J") return jrule(node)?.name?.trim() || "";
-        if (["R", "L", "H"].includes(node.type)) return node.name?.trim() || "";
-        return node.label?.trim() || "";
+        return node.name?.trim() || "";
     }
 
     function ruleDisplayName(node) {
-        const rule = jrule(node);
+        const rule = conditionRule(node);
         if (!rule) return "未配置规则";
         return ruleNodeDisplayName(rule);
     }
@@ -238,7 +231,7 @@
     function ruleNodeDisplayName(node) {
         const alias = node.name?.trim();
         if (alias) return alias;
-        if (node.type === "R") {
+        if (node.type === "B") {
             return ruleDefinitionById(node.expr)?.desc || "未命名规则";
         }
         return ["L", "H"].includes(node.type) ? "复合规则" : TYPES[node.type]?.name || "未命名规则";
@@ -249,7 +242,7 @@
     }
 
     function isCompositeReference(node) {
-        return node.type === "A" && /^f[1-9]\d*$/.test(String(node.expr || ""));
+        return node.type === "A" && /^f[1-9]\d*$/.test(String(node.rule?.expr || ""));
     }
 
     function flowNodeDisplayName(node) {
@@ -257,13 +250,11 @@
         const name = flowNodeName(node);
         if (name) return name;
         if (isStructuralFlowType(node.type)) return TYPES[node.type].name;
-        if (node.type === "J") return ruleDisplayName(node);
+        if (node.type === "C") return ruleDisplayName(node);
         if (node.type === "A") {
-            if (isCompositeReference(node)) return `复合规则 ${node.expr}`;
-            return actionDefinitionById(node.expr)?.desc || TYPES[node.type].name;
-        }
-        if (node.type === "C") {
-            return ruleDefinitionById(node.expr)?.desc || TYPES[node.type].name;
+            const ruleId = node.rule?.expr;
+            if (isCompositeReference(node)) return `复合规则 ${ruleId}`;
+            return actionDefinitionById(ruleId)?.desc || TYPES[node.type].name;
         }
         return TYPES[node.type]?.name || "未命名节点";
     }
@@ -279,9 +270,9 @@
             if (!node) continue;
             flowNodes++;
             if (hidden) hiddenNodes++;
-            if (node.type === "J" && jrule(node)) modalRuleNodes += countNodes(jrule(node));
-            const children = node.type === "J" ? jflows(node) : childNodes(node);
-            const hideChildren = hidden || (node.type !== "J" && isCollapsed(node) && children.length > 0);
+            if (["A", "C"].includes(node.type) && node.rule) modalRuleNodes += countNodes(node.rule);
+            const children = executionEdges(node).map((edge) => edge.node);
+            const hideChildren = hidden || (node.type !== "C" && isCollapsed(node) && children.length > 0);
             for (const child of children) stack.push({ node: child, hidden: hideChildren });
         }
         return { flowNodes, hiddenNodes, modalRuleNodes };
@@ -299,7 +290,7 @@
             seen.add(node);
             nodes++;
             if (depth > maxDepth) { maxDepth = depth; deepest = node; }
-            for (const child of childNodes(node)) stack.push([child, depth + 1]);
+            for (const edge of childEdges(node)) stack.push([edge.node, depth + 1]);
         }
         return { nodes, depth: maxDepth, deepest, dup };
     }
@@ -318,7 +309,7 @@
 
     // 导入边界：校验通过才整体替换。root 可传语义树或后端 TreeNode JSON。
     function loadTree(root, { bypassLimits = false } = {}) {
-        const semantic = (root && typeof root === "object" && root.type) ? root : T.deserialize(root);
+        const semantic = T.deserialize(root);
         if (!bypassLimits) assertTreeWithinLimits(semantic, "导入的树");
         tree = semantic;
         collapsedIds.clear();
@@ -337,7 +328,7 @@
         while (stack.length) {
             const [node, depth] = stack.pop();
             if (idOf(node) === targetId) return depth;
-            for (const child of childNodes(node)) stack.push([child, depth + 1]);
+            for (const edge of childEdges(node)) stack.push([edge.node, depth + 1]);
         }
         return -1;
     }
@@ -355,18 +346,17 @@
         return null;
     }
 
-    // 某关系边当前是否已被占用。
-    function hasEdge(node, relation) {
-        return childEdges(node).some((edge) => edge.relation === relation);
-    }
     function availableRelations(parent) {
-        if (parent.type === "T") return hasEdge(parent, "next") ? [] : ["next"];
-        if (parent.type === "A") return hasEdge(parent, "next") ? [] : ["next"];
-        if (parent.type === "C") return hasEdge(parent, "action") ? [] : ["action"];
-        if (parent.type === "D") return hasEdge(parent, "default") ? ["decision"] : ["decision", "default"];
-        if (parent.type === "J") return hasEdge(parent, "action") ? [] : ["action"];
-        if (["S", "P"].includes(parent.type)) return ["branch"];
-        return [];
+        if (parent.type === "T") return parent.next ? [] : ["next"];
+        const relations = [];
+        if (parent.type === "A" && !parent.next) relations.push("next");
+        if (parent.type === "C" && !parent.next) relations.push("matched");
+        if (["S", "P"].includes(parent.type)) relations.push("branch");
+        if (parent.type === "D") {
+            relations.push("decision");
+            if (!parent.defaultBranch) relations.push("default");
+        }
+        return relations;
     }
 
     function flowNodeOperations(node) {
@@ -377,15 +367,15 @@
         };
         if (node.type === "T") {
             add("next", "设置入口", "设置入口");
-        } else if (node.type === "A") {
-            add("next", "添加后续", "添加后续");
-        } else if (["C", "J"].includes(node.type)) {
-            add("action", "添加后续", "添加后续");
         } else if (node.type === "S" || node.type === "P") {
             add("branch", "添加分支", "添加分支");
         } else if (node.type === "D") {
             add("decision", "添加分支", "添加分支");
             add("default", "设置默认", "设置默认");
+        } else if (node.type === "C") {
+            add("matched", "添加命中流程", "添加命中流程");
+        } else if (node.type === "A") {
+            add("next", "添加后续", "添加后续");
         }
         return operations;
     }
@@ -397,7 +387,7 @@
         }
         if (parent.type === "D") {
             const decisions = parent.branches.length;
-            const hasDefault = !!parent.action;
+            const hasDefault = !!parent.defaultBranch;
             if (relation === "decision") {
                 const remaining = decisions - 1;
                 return remaining >= 1 && remaining + (hasDefault ? 1 : 0) >= 2;
@@ -411,13 +401,19 @@
 
     // 从父节点上按 relation 移除某个子节点。
     function detachChild(parent, node, relation) {
-        if (relation === "branch" || relation === "decision") {
+        const edge = childEdges(parent).find((candidate) => candidate.node === node && candidate.relation === relation);
+        if (!edge) return;
+        if (relation === "branch") {
+            parent.branches.splice(edge.index, 1);
+        } else if (relation === "decision") {
             const idx = parent.branches.indexOf(node);
             if (idx >= 0) parent.branches.splice(idx, 1);
         } else if (relation === "next") {
+            parent.next = node.type === "A" ? node.next : null;
+        } else if (relation === "matched") {
             parent.next = null;
-        } else if (relation === "action" || relation === "default") {
-            parent.action = null;
+        } else if (relation === "default") {
+            parent.defaultBranch = null;
         }
     }
 
@@ -432,7 +428,7 @@
         if (node.type === "S") return "串";
         if (node.type === "P") return "并";
         if (node.type === "D") return "分";
-        if (node.type === "J") return "规则";
+        if (node.type === "C") return "规则";
         if (node.type !== "H") return type.short;
         const low = node.minHits == null ? "_" : String(node.minHits);
         const high = node.maxHits == null ? "_" : String(node.maxHits);
@@ -447,13 +443,12 @@
         const type = TYPES[node.type] || TYPES.A;
         const reorderable = Boolean(parent && ["branch", "decision"].includes(relation)
             && siblingCount >= 2);
-        const showExpr = node.expr && type.kind !== "structure" && type.kind !== "root";
-        const expression = showExpr ? `<span class="node-expression">${escapeText(node.expr)}</span>` : "";
-        const collapsible = node.type !== "J" && childNodes(node).length > 0;
+        const expressionValue = node.type === "A" ? node.rule?.expr : "";
+        const expression = expressionValue ? `<span class="node-expression">${escapeText(expressionValue)}</span>` : "";
+        const executionChildren = executionEdges(node);
+        const collapsible = node.type !== "C" && executionChildren.length > 0;
         const collapsed = Boolean(collapsible && isCollapsed(node));
-        const visibleEdges = node.type === "J"
-            ? childEdges(node).filter((edge) => edge.relation === "action")
-            : (collapsed ? [] : childEdges(node));
+        const visibleEdges = collapsed ? [] : executionChildren;
         const relationCounts = visibleEdges.reduce((counts, edge) => {
             counts.set(edge.relation, (counts.get(edge.relation) || 0) + 1);
             return counts;
@@ -461,28 +456,28 @@
         const children = visibleEdges.length
             ? `<div class="tree-children">${visibleEdges.map((edge) => renderBranch(
                 edge.node, node, edge.relation, relationCounts.get(edge.relation))).join("")}</div>` : "";
-        const hiddenCount = childNodes(node).length;
+        const hiddenCount = executionChildren.length;
         const collapsedBadge = collapsed ? `<span class="collapsed-count" title="${hiddenCount} 个分支">${hiddenCount}</span>` : "";
         // 待配置节点（占位 PH，或未选引用规则的 动作/条件/判断）统一以红虚线“待配置”呈现。
         const pending = isUnconfigured(node);
         const title = pending
             ? `＋ ${pendingLabel(node)}`
-            : (node.type === "J"
+            : (node.type === "C"
                 ? ruleDisplayName(node)
                 : (type.kind === "structure" || type.kind === "root"
                     ? compactStructureLabel(node, type)
                     : flowNodeDisplayName(node)));
         const cardKind = pending
             ? `placeholder${node.type === "PH" && node.slot === "decision" ? " placeholder-hex" : ""} node-type-${node.type.toLowerCase()}`
-            : `${node.type === "J" ? "condition judge-summary" : type.kind} node-type-${node.type.toLowerCase()}`;
+            : `${node.type === "C" ? "condition judge-summary" : type.kind} node-type-${node.type.toLowerCase()}`;
         const cardTitle = pending
-            ? `${pendingLabel(node)}（点击后在右侧「引用规则」完成配置）`
-            : (node.type === "J"
+            ? `${pendingLabel(node)}（双击配置）`
+            : (node.type === "C"
                 ? `条件节点 · ${ruleDisplayName(node)}`
-                : (["A", "C"].includes(node.type)
+                : (node.type === "A"
                     ? `${type.name} · ${flowNodeDisplayName(node)}`
                     : (flowNodeName(node) ? `${type.name} · ${flowNodeName(node)}` : type.name)));
-        const jNegated = node.type === "J" && Boolean(jrule(node)?.negative);
+        const jNegated = node.type === "C" && Boolean(conditionRule(node)?.negative);
         const negateBadge = jNegated ? `<span class="negate-badge" title="取反">非</span>` : "";
         const id = idOf(node);
         const nodeShell = `
@@ -526,14 +521,151 @@
     }
 
     function judgeRuleReference(node) {
-        const rule = jrule(node);
+        const rule = conditionRule(node);
         if (!rule) return "未设置";
-        if (rule.type === "R") return definitionReference(RULE_DEFINITIONS, rule.expr);
+        if (rule.type === "B") return definitionReference(RULE_DEFINITIONS, rule.expr);
         return `复合规则 · ${countNodes(rule)} 个规则节点`;
     }
 
     function inspectorEditableType(type) {
-        return ["A", "C", "S", "P", "D", "J"].includes(type);
+        return ["A", "S", "P", "D", "C"].includes(type);
+    }
+
+    // ---- 模板参数（$args）录入 ----
+    // 节点引用的单个原子规则ID：A 取内嵌 R，C 取内嵌 B，复合规则流(f*)与复合规则无参
+    function nodeReferencedRuleId(node) {
+        if (!node) return null;
+        if (node.type === "A") return isCompositeReference(node) ? null : (node.rule?.expr || null);
+        if (["R", "B"].includes(node.type)) return node.expr || null;
+        if (node.type === "C") { const r = conditionRule(node); return r && r.type === "B" ? (r.expr || null) : null; }
+        return null;
+    }
+
+    // 承载 args 的宿主节点是 A/C 内嵌的 R/B，规则编辑器中的 R/B 则直接作为宿主
+    function argsHost(node) {
+        if (!node) return null;
+        if (node.type === "A") return node.rule?.type === "R" ? node.rule : null;
+        if (["R", "B"].includes(node.type)) return node;
+        if (node.type === "C") { const r = conditionRule(node); return r && r.type === "B" ? r : null; }
+        return null;
+    }
+
+    // 节点引用规则声明的模板参数定义（数组），无则空。
+    function nodeParamDefs(node) {
+        const ruleId = nodeReferencedRuleId(node);
+        if (!ruleId) return [];
+        const def = ruleDefinitionById(ruleId) || actionDefinitionById(ruleId);
+        return def && Array.isArray(def.params) ? def.params : [];
+    }
+
+    // 解析宿主节点当前 args（JSON对象文本）为对象；非对象归一为空。
+    function parseArgs(host) {
+        if (!host || !host.args) return {};
+        try {
+            const v = JSON.parse(host.args);
+            return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+        } catch (_) { return {}; }
+    }
+
+    // 按类型把录入的原始字符串转换为 $args 中的规范值。
+    function coerceArgValue(type, raw) {
+        if (type === "boolean") return raw === "true";
+        if (type === "number") { const n = Number(raw); return Number.isFinite(n) ? n : raw; }
+        return raw;
+    }
+
+    function argValueFilled(value) {
+        return value !== undefined && value !== null && String(value) !== "";
+    }
+
+    function paramControlHtml(p, current) {
+        const name = escapeText(p.name);
+        const has = current[p.name] !== undefined && current[p.name] !== null;
+        const val = has ? String(current[p.name])
+            : (p.default !== undefined && p.default !== null ? String(p.default) : "");
+        if (p.type === "boolean") {
+            return `<select class="field-control arg-control" data-arg="${name}" data-arg-type="boolean">
+                <option value="">未设置</option>
+                <option value="true" ${val === "true" ? "selected" : ""}>是</option>
+                <option value="false" ${val === "false" ? "selected" : ""}>否</option>
+            </select>`;
+        }
+        if (p.type === "enum") {
+            const opts = Array.isArray(p.options) ? p.options : [];
+            return `<select class="field-control arg-control" data-arg="${name}" data-arg-type="enum">
+                <option value="">未设置</option>
+                ${opts.map((o) => `<option value="${escapeText(o)}" ${String(o) === val ? "selected" : ""}>${escapeText(o)}</option>`).join("")}
+            </select>`;
+        }
+        const numeric = p.type === "number" ? ' inputmode="decimal"' : "";
+        return `<input class="field-control arg-control" data-arg="${name}" data-arg-type="${escapeText(p.type)}"${numeric}
+            value="${escapeText(val)}" placeholder="${escapeText(p.description || "")}" autocomplete="off">`;
+    }
+
+    // 渲染参数录入区 HTML（无参返回空串）。
+    function renderParamsSectionHtml(node) {
+        const defs = nodeParamDefs(node);
+        if (!defs.length) return "";
+        const current = parseArgs(argsHost(node));
+        const rows = defs.map((p) => {
+            const label = escapeText(p.label || p.name);
+            const req = p.required ? ` <span class="arg-req">*</span>` : "";
+            const missing = p.required && !argValueFilled(current[p.name]) ? " arg-missing" : "";
+            const hint = p.description ? `<span class="arg-hint">${escapeText(p.description)}</span>` : "";
+            return `<div class="detail-field arg-field${missing}" data-arg-name="${escapeText(p.name)}">
+                <span class="detail-label">${label}${req}</span>
+                ${paramControlHtml(p, current)}
+                ${hint}
+            </div>`;
+        }).join("");
+        return `<div class="args-section" data-args-section><div class="args-title">规则参数</div>${rows}</div>`;
+    }
+
+    // 从录入区收集 args 写回宿主节点（omit 空值），返回是否变更。container 为参数区所在容器。
+    function commitArgsFromInputs(node, container) {
+        const host = argsHost(node);
+        const section = container && container.querySelector("[data-args-section]");
+        if (!host || !section) return false;
+        const values = {};
+        nodeParamDefs(node).forEach((p) => {
+            const control = section.querySelector(`[data-arg="${CSS.escape(p.name)}"]`);
+            if (!control) return;
+            const raw = control.value;
+            if (raw === "" || raw == null) return; // 未填写：不写入该键
+            values[p.name] = coerceArgValue(p.type, raw);
+        });
+        const next = Object.keys(values).length ? JSON.stringify(values) : "";
+        if ((host.args || "") === next) return false;
+        host.args = next;
+        return true;
+    }
+
+    // 刷新参数录入区各行的必填缺失标记（不重渲染，避免打断输入焦点）。
+    function refreshArgMissingMarks(node, container) {
+        const section = container && container.querySelector("[data-args-section]");
+        if (!section) return;
+        const current = parseArgs(argsHost(node));
+        nodeParamDefs(node).forEach((p) => {
+            const row = section.querySelector(`[data-arg-name="${CSS.escape(p.name)}"]`);
+            if (row) row.classList.toggle("arg-missing", !!p.required && !argValueFilled(current[p.name]));
+        });
+    }
+
+    // 收集规则子树内必填参数未填写的原子规则节点（含未填参数名），供规则弹窗保存前校验。
+    function missingRequiredInRule(ruleRoot) {
+        const missing = [];
+        const walkRule = (node) => {
+            if (!node) return;
+            if (["R", "B"].includes(node.type)) {
+                const defs = nodeParamDefs(node);
+                const current = parseArgs(node);
+                const unfilled = defs.filter((p) => p.required && !argValueFilled(current[p.name])).map((p) => p.label || p.name);
+                if (unfilled.length) missing.push({ node, params: unfilled });
+            }
+            (node.rules || []).forEach(walkRule);
+        };
+        walkRule(ruleRoot);
+        return missing;
     }
 
     function editKey(nodeId, field) { return `${nodeId}:${field}`; }
@@ -568,16 +700,21 @@
                 </div>
             </div>`);
         }
-        const typeEditable = ["S", "P"].includes(node.type);
+        const location = findNode(nodeId);
+        const canWrap = Boolean(["A", "C"].includes(node.type)
+            && location?.parent && location.relation !== "decision");
+        const typeEditable = ["S", "P"].includes(node.type) || canWrap;
         const typeActive = typeEditable && inspectorEditingField === editKey(nodeId, "type");
+        const typeOptions = ["S", "P"].includes(node.type)
+            ? ["S", "P"]
+            : (canWrap ? [node.type, "S", "P"] : [node.type]);
         parts.push(`<div class="detail-field${typeEditable ? " editable" : ""}${typeActive ? " field-editing" : ""}" data-field="type">
             <span class="detail-label">节点类型</span>
             <div class="field-row">
                 <span class="detail-value">${escapeText(TYPES[node.type].name)}</span>
                 ${typeEditable && !typeActive ? pencil("type") : ""}
                 <select class="field-control" id="inspectorTypeSelect">
-                    <option value="S" ${node.type === "S" ? "selected" : ""}>串行节点</option>
-                    <option value="P" ${node.type === "P" ? "selected" : ""}>并行节点</option>
+                    ${typeOptions.map((type) => `<option value="${type}" ${node.type === type ? "selected" : ""}>${escapeText(TYPES[type].name)}</option>`).join("")}
                 </select>
                 ${typeActive ? confirmCancel() : ""}
             </div>
@@ -606,20 +743,22 @@
         };
 
         if (node.type === "A") {
-            ruleField(ACTION_DEFINITIONS, node.expr, flowNodeName(node));
-            if (node.next) readonlyField("流程", flowNodeDisplayName(node.next));
+            const selectedRuleId = node.rule?.expr === "∅" ? null : node.rule?.expr;
+            ruleField(ACTION_DEFINITIONS, selectedRuleId, flowNodeName(node));
         } else if (node.type === "C") {
-            ruleField(RULE_DEFINITIONS, node.expr, flowNodeName(node));
-        } else if (node.type === "J") {
             readonlyField("引用规则", judgeRuleReference(node));
         } else if (["S", "P"].includes(node.type)) {
             readonlyField("分支数", `${node.branches.length} 个`);
         } else if (node.type === "D") {
             readonlyField("分支数", `${node.branches.length} 个`);
-            readonlyField("默认分支", node.action ? "已设置" : "未设置");
-        } else {
-            readonlyField("流程入口", node.next ? flowNodeDisplayName(node.next) : "未设置");
+            readonlyField("默认分支", node.defaultBranch ? "已设置" : "未设置");
         }
+        if (node.type === "T") {
+            readonlyField("流程入口", node.next ? flowNodeDisplayName(node.next) : "未设置");
+        } else if (node.type === "C") {
+            readonlyField("命中分支", node.next ? flowNodeDisplayName(node.next) : "未设置");
+        }
+        if (node.type === "A") parts.push(renderParamsSectionHtml(node));
         $("#nodeDetailFields").innerHTML = parts.join("");
         if (inspectorEditingField && inspectorEditingField.startsWith(`${nodeId}:`)) {
             requestAnimationFrame(() => {
@@ -666,7 +805,7 @@
             : "";
         $("#flowNodeActions").innerHTML = addButtons + insertButton;
         const editButton = $("#editNodeButton");
-        editButton.hidden = node.type !== "J";
+        editButton.hidden = node.type !== "C";
         // 插入节点按钮对所有非根节点都存在，故只要不是根节点该操作区就应可见，
         // 否则「有后继、非判断」的节点（如根下第一个动作节点）会误藏插入入口。
         const hasInsert = node.type !== "T";
@@ -693,32 +832,36 @@
         const field = inspectorEditingField.split(":")[1];
         if (field === "alias") {
             setNodeAlias(node, $("#inspectorAliasInput").value.trim());
-        } else if (field === "expression" && ["A", "C"].includes(node.type)) {
-            const definitions = node.type === "A" ? ACTION_DEFINITIONS : RULE_DEFINITIONS;
-            const definition = definitions.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
-            if (definition) node.expr = definition.ruleId;
-        } else if (field === "expression" && node.type === "J") {
-            // 就地设置判断节点的根规则（单个规则）；保留原规则名与取反。
+        } else if (field === "expression" && node.type === "A") {
+            const definition = ACTION_DEFINITIONS.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
+            if (definition && node.rule) node.rule.expr = definition.ruleId;
+        } else if (field === "expression" && node.type === "C") {
+            // 就地设置条件节点的根规则（单个规则），保留原规则名与取反
             const definition = RULE_DEFINITIONS.find((candidate) => candidate.ruleId === $("#inspectorDefinitionSelect").value);
             if (definition) {
-                const r = jrule(node);
-                if (r && r.type === "R") { r.expr = definition.ruleId; }
+                const r = conditionRule(node);
+                if (r && r.type === "B") { r.expr = definition.ruleId; }
                 else { node.rule = make.atom(definition.ruleId); }
             }
         } else if (field === "type" && ["S", "P"].includes(node.type)) {
             const newType = $("#inspectorTypeSelect").value;
-            if (["S", "P"].includes(newType)) { node.type = newType; node.expr = newType; }
+            if (["S", "P"].includes(newType)) node.type = newType;
+        } else if (field === "type" && ["A", "C"].includes(node.type)) {
+            const newType = $("#inspectorTypeSelect").value;
+            if (["S", "P"].includes(newType)) {
+                inspectorEditingField = null;
+                insertNodeBefore(newType);
+                return;
+            }
         }
         inspectorEditingField = null;
         render({ preserveView: true });
         if (before !== JSON.stringify(node)) markDraft();
     }
 
-    // 流程节点名称写入 label；J 写入其规则根 name；规则节点写入 name。
+    // 所有节点名称统一写入 NameNode.name
     function setNodeAlias(node, value) {
-        if (node.type === "J") { const rule = jrule(node); if (rule) rule.name = value; }
-        else if (["R", "L", "H"].includes(node.type)) node.name = value;
-        else node.label = value;
+        node.name = value;
     }
 
     function cancelFieldEdit() {
@@ -738,16 +881,16 @@
 
     function confirmDiscardInspectorEdit() { inspectorEditingField = null; return true; }
 
-    // ---- 规则弹窗（在 J 的规则子树上操作）----
+    // ---- 规则弹窗（在 C 的规则子树上操作）----
     function currentRuleJudge() {
         const found = ruleJudgeId ? findNode(ruleJudgeId) : null;
-        return found?.node.type === "J" ? found.node : null;
+        return found?.node.type === "C" ? found.node : null;
     }
 
-    // 在当前 J 的规则子树中定位规则节点，返回 {node, parent}。parent 为 L/H 或 J（根规则）。
+    // 在当前 C 的规则子树中定位规则节点，返回 {node, parent}，parent 为 L/H 或 C（根规则）
     function findRuleNode(id) {
         const judge = currentRuleJudge();
-        const root = judge ? jrule(judge) : null;
+        const root = judge ? conditionRule(judge) : null;
         if (!root || !id) return null;
         let found = null;
         const visitRule = (node, parent) => {
@@ -762,10 +905,10 @@
     }
 
     function renderRuleBranch(node, parent = null) {
-        const type = TYPES[node.type] || TYPES.R;
+        const type = TYPES[node.type] || TYPES.B;
         const reorderable = Boolean(parent && ["L", "H"].includes(parent.type) && (parent.rules?.length || 0) >= 2);
-        const showExpr = node.type !== "H" && node.expr;
-        const expression = showExpr ? `<span class="node-expression">${escapeText(node.expr)}</span>` : "";
+        const ruleExpression = node.type === "L" ? node.expr : (node.type === "B" ? node.expr : "");
+        const expression = ruleExpression ? `<span class="node-expression">${escapeText(ruleExpression)}</span>` : "";
         const kids = childNodes(node);
         const children = kids.length
             ? `<div class="rule-children">${kids.map((child) => renderRuleBranch(child, node)).join("")}</div>` : "";
@@ -787,14 +930,14 @@
 
     function canDeleteRule(found) {
         if (!found) return false;
-        if (found.parent?.type === "J") return false;
+        if (found.parent?.type === "C") return false;
         if (found.parent?.type === "H" && (found.parent.rules?.length || 0) <= 1) return false;
         return true;
     }
 
     function renderRuleTree() {
         const judge = currentRuleJudge();
-        const rule = judge ? jrule(judge) : null;
+        const rule = judge ? conditionRule(judge) : null;
         if (!judge) return;
         if (ruleSelectedId && !findRuleNode(ruleSelectedId)) ruleSelectedId = rule ? idOf(rule) : null;
         ruleTreeRoot.innerHTML = rule
@@ -808,13 +951,13 @@
     }
 
     function ruleNodeSubrules(node) {
-        if (node.type === "R") return [node];
+        if (node.type === "B") return [node];
         if (["L", "H"].includes(node.type)) return node.rules.slice();
         return [];
     }
 
     function subruleRowLabel(child) {
-        if (child.type === "R") {
+        if (child.type === "B") {
             const definition = ruleDefinitionById(child.expr);
             return definition ? `${definition.desc} · ${definition.ruleId}` : (child.expr || "未设置");
         }
@@ -839,7 +982,7 @@
                 <button type="button" data-subrule-up="${index}" aria-label="上移" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
                 <button type="button" data-subrule-down="${index}" aria-label="下移" title="下移" ${index === lastIndex ? "disabled" : ""}>↓</button>
             ` : "";
-            if (child.type !== "R") {
+            if (child.type !== "B") {
                 return `<div class="rule-add-row rule-subrule-static${activeClass}">
                     <span class="detail-value">${escapeText(subruleRowLabel(child))}</span>
                     ${moveButtons}
@@ -852,7 +995,7 @@
                 ${moveButtons}
             </div>`;
         }).join("");
-        $("#ruleEditorAddRuleButton").hidden = !["R", "L", "H"].includes(node.type);
+        $("#ruleEditorAddRuleButton").hidden = !["B", "L", "H"].includes(node.type);
         renderRuleLogicField();
     }
 
@@ -865,7 +1008,7 @@
         const node = findRuleNode(ruleSelectedId)?.node;
         if (!node || node.type === "H") { container.hidden = true; return; }
         container.hidden = false;
-        if (node.type === "R") {
+        if (node.type === "B") {
             ruleLogicEditing = false;
             container.className = "detail-field";
             container.innerHTML = `<span class="detail-label">节点类型</span>
@@ -919,7 +1062,7 @@
         const empty = $("#ruleEditorEmpty");
         const panel = $("#ruleEditorPanel");
         if (!found) {
-            const hasRule = Boolean(currentRuleJudge() && jrule(currentRuleJudge()));
+            const hasRule = Boolean(currentRuleJudge() && conditionRule(currentRuleJudge()));
             $("#ruleEditorEmptyTitle").textContent = hasRule ? "选择一个规则节点" : "尚未配置条件";
             $("#ruleEditorEmptyHint").textContent = hasRule
                 ? "选择左侧节点后在这里查看规则信息。"
@@ -938,6 +1081,7 @@
         $("#ruleNodeExpression").readOnly = true;
         $("#ruleEditorSubrulesField").hidden = false;
         renderRuleEditorSubrules();
+        renderRuleEditorParams(node);
         $("#ruleNegateField").hidden = false;
         $("#ruleNegateInput").checked = !!node.negative;
         $("#ruleAddPanel").hidden = true;
@@ -946,19 +1090,29 @@
         $("#ruleEditorDeleteButton").disabled = !deletable;
         $("#ruleEditorDeleteButton").title = deletable
             ? ""
-            : (found.parent?.type === "J"
-                ? "判断节点必须保留根规则，不能删除"
+            : (found.parent?.type === "C"
+                ? "条件节点必须保留根规则，不能删除"
                 : "组合规则至少需要保留两个子规则，不能直接删除");
+    }
+
+    // 规则弹窗内选中原子规则节点且其引用规则声明了模板参数时渲染参数录入区并绑定到该 BNode 的 args
+    function renderRuleEditorParams(node) {
+        const field = $("#ruleEditorParamsField");
+        if (!field) return;
+        if (!node || node.type !== "B") { field.hidden = true; field.innerHTML = ""; return; }
+        const html = renderParamsSectionHtml(node);
+        field.innerHTML = html;
+        field.hidden = !html;
     }
 
     function currentEditingNode() { return findRuleNode(ruleSelectedId)?.node || null; }
 
-    // 用幸存子规则替换 L 节点：L 是 J 的根规则则替换 J.rule，否则替换父 L/H.rules 中的该项。
+    // 用幸存子规则替换 L 节点，L 是 C 的根规则则替换 C.rule，否则替换父 L/H.rules 中的该项
     function collapseLogicToSurvivor(logicNode, survivor) {
         const found = findRuleNode(idOf(logicNode));
         const parent = found ? found.parent : currentRuleJudge();
         if (!parent) return;
-        if (parent.type === "J") {
+        if (parent.type === "C") {
             parent.rule = survivor;
         } else if (["L", "H"].includes(parent.type)) {
             const idx = parent.rules.indexOf(logicNode);
@@ -1013,8 +1167,8 @@
 
     function openCompositeBuilder() {
         const node = findRuleNode(ruleSelectedId)?.node;
-        if (!node || !["R", "L", "H"].includes(node.type)) return;
-        compositePromoteFrom = node.type === "R" ? node : null;
+        if (!node || !["B", "L", "H"].includes(node.type)) return;
+        compositePromoteFrom = node.type === "B" ? node : null;
         const firstId = compositePromoteFrom
             ? (RULE_DEFINITIONS.find((d) => d.ruleId !== compositePromoteFrom.expr)?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "")
             : (RULE_DEFINITIONS[0]?.ruleId || "");
@@ -1064,12 +1218,15 @@
         });
         const logic = document.querySelector('input[name="ruleCompositeLogic"]:checked')?.value || "&&";
 
-        if (compositePromoteFrom && node.type === "R") {
+        if (compositePromoteFrom && node.type === "B") {
             // 单规则转复合：创建 LNode，把原 R 保留为第一个子规则，新选的追加其后
             const lNode = make.logic(logic);
             lNode.name = "";
             // 保留原 R 的名称、取反状态和引用
-            const originalR = { type: "R", expr: node.expr, negative: node.negative };
+            const originalR = {
+                type: "B", name: node.name || "", expr: node.expr,
+                args: node.args || "", negative: node.negative
+            };
             if (node.name) originalR.name = node.name;
             lNode.rules.push(originalR);
             ruleCompositeRuleIds.forEach((ruleId) => {
@@ -1084,9 +1241,9 @@
                 openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
                 return;
             }
-            // 替换：parent 可能是 J（rule 边）或 L/H（rules 数组）
+            // parent 可能是 C（rule 边）或 L/H（rules 数组）
             const parent = found.parent;
-            if (parent.type === "J") {
+            if (parent.type === "C") {
                 parent.rule = lNode;
             } else if (["L", "H"].includes(parent.type) && Array.isArray(parent.rules)) {
                 const idx = parent.rules.indexOf(node);
@@ -1136,15 +1293,14 @@
 
     function openRuleDialog(judgeId, rollbackOnCancel = null) {
         const found = findNode(judgeId);
-        if (!found || found.node.type !== "J") return;
+        if (!found || found.node.type !== "C") return;
         ruleJudgeId = judgeId;
         ruleDialogSnapshot = {
             rule: cloneNode(found.node.rule),
-            action: cloneNode(found.node.action),
             rollbackOnCancel
         };
         ruleDialogCommitted = false;
-        const rule = jrule(found.node);
+        const rule = conditionRule(found.node);
         ruleSelectedId = rule ? idOf(rule) : null;
         hideRulePopover();
         renderRuleDialog();
@@ -1205,7 +1361,7 @@
 
     function startRuleAdd() {
         const judge = currentRuleJudge();
-        if (!judge || jrule(judge)) return;
+        if (!judge || conditionRule(judge)) return;
         $("#ruleEditorEmpty").hidden = true;
         $("#ruleEditorPanel").hidden = false;
         $("#ruleEditorHeading").innerHTML = "";
@@ -1229,7 +1385,7 @@
 
     function confirmRuleAdd() {
         const judge = currentRuleJudge();
-        if (!judge || ruleAddRuleIds.length === 0 || jrule(judge)) return;
+        if (!judge || ruleAddRuleIds.length === 0 || conditionRule(judge)) return;
         const node = ruleAddRuleIds.length === 1
             ? createAtomicRule(ruleAddRuleIds[0])
             : createLogicRule(document.querySelector('input[name="ruleAddLogic"]:checked').value, "", ruleAddRuleIds);
@@ -1265,16 +1421,19 @@
         render({ preserveView: true });
     }
 
-    // 判断节点是否处于“待配置”：占位 PH，或动作/条件/判断尚未选择引用规则（J 规则为空或空原子）。
+    // 判断节点是否处于待配置状态：占位 PH，或动作/条件尚未选择引用规则
     function isUnconfigured(node) {
         if (node.type === "PH") return true;
-        if (["A", "C"].includes(node.type)) return !((node.expr || "").trim());
-        if (node.type === "J") { const r = jrule(node); return !r || (r.type === "R" && !((r.expr || "").trim())); }
+        if (node.type === "A") {
+            const expr = (node.rule?.expr || "").trim();
+            return !expr || expr === "∅";
+        }
+        if (node.type === "C") { const r = conditionRule(node); return !r || (r.type === "B" && !((r.expr || "").trim())); }
         return false;
     }
     function pendingLabel(node) {
         if (node.type === "A") return "待配置动作";
-        if (node.type === "C" || node.type === "J") return "待配置条件";
+        if (node.type === "C") return "待配置条件";
         if (node.type === "PH" && node.slot === "decision") return "待配置条件";
         return "待配置";
     }
@@ -1290,7 +1449,7 @@
         if (type === "D") {
             const node = make.decision();
             node.branches.push(make.placeholder("decision"));
-            node.action = make.placeholder("default");
+            node.defaultBranch = make.placeholder("default");
             return node;
         }
         return null;
@@ -1305,10 +1464,8 @@
 
     // 把新建节点挂到父节点的目标关系边上（列表边支持定位）。
     function attachChild(parent, relation, node, placement, anchorId) {
-        if (relation === "next") { parent.next = node; return; }
-        if (relation === "action") { parent.action = node; return; }
-        if (relation === "default") { parent.action = node; return; }
-        // list edge: branch / decision -> parent.branches
+        if (relation === "next" || relation === "matched") { parent.next = node; return; }
+        if (relation === "default") { parent.defaultBranch = node; return; }
         const list = parent.branches;
         if (placement === "first") { list.unshift(node); return; }
         if (placement === "before" || placement === "after") {
@@ -1343,20 +1500,17 @@
 
     // 用真实节点替换占位/目标（按其所在的关系边）。
     function replaceChild(parent, oldNode, relation, real) {
-        if (relation === "branch" || relation === "decision") {
-            const idx = parent.branches.indexOf(oldNode);
-            if (idx >= 0) parent.branches.splice(idx, 1, real);
-        } else if (relation === "default" || relation === "action") {
-            parent.action = real;
-        } else if (relation === "next") {
-            parent.next = real;
-        }
+        const edge = childEdges(parent).find((candidate) => candidate.node === oldNode && candidate.relation === relation);
+        if (!edge) return;
+        if (edge.kind === "list") edge.list.splice(edge.index, 1, real);
+        else parent[edge.field] = real;
     }
 
     function relationToSlot(relation) {
         if (relation === "decision") return "decision";
         if (relation === "branch") return "branch";
         if (relation === "default") return "default";
+        if (relation === "matched") return "matched";
         return "next";
     }
 
@@ -1372,7 +1526,7 @@
         if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
         if (relation === "decision") {
             setCollapsed(parent, false);
-            const j = make.judge(null);
+            const j = make.condition(null);
             j.rule = null;
             attachChild(parent, relation, j, "last", null);
             selectedId = idOf(j);
@@ -1392,7 +1546,11 @@
 
     function openConfigDialog() {
         const dlg = document.getElementById("nodeConfigDialog");
-        $("#nodeConfigType").value = "A";
+        const relation = configTarget?.mode === "add"
+            ? configTarget.relation
+            : findNode(configTarget?.phId)?.relation;
+        populateTypeSelect($("#nodeConfigType"), RELATIONS[relation]?.types || FLOW_TYPES);
+        $("#nodeConfigType").value = $("#nodeConfigType").options[0]?.value || "A";
         syncNodeConfigRule();
         if (!dlg.open) dlg.showModal();
     }
@@ -1414,7 +1572,7 @@
             $("#nodeConfigRule").innerHTML = ACTION_DEFINITIONS
                 .map((d) => `<option value="${escapeText(d.ruleId)}">${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("");
             note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无执行动作，请先在「业务规则」中新建执行动作。";
-        } else if (type === "J") {
+        } else if (type === "C") {
             ruleField.hidden = true;
             note.textContent = "确认后打开条件编辑，配置该条件（可原子 / 与或 / 命中）。";
         } else {
@@ -1456,10 +1614,10 @@
             const real = placeConfigured(buildStructuralScaffold(type));
             closeNodeConfig();
             if (real) { selectedId = idOf(real); render({ preserveView: true }); markDraft(); }
-        } else if (type === "J") {
+        } else if (type === "C") {
             const target = configTarget;
             closeNodeConfig();
-            const j = make.judge(null);
+            const j = make.condition(null);
             j.rule = null;
             let rollback;
             if (target.mode === "add") {
@@ -1490,11 +1648,11 @@
         }
     }
 
-    // 条件配置：把已有占位替换成判断节点（规则暂空=待配置条件），随即打开条件编辑弹窗。
+    // 条件配置：把已有占位替换成条件节点（规则暂空=待配置条件），随即打开条件编辑弹窗
     function configureAsCondition(ph) {
         const found = findNode(idOf(ph));
         if (!found || found.node.type !== "PH") return;
-        const j = make.judge(null);
+        const j = make.condition(null);
         j.rule = null;
         const { node: placeholder, parent, relation } = found;
         replaceChild(parent, placeholder, relation, j);
@@ -1510,11 +1668,12 @@
         requestAnimationFrame(() => openRuleDialog(idOf(j), rollback));
     }
 
-    function insertNodeBefore() {
+    function insertNodeBefore(typeOverride = null) {
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !found.parent) return;
         const { node: target, parent, relation } = found;
-        const type = $("#newNodeType").value;
+        if (relation === "decision") return;
+        const type = typeOverride || $("#newNodeType").value;
         // 向前插入只支持包裹为结构（串/并）：新结构含 target + 一个待配置占位分支。
         if (!["S", "P"].includes(type)) return;
         const node = buildStructuralScaffold(type);   // 含 2 个占位分支
@@ -1527,23 +1686,13 @@
             openConfirm(`节点总数将达 ${cur + added}，超过编辑器上限 ${TREE_LIMITS.maxNodes}`, { title: "超出编辑器上限", confirmLabel: "知道了" });
             return;
         }
-        const projectedDepth = depthOf(idOf(target)) + 2;
+        const projectedDepth = depthOf(idOf(target)) + 1;
         if (projectedDepth > TREE_LIMITS.maxDepth) {
             openConfirm(`插入后嵌套深度将达 ${projectedDepth}，超过编辑器上限 ${TREE_LIMITS.maxDepth}`, { title: "超出编辑器上限", confirmLabel: "知道了" });
             return;
         }
-        // 把新结构放回 target 原来的位置。
-        if (relation === "branch" || relation === "decision") {
-            const idx = parent.branches.indexOf(target);
-            if (idx < 0) return;
-            parent.branches.splice(idx, 1, node);
-        } else if (relation === "next") {
-            parent.next = node;
-        } else if (relation === "action" || relation === "default") {
-            parent.action = node;
-        } else {
-            return;
-        }
+        // 把新结构放回 target 原来的关系边，target 自身的 next 保持不变
+        replaceChild(parent, target, relation, node);
         selectedId = idOf(node);
         insertBeforeMode = false;
         $("#inspectorAddPanel").hidden = true;
@@ -1556,7 +1705,7 @@
     async function deleteSelected() {
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !canDeleteFlowNode(found.node, found.parent, found.relation)) return;
-        const descendants = countFlowNodes(found.node) - 1;
+        const descendants = countFlowNodes(found.node, found.relation !== "next") - 1;
         const nodeName = flowNodeDisplayName(found.node);
         const nodeId = idOf(found.node);
         const message = descendants
@@ -1566,7 +1715,17 @@
         const current = findNode(nodeId);
         if (!current || !canDeleteFlowNode(current.node, current.parent, current.relation)) return;
         detachChild(current.parent, current.node, current.relation);
-        selectedId = idOf(current.parent);
+        let selection = current.parent;
+        if (["S", "P"].includes(current.parent.type) && current.parent.branches.length === 1) {
+            const survivor = current.parent.branches[0];
+            const location = findNode(idOf(current.parent));
+            if (location?.parent) {
+                replaceChild(location.parent, current.parent, location.relation, survivor);
+                collapsedIds.delete(idOf(current.parent));
+                selection = survivor;
+            }
+        }
+        selectedId = idOf(selection);
         render({ preserveView: true });
         markDraft();
     }
@@ -1574,7 +1733,7 @@
     function toggleCollapse() {
         const found = selectedId ? findNode(selectedId) : null;
         if (!found) return;
-        if (!childNodes(found.node).length || found.node.type === "J") return;
+        if (!executionEdges(found.node).length || found.node.type === "C") return;
         setCollapsed(found.node, !isCollapsed(found.node));
         render({ preserveView: true });
     }
@@ -1660,7 +1819,7 @@
             // 与后端 TreeVisitor 契约一致：分支节点至少两个结果
             // （决策分支+默认分支合计≥2）；决策分支的命中后续动作可以为空。
             const decisions = node.branches.length;
-            const hasDefault = !!node.action;
+            const hasDefault = !!node.defaultBranch;
             const outcomes = decisions + (hasDefault ? 1 : 0);
             if (outcomes < 2) {
                 problems.push({
@@ -1698,7 +1857,7 @@
         const locate = (node) => {
             path.push(node);
             if (idOf(node) === id) return true;
-            for (const child of childNodes(node)) { if (locate(child)) return true; }
+            for (const edge of executionEdges(node)) { if (locate(edge.node)) return true; }
             path.pop();
             return false;
         };
@@ -1755,16 +1914,15 @@
         selectNode(nextId);
         const action = event.target.closest("[data-action]")?.dataset.action;
         if (action === "collapse") { toggleCollapse(); return; }
-        // 待配置节点点击即进入配置：占位→配置弹窗；未配置判断→条件编辑弹窗。
-        const node = findNode(nextId)?.node;
-        if (node?.type === "PH") { openNodeConfig(node); return; }
-        if (node?.type === "J" && isUnconfigured(node)) { openRuleDialog(nextId); return; }
     });
     treeRoot.addEventListener("dblclick", (event) => {
         const shell = event.target.closest(".node-shell");
         if (!shell) return;
-        const node = findNode(shell.dataset.nodeId)?.node;
-        if (node?.type === "J") openRuleDialog(shell.dataset.nodeId);
+        const nodeId = shell.dataset.nodeId;
+        const node = findNode(nodeId)?.node;
+        if (node?.type === "PH") { openNodeConfig(node); return; }
+        if (node?.type === "A" && isUnconfigured(node)) { beginFieldEdit("expression"); return; }
+        if (node?.type === "C") openRuleDialog(nodeId);
     });
     treeRoot.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && event.target.matches(".node-shell")) {
@@ -1793,7 +1951,7 @@
             flowNodeOperations(node).forEach((op, i) => {
                 items.push({ label: op.label, icon: "add", kind: i === 0 ? "hot" : "normal", onClick: () => startAddConfig(op.relation) });
             });
-            if (node.type === "J") items.push({ label: "查看规则", icon: "rule", kind: "normal", onClick: () => openRuleDialog(idOf(node)) });
+            if (node.type === "C") items.push({ label: "查看规则", icon: "rule", kind: "normal", onClick: () => openRuleDialog(idOf(node)) });
             if (node.type !== "T") items.push({ label: "向前插入", icon: "insert", kind: "normal", onClick: () => openInsertPanel() });
         }
         if (node.type !== "T") {
@@ -1931,7 +2089,7 @@
     zoomInput.addEventListener("blur", applyZoomInput);
     $("#fitButton").addEventListener("click", fitTree);
     $("#collapseAllButton").addEventListener("click", () => {
-        walk(tree, (node) => { if (node.type !== "J" && childNodes(node).length) setCollapsed(node, true); });
+        walk(tree, (node) => { if (node.type !== "C" && executionEdges(node).length) setCollapsed(node, true); });
         render({ preserveView: true });
     });
     $("#expandAllButton").addEventListener("click", () => {
@@ -1958,7 +2116,7 @@
     $("#deleteButton").addEventListener("click", deleteSelected);
     $("#editNodeButton").addEventListener("click", () => {
         const found = selectedId ? findNode(selectedId) : null;
-        if (found?.node.type === "J") openRuleDialog(selectedId);
+        if (found?.node.type === "C") openRuleDialog(selectedId);
     });
     const inspectorFieldClick = (event) => {
         const editBtn = event.target.closest("[data-field-edit]");
@@ -1973,10 +2131,44 @@
     };
     $("#nodeDetailFields").addEventListener("click", inspectorFieldClick);
     $("#nodeDetailFields").addEventListener("keydown", inspectorFieldKeydown);
+    const onFlowArgInput = (event) => {
+        if (!event.target.classList.contains("arg-control")) return;
+        const node = selectedId ? findNode(selectedId)?.node : null;
+        if (!node) return;
+        const container = $("#nodeDetailFields");
+        if (commitArgsFromInputs(node, container)) markDraft();
+        refreshArgMissingMarks(node, container);
+    };
+    $("#nodeDetailFields").addEventListener("input", onFlowArgInput);
+    $("#nodeDetailFields").addEventListener("change", onFlowArgInput);
     $("#inspectorHeading").addEventListener("click", inspectorFieldClick);
     $("#inspectorHeading").addEventListener("keydown", inspectorFieldKeydown);
 
-    $("#ruleDialogCloseButton").addEventListener("click", () => { ruleDialogCommitted = true; ruleDialog.close(); });
+    // 模板参数录入：就地写回选中规则节点的 args，不重渲染以保留输入焦点。
+    const onRuleArgInput = (event) => {
+        if (!event.target.classList.contains("arg-control")) return;
+        const node = currentEditingNode();
+        if (!node) return;
+        const container = $("#ruleEditorParamsField");
+        if (commitArgsFromInputs(node, container)) markDraft();
+        refreshArgMissingMarks(node, container);
+    };
+    $("#ruleEditorParamsField").addEventListener("input", onRuleArgInput);
+    $("#ruleEditorParamsField").addEventListener("change", onRuleArgInput);
+    $("#ruleDialogCloseButton").addEventListener("click", () => {
+        // 「填了才能保存」：规则子树内任一原子规则的必填模板参数未填写则拦截保存，并定位到该节点。
+        const judge = currentRuleJudge();
+        const missing = missingRequiredInRule(judge ? conditionRule(judge) : null);
+        if (missing.length) {
+            ruleSelectedId = idOf(missing[0].node);
+            renderRuleDialog();
+            const names = [...new Set(missing.flatMap((m) => m.params))];
+            openConfirm(`请先填写规则必填参数：${names.join("、")}`, { title: "参数未填写", confirmLabel: "知道了" });
+            return;
+        }
+        ruleDialogCommitted = true;
+        ruleDialog.close();
+    });
     $("#ruleDialogCancelButton").addEventListener("click", () => { ruleDialogCommitted = false; ruleDialog.close(); });
     $("#ruleEditorDeleteButton").addEventListener("click", () => { deleteSelectedRule(); });
     $("#ruleAddCancelButton").addEventListener("click", cancelRuleAdd);
@@ -2005,8 +2197,8 @@
         const node = currentEditingNode();
         if (!node) return;
         const idx = Number(select.dataset.subruleSelect);
-        const target = node.type === "R" ? node : node.rules[idx];
-        if (target && target.type === "R") {
+        const target = node.type === "B" ? node : node.rules[idx];
+        if (target && target.type === "B") {
             target.expr = select.value;
             renderRuleTree();
             render({ preserveView: true });
@@ -2040,7 +2232,7 @@
                 ruleDialogSnapshot.rollbackOnCancel();
             } else {
                 const found = findNode(ruleJudgeId);
-                if (found) { found.node.rule = ruleDialogSnapshot.rule; found.node.action = ruleDialogSnapshot.action; }
+                if (found) found.node.rule = ruleDialogSnapshot.rule;
             }
         }
         ruleDialogSnapshot = null;
@@ -2083,7 +2275,8 @@
         let st = null;
 
         function members(parent, relation) {
-            return relation === "rule" ? (parent.rules || []) : (parent.branches || []);
+            if (relation === "rule") return parent.rules || [];
+            return parent.branches || [];
         }
 
         function startDrag() {
@@ -2177,7 +2370,7 @@
             const k = Math.max(0, Math.min(ref.dropIndex ?? others.length, others.length));
             const order = [...others.slice(0, k), dragged, ...others.slice(k)];
             list.length = 0;
-            order.forEach((n) => list.push(n));
+            order.forEach((node) => list.push(node));
         }
 
         function finish(doCommit) {
@@ -2241,7 +2434,7 @@
         relationOf: (entry) => entry.relation,
         labelOf: (node) => {
             const type = TYPES[node.type] || TYPES.A;
-            if (node.type === "J") return ruleDisplayName(node);
+            if (node.type === "C") return ruleDisplayName(node);
             if (type.kind === "structure" || type.kind === "root") return compactStructureLabel(node, type);
             return flowNodeDisplayName(node);
         },
@@ -2263,7 +2456,7 @@
         findEntry: (id) => findRuleNode(id),
         relationOf: () => "rule",
         labelOf: (node) => {
-            const type = TYPES[node.type] || TYPES.R;
+            const type = TYPES[node.type] || TYPES.B;
             return type.kind === "structure" ? compactStructureLabel(node, type) : ruleNodeDisplayName(node);
         },
         afterCommit: (ref) => {

@@ -42,6 +42,7 @@ public class AtomicRuleDao {
             .name(rs.getString("name"))
             .description(rs.getString("description"))
             .expression(rs.getString("expression"))
+            .params(rs.getString("params"))
             .kind(rs.getString("kind"))
             .status(rs.getInt("status"))
             .version(rs.getLong("version"))
@@ -60,15 +61,16 @@ public class AtomicRuleDao {
         jdbc.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO atomic_rule "
-                            + "(namespace_id, name, description, expression, kind, status, version, created_at, updated_at) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
+                            + "(namespace_id, name, description, expression, params, kind, status, version, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
                     Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, entity.getNamespaceId());
             statement.setString(2, entity.getName());
             statement.setString(3, entity.getDescription() == null ? "" : entity.getDescription());
             statement.setString(4, entity.getExpression());
-            statement.setString(5, normalizeKind(entity.getKind()));
-            statement.setInt(6, entity.getStatus() == null ? 1 : entity.getStatus());
+            statement.setString(5, normalizeParams(entity.getParams()));
+            statement.setString(6, normalizeKind(entity.getKind()));
+            statement.setInt(7, entity.getStatus() == null ? 1 : entity.getStatus());
             return statement;
         }, keys);
         Number key = keys.getKey();
@@ -81,11 +83,12 @@ public class AtomicRuleDao {
     /** 按 ruleId 和期望版本更新规则正文及元数据 */
     public int update(String ruleId, AtomicRuleEntity entity) {
         return jdbc.update(
-                "UPDATE atomic_rule SET name=?, description=?, expression=?, kind=?, status=?, "
+                "UPDATE atomic_rule SET name=?, description=?, expression=?, params=?, kind=?, status=?, "
                         + "version=version+1, updated_at=datetime('now','localtime') "
                         + "WHERE id=? AND version=?",
                 entity.getName(), entity.getDescription() == null ? "" : entity.getDescription(),
-                entity.getExpression(), normalizeKind(entity.getKind()), entity.getStatus(),
+                entity.getExpression(), normalizeParams(entity.getParams()),
+                normalizeKind(entity.getKind()), entity.getStatus(),
                 RuleIds.parseRuleId(ruleId), entity.getVersion());
     }
 
@@ -191,5 +194,10 @@ public class AtomicRuleDao {
     /** 规范化原子规则分类 */
     private static String normalizeKind(String kind) {
         return "action".equals(kind) ? "action" : "condition";
+    }
+
+    /** 空参数模板归一为空 JSON 数组，保持列非空约束 */
+    private static String normalizeParams(String params) {
+        return params == null || params.isBlank() ? "[]" : params;
     }
 }

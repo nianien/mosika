@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS atomic_rule (
     name         TEXT    NOT NULL,
     description  TEXT    NOT NULL DEFAULT '',
     expression   TEXT    NOT NULL,
+    params       TEXT    NOT NULL DEFAULT '[]',
     kind         TEXT    NOT NULL DEFAULT 'condition' CHECK (kind IN ('condition', 'action')),
     status       INTEGER NOT NULL DEFAULT 1,
     version      INTEGER NOT NULL DEFAULT 0,

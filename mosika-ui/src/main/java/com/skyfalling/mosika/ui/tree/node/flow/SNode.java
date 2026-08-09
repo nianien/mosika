@@ -2,31 +2,24 @@ package com.skyfalling.mosika.ui.tree.node.flow;
 
 
 import com.skyfalling.mosika.ui.tree.node.define.BranchNode;
-import com.skyfalling.mosika.ui.tree.node.define.FlowNode;
+import com.skyfalling.mosika.ui.tree.node.define.UINode;
 import lombok.Getter;
 
 /**
- * 串行流程结构节点。
+ * 串行组合结构节点
  * <p>
- * {@code branches}中的每个元素都是可替换的完整流程子树，并严格按照列表顺序执行。
- * 显式串行结构保存子树作用域，不能用节点纵向位置或隐含连线替代。
+ * {@code branches} 中的每个元素都是完整的执行子树，并严格按照列表顺序执行
+ * 该节点表达组合子树之间的显式顺序，不替代 {@code ANode.next} 表达的普通动作链
  * <pre>
- *      sN
- *     / | \
- *    /  |  \
- *   fN  fN fN
+ *       sN
+ *      / | \
+ *     /  |  \
+ *   uN  uN  uN
  * </pre>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
  */
 @Getter
-public class SNode extends BranchNode<FlowNode> {
-
-    /**
-     * 创建串行节点，使用{@code S}作为稳定结构标识。
-     */
-    public SNode() {
-        super("S");
-    }
+public class SNode extends BranchNode<UINode> {
 }

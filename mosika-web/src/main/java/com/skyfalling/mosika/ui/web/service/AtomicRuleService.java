@@ -6,6 +6,7 @@ import com.skyfalling.mosika.ui.web.dao.FlowReferenceDao;
 import com.skyfalling.mosika.ui.web.dao.RuleNamespaceDao;
 import com.skyfalling.mosika.ui.web.entity.AtomicRuleEntity;
 import com.skyfalling.mosika.ui.web.entity.RuleNamespaceEntity;
+import com.skyfalling.mosika.utils.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 原子规则业务服务
@@ -119,6 +121,7 @@ public class AtomicRuleService {
             reference.put("description", rule.getDescription());
             reference.put("kind", rule.getKind());
             reference.put("namespace", rule.getNamespace());
+            reference.put("params", parseParams(rule.getParams()));
             return reference;
         }).toList();
     }
@@ -168,6 +171,68 @@ public class AtomicRuleService {
             request.setKind("condition");
         } else {
             validateKind(request.getKind());
+        }
+        request.setParams(validateParams(request.getParams()));
+    }
+
+    /** 允许的参数类型 */
+    private static final Set<String> PARAM_TYPES = Set.of("string", "number", "boolean", "enum");
+
+    /**
+     * 校验并规范化参数模板 JSON
+     * <p>
+     * 空值归一为 {@code []}；否则必须是 JSON 数组，每个元素声明非空 {@code name} 与合法 {@code type}，
+     * {@code type=enum} 时必须带非空 {@code options}。校验通过后原样返回，不改写内部结构（原始 JSON 透传）
+     */
+    static String validateParams(String params) {
+        if (params == null || params.isBlank()) {
+            return "[]";
+        }
+        List<?> defs;
+        try {
+            defs = JsonUtils.toList(params, Object.class);
+        } catch (Exception e) {
+            // JsonUtils 以 @SneakyThrows 透传 Jackson 的受检 IOException（解析/类型不匹配），
+            // 故必须捕获 Exception 而非仅 RuntimeException，否则非法 JSON 会绕过本层校验
+            throw new IllegalArgumentException("params must be a JSON array: " + e.getMessage(), e);
+        }
+        Set<String> names = new java.util.HashSet<>();
+        for (Object def : defs) {
+            if (!(def instanceof Map<?, ?> param)) {
+                throw new IllegalArgumentException("each param must be a JSON object");
+            }
+            Object name = param.get("name");
+            if (!(name instanceof String s) || s.isBlank()) {
+                throw new IllegalArgumentException("param name is required");
+            }
+            if (!names.add(s)) {
+                throw new IllegalArgumentException("duplicate param name: " + s);
+            }
+            Object type = param.get("type");
+            if (!(type instanceof String t) || !PARAM_TYPES.contains(t)) {
+                throw new IllegalArgumentException(
+                        "param type must be one of " + PARAM_TYPES + ", got " + type);
+            }
+            if ("enum".equals(type)) {
+                Object options = param.get("options");
+                if (!(options instanceof List<?> opts) || opts.isEmpty()) {
+                    throw new IllegalArgumentException("enum param '" + s + "' requires non-empty options");
+                }
+            }
+        }
+        return params;
+    }
+
+    /** 参数模板 JSON 解析为结构化列表，供画布直接消费；空或非法归一为空列表 */
+    static List<?> parseParams(String params) {
+        if (params == null || params.isBlank()) {
+            return List.of();
+        }
+        try {
+            return JsonUtils.toList(params, Object.class);
+        } catch (Exception e) {
+            // 同 validateParams：JsonUtils 透传受检解析异常，此处对非法 JSON 静默回退空列表
+            return List.of();
         }
     }
 

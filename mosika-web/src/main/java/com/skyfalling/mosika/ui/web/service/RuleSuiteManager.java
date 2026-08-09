@@ -13,7 +13,6 @@ import com.skyfalling.mosika.ui.web.dao.UdfDefinitionDao;
 import com.skyfalling.mosika.ui.web.entity.AtomicRuleEntity;
 import com.skyfalling.mosika.ui.web.entity.RuleFlowEntity;
 import com.skyfalling.mosika.ui.web.entity.UdfDefinitionEntity;
-import com.skyfalling.mosika.utils.JsonUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -165,7 +164,7 @@ public class RuleSuiteManager {
     private List<RuleDefinition> toFlowDefinitions(Collection<RuleFlowEntity> flows) {
         List<RuleDefinition> definitions = new ArrayList<>(flows.size());
         for (RuleFlowEntity flow : flows) {
-            TreeNode tree = JsonUtils.toBean(flow.getRuleTree(), TreeNode.class);
+            TreeNode tree = TreeNode.fromJson(flow.getRuleTree());
             tree.validateSize(RuleTreeCompiler.MAX_TREE_DEPTH, RuleTreeCompiler.MAX_TOTAL_NODES);
             tree.validate();
             String description = flow.getDescription() == null ? flow.getName() : flow.getDescription();

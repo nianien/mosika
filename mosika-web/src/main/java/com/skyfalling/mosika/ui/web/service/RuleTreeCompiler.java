@@ -3,7 +3,6 @@ package com.skyfalling.mosika.ui.web.service;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.ui.tree.node.TreeNode;
 import com.skyfalling.mosika.ui.tree.visitor.TreeVisitor;
-import com.skyfalling.mosika.utils.JsonUtils;
 import lombok.Data;
 
 import java.util.LinkedHashSet;
@@ -64,7 +63,7 @@ public final class RuleTreeCompiler {
         }
         TreeNode tree;
         try {
-            tree = JsonUtils.toBean(treeJson, TreeNode.class);
+            tree = TreeNode.fromJson(treeJson);
         } catch (Exception e) {
             throw new IllegalArgumentException("ruleTree is not a valid TreeNode JSON: " + e.getMessage(), e);
         }
@@ -109,7 +108,7 @@ public final class RuleTreeCompiler {
         }
         TreeNode tree;
         try {
-            tree = JsonUtils.toBean(treeJson, TreeNode.class);
+            tree = TreeNode.fromJson(treeJson);
         } catch (Exception e) {
             throw new IllegalArgumentException("ruleTree is not a valid TreeNode JSON: " + e.getMessage(), e);
         }

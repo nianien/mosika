@@ -3,12 +3,14 @@ package com.skyfalling.mosika.ui.tree.node;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.ui.tree.UINodeAdapter;
 import com.skyfalling.mosika.ui.tree.node.define.BranchNode;
+import com.skyfalling.mosika.ui.tree.node.define.FlowNode;
+import com.skyfalling.mosika.ui.tree.node.define.NameNode;
 import com.skyfalling.mosika.ui.tree.node.define.TypeNode;
+import com.skyfalling.mosika.ui.tree.node.define.UINode;
 import com.skyfalling.mosika.ui.tree.node.flow.ANode;
-import com.skyfalling.mosika.ui.tree.node.flow.CNode;
 import com.skyfalling.mosika.ui.tree.node.flow.DNode;
-import com.skyfalling.mosika.ui.tree.node.flow.JNode;
 import com.skyfalling.mosika.ui.tree.node.rule.LNode;
+import com.skyfalling.mosika.ui.tree.node.rule.RNode;
 import com.skyfalling.mosika.ui.tree.visitor.TreeVisitor;
 import com.skyfalling.mosika.utils.Constants;
 import com.skyfalling.mosika.utils.JsonUtils;
@@ -17,80 +19,106 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
 /**
- * UI树的序列化根节点。
+ * UITree 的序列化、遍历、校验和编译入口
  * <p>
- * 根节点本身不表示业务动作，继承的{@code next}是整棵流程树的唯一入口。
- * 默认入口为{@link Constants#NOP}动作，便于构造空树并保持JSON结构稳定。
- * Created on 2023/4/27
+ * 根节点不表示业务动作或条件，只通过 {@code next} 指向执行树入口
+ * <pre>
+ *     tN
+ *      |
+ *     uN
+ * </pre>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-public class TreeNode extends ANode {
-
-    /**
-     * 创建带空操作入口的UI树。
-     */
-    public TreeNode() {
-        super("");
-        this.setNext(new ANode(Constants.NOP));
-    }
+public class TreeNode extends NameNode {
 
     private static final UINodeAdapter ADAPTER = new UINodeAdapter();
 
+    private UINode next;
+
     /**
-     * 将当前UI流程树单向编译为内核规则节点。
-     *
-     * @return 内核规则树
+     * 创建带空操作入口的 UITree
      */
-    public RuleNode toRule() {
-        return ADAPTER.toRule(getNext());
+    public TreeNode() {
+        ANode action = new ANode();
+        action.setRule(new RNode(Constants.NOP));
+        next = action;
     }
 
     /**
-     * 从JSON反序列化UI树。
+     * 返回执行树入口
      *
-     * @param json UI树JSON
-     * @return UI树
+     * @return 执行树入口
+     */
+    public UINode getNext() {
+        return next;
+    }
+
+    /**
+     * 设置执行树入口
+     *
+     * @param next 执行树入口
+     */
+    public void setNext(UINode next) {
+        this.next = next;
+    }
+
+    /**
+     * 将当前 UITree 编译为内核执行树
+     *
+     * @return 内核执行树
+     */
+    public RuleNode toRule() {
+        return ADAPTER.toRule(next);
+    }
+
+    /**
+     * 从 JSON 反序列化 UITree
+     *
+     * @param json UITree 的 JSON 文本
+     * @return 反序列化后的 UITree
      */
     public static TreeNode fromJson(String json) {
         return JsonUtils.toBean(json, TreeNode.class);
     }
 
     /**
-     * 将当前UI树序列化为JSON。
+     * 将当前 UITree 序列化为 JSON
      *
-     * @return UI树JSON
+     * @return UITree 的 JSON 文本
      */
     public String toJson() {
         return JsonUtils.toJson(this);
     }
 
     /**
-     * 收集树中引用的原子规则ID。
+     * 收集树中引用的原子规则标识
      *
-     * @return 保持首次访问顺序的规则ID集合
+     * @return 按首次访问顺序排列的规则标识集合
      */
     public Set<String> collect() {
         return visit(TreeVisitor.RULE_ID_COLLECTOR, new LinkedHashSet<>());
     }
 
     /**
-     * 校验节点结构和规则参数。
+     * 校验 UITree 的节点结构和规则参数
      */
     public void validate() {
         visit(TreeVisitor.NODE_VALIDATOR, null);
     }
 
     /**
-     * 使用显式栈检查整棵 UI AST 的规模，并拒绝重复引用或循环引用。
-     * 该检查应在任何递归校验、编译和序列化之前执行。
+     * 校验 UITree 的最大深度、节点数量和引用唯一性
      *
-     * @param maxDepth 允许的最大嵌套深度，根节点深度为 1
-     * @param maxNodes 允许的最大节点总数
+     * @param maxDepth 允许的最大深度，根节点深度为 {@code 1}
+     * @param maxNodes 允许的最大节点数量
+     * @throws IllegalArgumentException 限制值不是正数
+     * @throws IllegalStateException 树超出限制或包含重复引用及循环引用
      */
     public void validateSize(int maxDepth, int maxNodes) {
         if (maxDepth < 1 || maxNodes < 1) {
@@ -119,31 +147,37 @@ public class TreeNode extends ANode {
     }
 
     private static void pushChildren(ArrayDeque<VisitFrame> stack, TypeNode node, int childDepth) {
-        if (node instanceof JNode judge && judge.getRule() != null) {
-            stack.push(new VisitFrame(judge.getRule(), childDepth));
-        }
-        if (node instanceof LNode logic) {
-            for (TypeNode rule : logic.getRules()) {
-                if (rule != null) {
-                    stack.push(new VisitFrame(rule, childDepth));
-                }
+        if (node instanceof TreeNode tree) {
+            if (tree.getNext() != null) {
+                stack.push(new VisitFrame(tree.getNext(), childDepth));
             }
-        }
-        if (node instanceof BranchNode<?> branch) {
-            for (TypeNode child : branch.getBranches()) {
-                if (child != null) {
-                    stack.push(new VisitFrame(child, childDepth));
-                }
+        } else if (node instanceof FlowNode<?> flow) {
+            if (flow.getNext() != null) {
+                stack.push(new VisitFrame(flow.getNext(), childDepth));
             }
+            if (flow.getRule() != null) {
+                stack.push(new VisitFrame(flow.getRule(), childDepth));
+            }
+        } else if (node instanceof DNode decision) {
+            if (decision.getDefaultBranch() != null) {
+                stack.push(new VisitFrame(decision.getDefaultBranch(), childDepth));
+            }
+            pushChildren(stack, decision.getBranches(), childDepth);
+        } else if (node instanceof BranchNode<?> branch) {
+            pushChildren(stack, branch.getBranches(), childDepth);
+        } else if (node instanceof LNode logic) {
+            pushChildren(stack, logic.getRules(), childDepth);
         }
-        if (node instanceof CNode condition && condition.getAction() != null) {
-            stack.push(new VisitFrame(condition.getAction(), childDepth));
-        }
-        if (node instanceof DNode decision && decision.getAction() != null) {
-            stack.push(new VisitFrame(decision.getAction(), childDepth));
-        }
-        if (node instanceof ANode action && action.getNext() != null) {
-            stack.push(new VisitFrame(action.getNext(), childDepth));
+    }
+
+    private static void pushChildren(ArrayDeque<VisitFrame> stack,
+                                     List<? extends TypeNode> children,
+                                     int childDepth) {
+        for (int i = children.size() - 1; i >= 0; i--) {
+            TypeNode child = children.get(i);
+            if (child != null) {
+                stack.push(new VisitFrame(child, childDepth));
+            }
         }
     }
 
@@ -151,41 +185,41 @@ public class TreeNode extends ANode {
     }
 
     /**
-     * 深度优先遍历流程树和嵌入的规则子树。
+     * 按深度优先顺序访问执行树及其绑定的规则树
      *
      * @param consumer 节点访问操作
-     * @param result   遍历期间共享的结果对象
-     * @param <T>      结果类型
-     * @return 传入的结果对象
+     * @param result 遍历期间共享的结果对象
+     * @param <T> 结果类型
+     * @return 调用方传入的结果对象
      */
     public <T> T visit(BiConsumer<TypeNode, T> consumer, T result) {
-        visit(this, consumer, result);
+        visitNode(this, consumer, result);
         return result;
     }
 
-    private static <T> void visit(TypeNode node, BiConsumer<TypeNode, T> consumer, T result) {
+    private static <T> void visitNode(TypeNode node, BiConsumer<TypeNode, T> consumer, T result) {
         if (node == null) {
             return;
         }
         consumer.accept(node, result);
-        if (node instanceof JNode) {
-            visit(((JNode) node).getRule(), consumer, result);
-        }
-        if (node instanceof LNode) {
-            ((LNode) node).getRules().forEach(rule -> visit(rule, consumer, result));
-        }
-        if (node instanceof BranchNode) {
-            ((BranchNode<?>) node).getBranches().forEach(branch -> visit(branch, consumer, result));
-        }
-        if (node instanceof CNode) {
-            visit(((CNode) node).getAction(), consumer, result);
-        }
-        if (node instanceof DNode) {
-            visit(((DNode) node).getAction(), consumer, result);
-        }
-        if (node instanceof ANode) {
-            visit(((ANode) node).getNext(), consumer, result);
+        if (node instanceof TreeNode tree) {
+            visitNode(tree.getNext(), consumer, result);
+        } else if (node instanceof FlowNode<?> flow) {
+            visitNode(flow.getRule(), consumer, result);
+            visitNode(flow.getNext(), consumer, result);
+        } else if (node instanceof DNode decision) {
+            for (TypeNode child : decision.getBranches()) {
+                visitNode(child, consumer, result);
+            }
+            visitNode(decision.getDefaultBranch(), consumer, result);
+        } else if (node instanceof BranchNode<?> branch) {
+            for (TypeNode child : branch.getBranches()) {
+                visitNode(child, consumer, result);
+            }
+        } else if (node instanceof LNode logic) {
+            for (RNode rule : logic.getRules()) {
+                visitNode(rule, consumer, result);
+            }
         }
     }
-
 }

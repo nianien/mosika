@@ -3,34 +3,37 @@ package com.skyfalling.mosika.ui.tree.node.rule;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonCreator.Mode;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.skyfalling.mosika.ui.tree.node.define.IRNode;
-import lombok.Getter;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 与/或逻辑组合规则节点。
+ * 与或逻辑组合规则节点
  * <p>
- * {@code expr}只能是{@code &&}或{@code ||}，{@code rules}按表达式顺序保存两个或以上
- * 纯规则子树。节点继承的{@code name}表示整个组合规则的可编辑名称，
- * 不会传播或覆盖子规则名称；继承的{@code label}仍只是通用节点展示标签。
+ * {@code expr} 只能是 {@code &&} 或 {@code ||}
+ * {@code rules} 按表达式顺序保存两个或以上规则子树
+ * <pre>
+ *       lN
+ *      / | \
+ *     /  |  \
+ *   rN  rN  rN
+ * </pre>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * <p>
  * Created on 2022-07-19
  */
-public class LNode extends RNode implements IRNode {
+@Data
+public class LNode extends BNode {
+
+    /** 按逻辑表达式顺序保存的直接子规则 */
+    private final List<RNode> rules = new ArrayList<>();
+
 
     /**
-     * 按逻辑表达式顺序保存的直接子规则。
-     */
-    @Getter
-    private List<RNode> rules = new ArrayList<>();
-
-    /**
-     * 创建逻辑组合节点。
+     * 创建逻辑组合节点
      *
      * @param expr 逻辑运算符，只能是{@code &&}或{@code ||}
      */
@@ -40,29 +43,29 @@ public class LNode extends RNode implements IRNode {
     }
 
     /**
-     * 将子规则追加到有序规则列表末尾。
+     * 将子规则追加到有序规则列表末尾
      *
-     * @param rNode 待追加的纯规则子树
+     * @param rule 待追加的规则子树
      * @return 当前逻辑组合节点
      */
-    public LNode addRule(RNode rNode) {
-        this.rules.add(rNode);
+    public LNode addRule(RNode rule) {
+        rules.add(rule);
         return this;
     }
 
     /**
-     * 创建“与”组合节点。
+     * 创建逻辑与组合节点
      *
-     * @return 使用{@code &&}运算符的组合节点
+     * @return 使用 {@code &&} 运算符的逻辑组合节点
      */
     public static LNode and() {
         return new LNode("&&");
     }
 
     /**
-     * 创建“或”组合节点。
+     * 创建逻辑或组合节点
      *
-     * @return 使用{@code ||}运算符的组合节点
+     * @return 使用 {@code ||} 运算符的逻辑组合节点
      */
     public static LNode or() {
         return new LNode("||");
@@ -70,9 +73,9 @@ public class LNode extends RNode implements IRNode {
 
 
     /**
-     * 按子规则顺序生成逻辑组合DSL，并应用当前组合节点的取反状态。
+     * 按子规则顺序生成逻辑组合 DSL，并应用当前节点的取反状态
      *
-     * @return 逻辑组合DSL表达式
+     * @return 逻辑组合 DSL 表达式
      */
     @Override
     public String ruleExpr() {

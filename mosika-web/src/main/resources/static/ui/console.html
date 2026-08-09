@@ -473,7 +473,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     try {
       const created = await Api.createFlow({
         name, namespace: $("#newNamespace").value, description: $("#newDesc").value.trim(),
-        ruleTree: JSON.stringify({ type: "T", expr: "", next: { type: "A", expr: "∅" } })
+        ruleTree: JSON.stringify({
+          type: "T", name: "",
+          next: { type: "A", name: "", rule: { type: "R", name: "", expr: "∅" } }
+        })
       });
       $("#newDlg").close();
       openCanvas(created.flowId);

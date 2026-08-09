@@ -92,6 +92,21 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13.5px;color:#123038;background:#fff;font-family:inherit}
 .field textarea{min-height:64px;resize:vertical;font-family:"JetBrains Mono",Menlo,Consolas,monospace}
 .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.params-editor{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto}
+.params-empty{font-size:12px;color:#8aa39d;padding:2px 0}
+.param-card{border:1px solid var(--border);border-radius:8px;padding:8px;background:#fbfefe;display:flex;flex-direction:column;gap:6px}
+.param-line{display:flex;gap:6px;align-items:center}
+.param-card input,.param-card select{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12.5px;color:#123038;background:#fff;font-family:inherit;min-width:0}
+.param-card input:focus,.param-card select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft)}
+.param-card .p-name,.param-card .p-label,.param-card .p-default{flex:1}
+.param-card .p-type{flex:0 0 82px}
+.param-card .p-desc,.param-card .p-options{width:100%}
+.param-req{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:12px;color:#5c766f;white-space:nowrap;cursor:pointer}
+.param-req input{width:auto;padding:0;margin:0}
+.param-remove{flex:0 0 auto;border:none;background:none;color:#c9504f;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1}
+.param-remove:hover{color:#a53a39}
+.param-add{align-self:flex-start;height:28px;padding:0 10px;border:1px dashed #9fd8cf;border-radius:7px;background:#f4faf9;color:var(--teal-d);font-size:12px;cursor:pointer;margin-top:2px}
+.param-add:hover{background:var(--teal-soft)}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.pager{justify-content:space-between}}
 </style>
 </head>
@@ -135,6 +150,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">支持表达式插值：形如 ${$.字段}（入参）或 ${$$.字段}（上下文），运行时替换为实际值，如 ${$.agent.id}。</div></div>
     <div class="field"><label>规则类型</label><select id="fKind"><option value="condition">判断条件（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
     <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
+    <div class="field">
+      <label>参数模板</label>
+      <div class="params-editor" id="paramsEditor"></div>
+      <button type="button" class="param-add" id="addParamBtn">＋ 添加参数</button>
+      <div class="hint">声明该规则可被参数化调用的模板参数（$args）。业务场景引用此规则时，画布会按此渲染录入表单并绑定到节点。</div>
+    </div>
   </div>
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
 </dialog>
@@ -159,6 +180,75 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
   const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+
+  // 参数模板编辑：每行声明一个可被参数化调用的模板参数（$args）。
+  const PARAM_TYPES = [["string", "文本"], ["number", "数字"], ["boolean", "布尔"], ["enum", "枚举"]];
+
+  // 后端以原始 JSON 字符串透传 params（entity 的 String 字段），此处解析为数组供编辑；非法归一为空数组。
+  function parseParamsField(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== "string" || !raw.trim()) return [];
+    try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+  }
+
+  function paramCardHtml(p) {
+    p = p || {};
+    const type = PARAM_TYPES.some(([v]) => v === p.type) ? p.type : "string";
+    const opts = Array.isArray(p.options) ? p.options.join(", ") : (p.options || "");
+    const def = p.default === undefined || p.default === null ? "" : String(p.default);
+    return `<div class="param-card" data-param>
+      <div class="param-grid">
+        <input data-p="name" placeholder="参数名 name *" value="${esc(p.name)}">
+        <input data-p="label" placeholder="中文名 label" value="${esc(p.label)}">
+        <select class="param-type" data-p="type">
+          ${PARAM_TYPES.map(([v, t]) => `<option value="${v}" ${v === type ? "selected" : ""}>${t}</option>`).join("")}
+        </select>
+        <label class="param-req"><input type="checkbox" data-p="required" ${p.required ? "checked" : ""}>必填</label>
+        <button type="button" class="param-remove" data-remove title="删除该参数">✕</button>
+      </div>
+      <input data-p="description" placeholder="描述 description" value="${esc(p.description)}">
+      <input data-p="options" placeholder="枚举项，逗号分隔" value="${esc(opts)}" ${type === "enum" ? "" : "hidden"}>
+      <input data-p="default" placeholder="默认值 default" value="${esc(def)}">
+    </div>`;
+  }
+
+  function renderParams(list) {
+    const editor = $("#paramsEditor");
+    const items = parseParamsField(list);
+    editor.innerHTML = items.length
+      ? items.map(paramCardHtml).join("")
+      : `<div class="params-empty">暂无参数，该规则将作为无参规则调用。点下方「添加参数」以支持参数化。</div>`;
+  }
+
+  // 汇总编辑区的参数行为规范化对象数组；name 为空的行忽略。校验失败返回 {error}。
+  function collectParams() {
+    const cards = Array.from(document.querySelectorAll("#paramsEditor .param-card"));
+    const result = [];
+    const seen = new Set();
+    for (const card of cards) {
+      const get = (k) => card.querySelector(`[data-p="${k}"]`);
+      const name = get("name").value.trim();
+      if (!name) continue; // 空行视为未填写，直接跳过
+      if (seen.has(name)) return { error: `参数名重复：${name}` };
+      seen.add(name);
+      const type = get("type").value;
+      const param = { name, type };
+      const label = get("label").value.trim();
+      if (label) param.label = label;
+      const description = get("description").value.trim();
+      if (description) param.description = description;
+      if (get("required").checked) param.required = true;
+      if (type === "enum") {
+        const options = get("options").value.split(",").map((s) => s.trim()).filter(Boolean);
+        if (!options.length) return { error: `枚举参数「${name}」需至少一个选项` };
+        param.options = options;
+      }
+      const def = get("default").value.trim();
+      if (def) param.default = def;
+      result.push(param);
+    }
+    return { params: result };
+  }
 
   async function loadRefCounts() {
     refCount = new Map();
@@ -249,6 +339,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     $("#fKind").value = rule ? (rule.kind === "action" ? "action" : "condition") : "condition";
     const expr = rule ? (rule.expression || "") : "";
     $("#fExpr").value = expr;
+    renderParams(rule ? rule.params : null);
     $("#ruleDlg").showModal();
     const cm = ensureExprEditor();
     if (cm) {
@@ -264,9 +355,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const expression = (exprEditor ? exprEditor.getValue() : $("#fExpr").value).trim();
     if (!name) { toast("规则名称不能为空"); return; }
     if (!expression) { toast("表达式不能为空"); return; }
+    const collected = collectParams();
+    if (collected.error) { toast(collected.error); return; }
     const body = {
       name, namespace: $("#fNamespace").value,
-      description: $("#fDesc").value.trim(), expression, kind: $("#fKind").value
+      description: $("#fDesc").value.trim(), expression, kind: $("#fKind").value,
+      params: JSON.stringify(collected.params)
     };
     try {
       if (editing) { body.ruleId = editing.ruleId; body.version = editing.version; await Api.updateRule(editing.ruleId, body); }
@@ -319,6 +413,22 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#newRuleBtn").addEventListener("click", () => openDialog(null));
   $("#dlgCancel").addEventListener("click", () => $("#ruleDlg").close());
   $("#dlgSave").addEventListener("click", saveRule);
+  $("#addParamBtn").addEventListener("click", () => {
+    const empty = $("#paramsEditor .params-empty");
+    if (empty) empty.remove();
+    $("#paramsEditor").insertAdjacentHTML("beforeend", paramCardHtml({}));
+  });
+  $("#paramsEditor").addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-remove]"); if (!rm) return;
+    rm.closest(".param-card").remove();
+    if (!$("#paramsEditor").querySelector(".param-card")) renderParams(null);
+  });
+  $("#paramsEditor").addEventListener("change", (e) => {
+    if (e.target.matches('[data-p="type"]')) {
+      const options = e.target.closest(".param-card").querySelector('[data-p="options"]');
+      options.hidden = e.target.value !== "enum";
+    }
+  });
 
   (async () => {
     try {

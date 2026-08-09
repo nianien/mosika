@@ -123,7 +123,7 @@
             <span class="detail-label">节点类型</span>
             <select id="nodeConfigType">
                 <option value="A">动作节点</option>
-                <option value="J">条件节点</option>
+                <option value="C">条件节点</option>
                 <option value="S">串行节点</option>
                 <option value="P">并行节点</option>
                 <option value="D">分支节点</option>
@@ -204,6 +204,7 @@
                         <span id="ruleReferenceLabel">命中表达式</span>
                         <input id="ruleNodeExpression" readonly>
                     </label>
+                    <div class="rule-editor-params" id="ruleEditorParamsField" hidden></div>
                     <div class="inspector-add" id="ruleAddPanel" hidden>
                         <div class="inspector-add-title" id="ruleAddTitle">添加规则</div>
                         <div class="rule-add-rows" id="ruleAddRows"></div>
@@ -264,8 +265,8 @@
 
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
-<script src="/ui/treenode.js?v=20260802-1"></script>
+<script src="/ui/treenode.js?v=20260809-1"></script>
 <script src="/ui/api.js?v=20260802-1"></script>
-<script src="/ui/app.js?v=20260802-1"></script>
+<script src="/ui/app.js?v=20260809-1"></script>
 </body>
 </html>

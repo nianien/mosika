@@ -41,11 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MosikaWebIntegrationTest {
 
     private static final Path DB_PATH = createDatabasePath();
-    private static final String EMPTY_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\"∅\"}}";
-    private static final String INVALID_DECISION_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"D\",\"expr\":\"D\",\"branches\":[],\"action\":{\"type\":\"A\",\"expr\":\"∅\"}}}";
-    private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"D\",\"expr\":\"D\",\"branches\":[{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"R\",\"expr\":\"true\"}},{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"R\",\"expr\":\"false\"}}]}}";
-    private static final String EMPTY_SERIAL_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"S\",\"expr\":\"S\",\"branches\":[]}}";
-    private static final String SINGLE_LOGIC_TREE = "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"L\",\"expr\":\"&&\",\"rules\":[{\"type\":\"R\",\"expr\":\"true\"}]}}}";
+    private static final String EMPTY_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\"∅\"}}}";
+    private static final String INVALID_DECISION_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"D\",\"branches\":[],\"defaultBranch\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\"∅\"}}}}";
+    private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"D\",\"branches\":[{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\"true\"}},{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\"false\"}}]}}";
+    private static final String EMPTY_SERIAL_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"S\",\"branches\":[]}}";
+    private static final String SINGLE_LOGIC_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"C\",\"rule\":{\"type\":\"L\",\"expr\":\"&&\",\"rules\":[{\"type\":\"B\",\"expr\":\"true\"}]}}}";
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -566,7 +566,7 @@ class MosikaWebIntegrationTest {
         mvc.perform(get("/api/flows"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].ruleTree").doesNotExist())
-                .andExpect(jsonPath("$.data.items[0].nodeCount").value(2))
+                .andExpect(jsonPath("$.data.items[0].nodeCount").value(3))
                 .andExpect(jsonPath("$.data.items[0].referencedRuleIds.length()").value(0));
         mvc.perform(get("/api/flows")
                         .param("pageNumber", String.valueOf(Integer.MAX_VALUE))
@@ -639,18 +639,18 @@ class MosikaWebIntegrationTest {
     }
 
     private String judgeTree(String ruleId) {
-        return "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"J\",\"expr\":\"J\",\"rule\":{\"type\":\"R\",\"expr\":\""
+        return "{\"type\":\"T\",\"next\":{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\""
                 + ruleId + "\"}}}";
     }
 
     private String actionTree(String ruleId) {
-        return "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\""
-                + ruleId + "\"}}";
+        return "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\""
+                + ruleId + "\"}}}";
     }
 
     private String compositeReferenceTree(String flowId) {
-        return "{\"type\":\"T\",\"expr\":\"\",\"next\":{\"type\":\"A\",\"expr\":\""
-                + flowId + "\"}}";
+        return "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\""
+                + flowId + "\"}}}";
     }
 
     private Map<String, Object> flowBody(String name, String tree, Integer version) {

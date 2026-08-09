@@ -1,27 +1,27 @@
 package com.skyfalling.mosika.ui.tree.node.define;
 
+import lombok.Data;
+
 /**
- * 流程递归域的抽象基类。
+ * 绑定一棵规则表达式并拥有单一出口的原子执行节点
  * <p>
- * 所有可出现在主流程中的节点均继承该类。具体节点通过{@code next}、
- * {@code action}或{@code branches}显式维护递归边，不依赖画布位置或连线方向推断语义。
+ * {@link com.skyfalling.mosika.ui.tree.node.flow.ANode} 将出口解释为无条件后继
+ * {@link com.skyfalling.mosika.ui.tree.node.flow.CNode} 将出口解释为条件命中分支
  * <pre>
  *     fN
  *      |
- *     fN
+ *     uN
  * </pre>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
  */
-public abstract class FlowNode extends UINode implements TypeNode {
+@Data
+public abstract class FlowNode<T extends RuleNode> extends UINode implements TypeNode {
 
-    /**
-     * 创建流程节点。
-     *
-     * @param expr 动作、条件表达式或流程结构标识
-     */
-    public FlowNode(String expr) {
-        super(expr);
-    }
+    /** 当前原子节点绑定的规则 */
+    private T rule;
+
+    /** 单一出口，具体语义由原子节点类型决定 */
+    private UINode next;
 }

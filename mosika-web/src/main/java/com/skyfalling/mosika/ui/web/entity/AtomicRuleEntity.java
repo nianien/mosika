@@ -42,6 +42,15 @@ public class AtomicRuleEntity {
     /** JavaScript 原子规则表达式 */
     private String expression;
 
+    /**
+     * 参数模板定义，原始 JSON 数组文本，默认 {@code []}
+     * <p>
+     * 每个元素声明一个模板参数（name/label/description/type/required/default，enum 另带 options），
+     * 供画布在引用该规则的节点上渲染录入表单并绑定 {@code $args}。本层只按原始 JSON 透传，
+     * 结构合法性由 {@code AtomicRuleService} 校验，与 {@code rule_tree} 的 JSON blob 存储方式一致
+     */
+    private String params;
+
     /** 规则分类：condition 条件规则 / action 动作规则 */
     private String kind;
 

@@ -311,6 +311,20 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .field-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .field-edit:hover { color: #4a6bd3; background: #eef3ff; }
+/* 模板参数（$args）录入区 */
+.args-section { display: grid; gap: 10px; margin-top: 6px; padding-top: 12px; border-top: 1px dashed #e2e7f0; }
+.args-title { color: #4a6bd3; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.arg-field { gap: 4px; }
+.arg-field .arg-req { color: #d3524f; font-weight: 700; }
+.arg-field .arg-hint { color: #9aa5b8; font-size: 10.5px; line-height: 1.4; }
+.args-section .arg-control {
+    display: block; width: 100%; min-width: 0; box-sizing: border-box;
+    padding: 6px 8px; border: 1px solid #d9e0ec; border-radius: 6px;
+    color: #2b3a54; font-size: 13px; background: #fff; font-family: inherit;
+}
+.args-section .arg-control:focus { outline: none; border-color: #4a6bd3; box-shadow: 0 0 0 2px #e6edff; }
+.arg-field.arg-missing .arg-control { border-color: #e6a6a6; background: #fff8f8; }
+.arg-field.arg-missing .detail-label { color: #c9504f; }
 .detail-field.field-editing .detail-value { display: none; }
 .detail-field.field-editing .field-control { display: block; }
 .field-edit-actions { flex: 0 0 auto; display: inline-flex; gap: 4px; }

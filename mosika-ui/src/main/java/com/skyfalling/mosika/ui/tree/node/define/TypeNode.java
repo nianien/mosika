@@ -6,10 +6,10 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.skyfalling.mosika.ui.tree.resolver.NodeTypeResolver;
 
 /**
- * UI树节点的多态类型契约。
+ * UITree 节点的 JSON 多态标记
  * <p>
- * JSON中的{@code type}字段由{@link NodeTypeResolver}根据具体节点类型生成并解析，
- * {@code expr}则保留节点自身的表达式或结构标识。
+ * 该接口不保存字段也不定义业务行为
+ * JSON 中的 {@code type} 字段由 {@link NodeTypeResolver} 根据节点的实际类型生成和解析
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
@@ -17,13 +17,5 @@ import com.skyfalling.mosika.ui.tree.resolver.NodeTypeResolver;
 @JsonTypeIdResolver(NodeTypeResolver.class)
 public interface TypeNode {
 
-    /**
-     * 返回节点表达式。
-     * <p>
-     * 原子节点返回规则或动作表达式，结构节点返回稳定的结构标识。
-     *
-     * @return 节点表达式或结构标识
-     */
-    String getExpr();
 
 }
