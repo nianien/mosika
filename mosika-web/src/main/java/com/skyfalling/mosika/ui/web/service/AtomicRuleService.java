@@ -108,8 +108,8 @@ public class AtomicRuleService {
     }
 
     /** 查询原子规则被运行态规则流闭包直接引用的次数 */
-    public Map<String, Integer> refCounts() {
-        return referenceDao.atomicRefCountsByActiveFlow();
+    public Map<String, Integer> refCounts(String namespace) {
+        return referenceDao.atomicRefCountsByActiveFlow(requireNamespace(namespace).getId());
     }
 
     /** 查询规则编辑器使用的轻量启用原子规则索引 */

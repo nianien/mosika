@@ -10,6 +10,7 @@ import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.eval.result.RuleResult;
 import com.skyfalling.mosika.exception.RuleEvalException;
+import com.skyfalling.mosika.exception.RuleNotFoundException;
 import lombok.Getter;
 
 import java.util.LinkedHashMap;
@@ -166,7 +167,8 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      * @param expression 完整节点表达式
      * @param arguments  当前规则调用参数
      * @return 叶子规则评估结果
-     * @throws RuleEvalException 规则未注册或执行失败时抛出
+     * @throws RuleNotFoundException 规则未注册时抛出
+     * @throws RuleEvalException 规则执行失败时抛出
      */
     private EvalResult doEval(String ruleId,
                               String expression,
@@ -183,6 +185,9 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
             long end = System.currentTimeMillis();
             ListenerProvider.DEFAULT.onEval(
                     new RuleEvent(EventType.EVAL_FAIL, expression, e, end - begin));
+            if (e instanceof RuleNotFoundException notFound) {
+                throw notFound;
+            }
             throw new RuleEvalException(ruleId, e.getMessage(), e);
         }
     }

@@ -2,7 +2,9 @@ package com.skyfalling.mosika.ui.web.service;
 
 import com.skyfalling.mosika.udf.JsUdf;
 import com.skyfalling.mosika.ui.web.common.BusinessException;
+import com.skyfalling.mosika.ui.web.dao.RuleNamespaceDao;
 import com.skyfalling.mosika.ui.web.dao.UdfDefinitionDao;
+import com.skyfalling.mosika.ui.web.entity.RuleNamespaceEntity;
 import com.skyfalling.mosika.ui.web.entity.UdfDefinitionEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class UdfDefinitionService {
 
+    /** 默认命名空间编码 */
+    private static final String DEFAULT_NAMESPACE = "default";
+
     /** JavaScript 标识符格式，不允许通过点号表达层级 */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
 
@@ -35,6 +40,9 @@ public class UdfDefinitionService {
 
     /** UDF 定义持久化访问对象 */
     private final UdfDefinitionDao udfDao;
+
+    /** 命名空间持久化访问对象 */
+    private final RuleNamespaceDao namespaceDao;
 
     /** 规则套件候选快照构造与发布入口 */
     private final RuleSuiteManager suiteManager;
@@ -53,7 +61,10 @@ public class UdfDefinitionService {
     @Transactional
     public UdfDefinitionEntity create(UdfDefinitionEntity request) {
         normalizeAndValidate(request);
-        ensurePathAvailable(request.getGroup(), request.getName(), null);
+        RuleNamespaceEntity namespace = requireNamespace(request.getNamespace());
+        request.setNamespaceId(namespace.getId());
+        request.setNamespace(namespace.getCode());
+        ensurePathAvailable(namespace.getCode(), request.getGroup(), request.getName(), null);
         request.setStatus(1);
         long id = udfDao.insert(request);
         // 事务内构造完整候选快照：函数、命名空间或存量规则失败则整体回滚
@@ -82,7 +93,11 @@ public class UdfDefinitionService {
         request.setId(id);
         request.setStatus(existing.getStatus());
         normalizeAndValidate(request);
-        ensurePathAvailable(request.getGroup(), request.getName(), id);
+        RuleNamespaceEntity namespace = requireNamespace(request.getNamespace());
+        assertNamespaceUnchanged(namespace.getCode(), existing.getNamespace());
+        request.setNamespaceId(existing.getNamespaceId());
+        request.setNamespace(existing.getNamespace());
+        ensurePathAvailable(existing.getNamespace(), request.getGroup(), request.getName(), id);
         int rows = udfDao.update(request);
         if (rows == 0) {
             throw new BusinessException(409,
@@ -106,7 +121,8 @@ public class UdfDefinitionService {
     public UdfDefinitionEntity enable(long id, long expectedVersion) {
         UdfDefinitionEntity existing = requireUdf(id);
         normalizeAndValidate(existing);
-        ensurePathAvailable(existing.getGroup(), existing.getName(), id);
+        requireNamespace(existing.getNamespace());
+        ensurePathAvailable(existing.getNamespace(), existing.getGroup(), existing.getName(), id);
         int rows = udfDao.enable(id, expectedVersion);
         if (rows == 0) {
             throw new BusinessException(409, "udf updated by others, please retry");
@@ -146,17 +162,21 @@ public class UdfDefinitionService {
      * 分页查询 UDF 定义
      *
      * @param status     启停状态过滤条件，传 {@code null} 表示不过滤
-     * @param keyword    命名空间、名称、描述或源码关键字，传空值表示不过滤
+     * @param namespace  规则命名空间，传空值表示默认命名空间
+     * @param keyword    UDF 分组、名称、描述或源码关键字，传空值表示不过滤
      * @param pageNumber 从 1 开始的页码，小于 1 时按 1 处理
      * @param pageSize   每页条数，范围限制为 1 到 200
      * @return 包含数据项、总数和规范化分页参数的结果
      */
-    public Map<String, Object> page(Integer status, String keyword, int pageNumber, int pageSize) {
+    public Map<String, Object> page(Integer status, String namespace, String keyword,
+                                    int pageNumber, int pageSize) {
         int page = Math.max(pageNumber, 1);
         int size = Math.max(1, Math.min(pageSize, 200));
         long offset = (long) (page - 1) * size;
-        List<UdfDefinitionEntity> rows = udfDao.list(status, keyword, offset, size);
-        int total = udfDao.count(status, keyword);
+        String normalizedNamespace = normalizeNamespace(namespace);
+        List<UdfDefinitionEntity> rows = udfDao.list(
+                status, normalizedNamespace, keyword, offset, size);
+        int total = udfDao.count(status, normalizedNamespace, keyword);
         return Map.of(
                 "items", rows,
                 "total", total,
@@ -177,6 +197,16 @@ public class UdfDefinitionService {
             throw new BusinessException(404, "udf not found: " + id);
         }
         return entity;
+    }
+
+    /** 查询必须存在且启用的命名空间 */
+    private RuleNamespaceEntity requireNamespace(String code) {
+        String normalized = normalizeNamespace(code);
+        RuleNamespaceEntity namespace = namespaceDao.findByCode(normalized);
+        if (namespace == null || namespace.getStatus() == null || namespace.getStatus() != 1) {
+            throw new BusinessException(400, "unknown or disabled namespace: " + normalized);
+        }
+        return namespace;
     }
 
     /**
@@ -241,16 +271,29 @@ public class UdfDefinitionService {
     /**
      * 校验 UDF 的完整注册路径是否唯一
      *
-     * @param group  点分隔命名空间
-     * @param name   函数名称
-     * @param selfId 更新场景中允许忽略的当前记录 ID，创建时传 {@code null}
+     * @param namespace 规则命名空间
+     * @param group     点分隔 UDF 分组
+     * @param name      函数名称
+     * @param selfId    更新场景中允许忽略的当前记录 ID，创建时传 {@code null}
      * @throws BusinessException 完整路径已被其他记录占用时抛出
      */
-    private void ensurePathAvailable(String group, String name, Long selfId) {
-        UdfDefinitionEntity conflict = udfDao.findByPath(group, name);
+    private void ensurePathAvailable(String namespace, String group, String name, Long selfId) {
+        UdfDefinitionEntity conflict = udfDao.findByPath(namespace, group, name);
         if (conflict != null && (selfId == null || !selfId.equals(conflict.getId()))) {
             throw new BusinessException(409, "udf already exists: " + fullName(group, name));
         }
+    }
+
+    /** UDF 创建后不允许改变命名空间 */
+    private static void assertNamespaceUnchanged(String requested, String existing) {
+        if (!existing.equals(requested)) {
+            throw new BusinessException(400, "namespace cannot be changed after creation");
+        }
+    }
+
+    /** 空命名空间归一为默认命名空间 */
+    private static String normalizeNamespace(String namespace) {
+        return namespace == null || namespace.isBlank() ? DEFAULT_NAMESPACE : namespace.trim();
     }
 
     /**

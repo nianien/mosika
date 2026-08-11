@@ -33,6 +33,7 @@ public class EvalController {
     @Data
     @EqualsAndHashCode(callSuper = false)
     public static class ExprEvalRequest extends EvalRequest {
+        private String namespace;
         private String expression;
     }
 
@@ -52,9 +53,13 @@ public class EvalController {
         return ApiResponse.ok(suiteManager.evalRule(ruleId, r.getTarget()));
     }
 
-    /** 执行任意 DSL 表达式：POST /api/eval/expr，body 包含 expression/target。 */
+    /** 执行任意规则 DSL 表达式：POST /api/eval/expr，body 包含 namespace/expression/target。 */
     @PostMapping("/expr")
     public ApiResponse<NodeResult> evalExpr(@RequestBody ExprEvalRequest req) {
-        return ApiResponse.ok(suiteManager.evalExpr(req.getExpression(), req.getTarget()));
+        if (req.getNamespace() == null || req.getNamespace().isBlank()) {
+            throw new IllegalArgumentException("namespace is required");
+        }
+        return ApiResponse.ok(suiteManager.evalExpr(
+                req.getNamespace(), req.getExpression(), req.getTarget()));
     }
 }

@@ -17,7 +17,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.DriverManager;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,6 +55,16 @@ class ContentGenerationDemoDataTest {
 
     @Test
     void contentGenerationFixtureIsIdempotentBuildableAndExecutable() {
+        assertEquals(
+                List.of(30001L, 30002L, 30003L),
+                jdbc.query("SELECT id FROM udf_definition ORDER BY id", (rs, i) -> rs.getLong(1)));
+        assertEquals(
+                3,
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM udf_definition u "
+                                + "JOIN rule_namespace n ON n.id=u.namespace_id WHERE n.code='default'",
+                        Integer.class));
+
         importDemoData();
 
         assertEquals(58, count("atomic_rule"));
@@ -227,7 +239,51 @@ class ContentGenerationDemoDataTest {
     private static Path createDatabasePath() {
         try {
             Path directory = Files.createTempDirectory("mosika-content-demo-test-");
-            return directory.resolve("mosika.db");
+            Path database = directory.resolve("mosika.db");
+            try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
+                 var statement = connection.createStatement()) {
+                statement.execute("""
+                        CREATE TABLE rule_namespace (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            code TEXT NOT NULL UNIQUE,
+                            name TEXT NOT NULL,
+                            description TEXT NOT NULL DEFAULT '',
+                            status INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                            updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                        )
+                        """);
+                statement.execute("""
+                        INSERT INTO rule_namespace (code, name, description, status)
+                        VALUES ('default', '默认命名空间', '系统默认规则引用范围', 1)
+                        """);
+                statement.execute("""
+                        CREATE TABLE udf_definition (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            group_name TEXT NOT NULL DEFAULT '',
+                            name TEXT NOT NULL,
+                            description TEXT NOT NULL DEFAULT '',
+                            source TEXT NOT NULL,
+                            status INTEGER NOT NULL DEFAULT 1,
+                            version INTEGER NOT NULL DEFAULT 0,
+                            created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                            updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                            UNIQUE (group_name, name)
+                        )
+                        """);
+                statement.execute("""
+                        INSERT INTO udf_definition
+                            (id, group_name, name, description, source, status, version)
+                        VALUES
+                            (30001, 'content.generation', 'extractClaims', '从领域对象中提取核心主张阶段结果',
+                             'function extractClaims(target) { return {stage:"CLAIM_EXTRACTION", status:"completed", claimCount:target.claimCount}; }', 1, 0),
+                            (30002, 'content.generation', 'bindCitations', '为核心主张绑定引用证据并返回阶段结果',
+                             'function bindCitations(target) { return {stage:"CITATION_BINDING", status:"completed", citedClaimCount:target.citedClaimCount}; }', 1, 0),
+                            (30003, 'content.delivery', 'publish', '将通过门禁的内容发布到目标渠道',
+                             'function publish(target) { return {stage:"PUBLISH", status:"published", channel:target.channel}; }', 1, 0)
+                        """);
+            }
+            return database;
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }

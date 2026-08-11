@@ -1,0 +1,52 @@
+/* ============================================================
+   Mosika 字体统一配置
+   全站唯一的字体族与字号刻度来源。所有页面（console / rules / udfs /
+   namespaces / index 画布）在自身样式之前引入本文件，禁止再各自声明
+   font-family 与 --fs-* 变量。
+
+   字号刻度共 11 级，按用途划分：
+     note     10px    角标、极小注释
+     label    11px    tag / pill / 字段名
+     caption  11.5px  行内 id、hint、辅助说明
+     minor    12px    次要正文、行描述、区块小标题
+     meta     12.5px  表头、chip、分页、状态文案
+     base     13px    正文基准、按钮、表格、搜索框
+     field    13.5px  弹窗输入框、空态提示
+     strong   14px    列表行标题
+     panel    15px    品牌名、面包屑、面板标题
+     title    17px    弹窗/抽屉标题、指标数值
+     page     19px    页面主标题 h1
+
+   刻度只约束"文字"。图标与装饰性字形（🔍、×、＋、空态图形、
+   面包屑分隔符等）按视觉需要单独写字号，就近注释说明，不纳入刻度。
+   ============================================================ */
+:root {
+    color-scheme: light;
+
+    --ff-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    --ff-mono: "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --fs-note: 10px;
+    --fs-label: 11px;
+    --fs-caption: 11.5px;
+    --fs-minor: 12px;
+    --fs-meta: 12.5px;
+    --fs-base: 13px;
+    --fs-field: 13.5px;
+    --fs-strong: 14px;
+    --fs-panel: 15px;
+    --fs-title: 17px;
+    --fs-page: 19px;
+
+    font-family: var(--ff-sans);
+    font-size: var(--fs-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 基准字号兜底：缺了这一行，未显式设字号的容器会落到浏览器默认 16px */
+body { font-size: var(--fs-base); }
+
+/* 表单控件默认不继承页面字体，font:inherit 之后必须补 font-size，
+   否则同样漏到 16px */
+button, input, select, textarea { font: inherit; font-size: var(--fs-base); }

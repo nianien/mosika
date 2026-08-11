@@ -20,13 +20,16 @@ BEGIN TRANSACTION;
 -- ============================================================
 
 INSERT OR IGNORE INTO udf_definition
-    (id, group_name, name, description, source, status, version)
+    (id, namespace_id, group_name, name, description, source, status, version)
 VALUES
-    (30001, 'content.generation', 'extractClaims', '从领域对象中提取核心主张阶段结果',
+    (30001, (SELECT id FROM rule_namespace WHERE code='default'),
+     'content.generation', 'extractClaims', '从领域对象中提取核心主张阶段结果',
      'function extractClaims(target) { return {stage:"CLAIM_EXTRACTION", status:"completed", claimCount:target.claimCount}; }', 1, 0),
-    (30002, 'content.generation', 'bindCitations', '为核心主张绑定引用证据并返回阶段结果',
+    (30002, (SELECT id FROM rule_namespace WHERE code='default'),
+     'content.generation', 'bindCitations', '为核心主张绑定引用证据并返回阶段结果',
      'function bindCitations(target) { return {stage:"CITATION_BINDING", status:"completed", citedClaimCount:target.citedClaimCount}; }', 1, 0),
-    (30003, 'content.delivery', 'publish', '将通过门禁的内容发布到目标渠道',
+    (30003, (SELECT id FROM rule_namespace WHERE code='default'),
+     'content.delivery', 'publish', '将通过门禁的内容发布到目标渠道',
      'function publish(target) { return {stage:"PUBLISH", status:"published", channel:target.channel}; }', 1, 0);
 
 -- ============================================================

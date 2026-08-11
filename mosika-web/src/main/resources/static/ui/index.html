@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
-    <title>Mosika 规则树编辑器</title>
+    <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
     <link rel="stylesheet" href="/ui/styles.css?v=20260802-1">
 </head>
 <body>
@@ -15,6 +16,9 @@
         <div class="brand">
             <span class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></span>
             <div>
+                <b class="brand-name">Mosika</b>
+                <span id="flowCrumbNsWrap" hidden><span class="crumb-sep">/</span><span id="flowCrumbNs" class="crumb-ns"></span></span>
+                <span class="crumb-sep">/</span>
                 <a class="back-link" id="backToFlows" href="/" title="返回业务场景列表">业务场景</a>
                 <span class="crumb-sep">/</span>
                 <strong id="flowCrumbName">规则树编辑器</strong>
@@ -265,8 +269,9 @@
 
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
-<script src="/ui/treenode.js?v=20260809-1"></script>
-<script src="/ui/api.js?v=20260802-1"></script>
-<script src="/ui/app.js?v=20260809-1"></script>
+<script src="/ui/treenode.js?v=20260810-1"></script>
+<script src="/ui/api.js?v=20260810-1"></script>
+<script src="/ui/ns.js?v=20260810-1"></script>
+<script src="/ui/app.js?v=20260810-1"></script>
 </body>
 </html>

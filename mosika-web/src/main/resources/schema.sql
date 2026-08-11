@@ -41,18 +41,21 @@ CREATE INDEX IF NOT EXISTS idx_atomic_rule_status ON atomic_rule(status);
 CREATE INDEX IF NOT EXISTS idx_atomic_rule_kind ON atomic_rule(kind);
 
 CREATE TABLE IF NOT EXISTS udf_definition (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_name  TEXT    NOT NULL DEFAULT '',
-    name        TEXT    NOT NULL,
-    description TEXT    NOT NULL DEFAULT '',
-    source      TEXT    NOT NULL,
-    status      INTEGER NOT NULL DEFAULT 1,
-    version     INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-    UNIQUE (group_name, name)
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    namespace_id INTEGER NOT NULL,
+    group_name   TEXT    NOT NULL DEFAULT '',
+    name         TEXT    NOT NULL,
+    description  TEXT    NOT NULL DEFAULT '',
+    source       TEXT    NOT NULL,
+    status       INTEGER NOT NULL DEFAULT 1,
+    version      INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (namespace_id, group_name, name),
+    FOREIGN KEY (namespace_id) REFERENCES rule_namespace(id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_udf_definition_namespace ON udf_definition(namespace_id);
 CREATE INDEX IF NOT EXISTS idx_udf_definition_status ON udf_definition(status);
 
 CREATE TABLE IF NOT EXISTS rule_flow (

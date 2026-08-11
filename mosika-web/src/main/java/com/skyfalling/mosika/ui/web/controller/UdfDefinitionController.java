@@ -99,6 +99,7 @@ public class UdfDefinitionController {
      * 按状态和关键字分页查询 UDF 定义
      *
      * @param status     启停状态，传 {@code null} 表示不过滤
+     * @param namespace  规则命名空间，传空值表示默认命名空间
      * @param keyword    模糊查询关键字，传空值表示不过滤
      * @param pageNumber 从 1 开始的页码
      * @param pageSize   每页条数
@@ -106,9 +107,10 @@ public class UdfDefinitionController {
      */
     @GetMapping
     public ApiResponse<Map<String, Object>> list(@RequestParam(required = false) Integer status,
+                                                 @RequestParam(required = false) String namespace,
                                                  @RequestParam(required = false) String keyword,
                                                  @RequestParam(defaultValue = "1") int pageNumber,
                                                  @RequestParam(defaultValue = "20") int pageSize) {
-        return ApiResponse.ok(service.page(status, keyword, pageNumber, pageSize));
+        return ApiResponse.ok(service.page(status, namespace, keyword, pageNumber, pageSize));
     }
 }

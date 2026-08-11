@@ -3,15 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>业务规则 · Mosika 规则编排</title>
+<title>业务规则 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <style>
 :root{
-  color-scheme:light;
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   color:#123038;background:#edf4f3;
   --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
   --cyan:#0891b2;--cyan-soft:#e3fafd;
@@ -20,20 +25,19 @@
   --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-button,input,textarea,select{font:inherit}
 .app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
 .brandwrap{display:flex;align-items:center}
 .brand{display:flex;align-items:center;gap:11px}
 .brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
-.brand b{font-size:15px}.brand small{display:block;color:#6f8b86;font-size:11.5px;margin-top:1px}
+.brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
 .tabs{display:flex;gap:6px;margin-left:26px}
-.tab{height:32px;padding:0 14px;border-radius:8px;font-size:13px;color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
+.tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
 .tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
 .top-right{display:flex;align-items:center;gap:12px}
-.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff}
-.search input{border:none;outline:none;font-size:13px;width:200px;background:transparent;color:#123038}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:13px;cursor:pointer}
+.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
+.search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
+.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
 .btn:hover{border-color:#a9d3cc;background:#f5faf9}
 .btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
 .btn.primary:hover{background:var(--teal-d)}
@@ -41,26 +45,28 @@ button,input,textarea,select{font:inherit}
 .btn.link.danger{color:#c9504f}
 .main{overflow:auto;padding:22px 26px}
 .page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.page-head .sub{color:#6f8b86;font-size:13px;margin-left:10px;font-weight:400}
+.page-head>div:first-child{display:flex;align-items:baseline}
+.page-head h1{font-size:var(--fs-page)}
+.page-head .sub{color:#6f8b86;font-size:var(--fs-base);margin-left:10px;font-weight:400}
 .filters{display:flex;gap:8px}
-.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:12.5px;display:flex;align-items:center;cursor:pointer;white-space:nowrap}
+.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:var(--fs-meta);display:flex;align-items:center;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
 .panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:900px;border-collapse:collapse;font-size:13.2px}
-thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:12.5px;background:#f4faf9;border-bottom:1px solid var(--border)}
+.table-scroll{overflow-x:auto}table{width:100%;min-width:900px;border-collapse:collapse;font-size:var(--fs-base)}
+thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
 tbody td{padding:14px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#f7fcfb}
-.name{font-weight:600;font-size:13.8px}
-.name .id{color:#9fb4af;font-weight:400;font-size:11.5px;margin-left:7px}
-.rowdesc{color:#71887f;font-size:12.2px;margin-top:3px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.expr{font-family:"JetBrains Mono",Menlo,Consolas,monospace;font-size:12px;color:#0b6274;background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:6px;padding:4px 9px;display:inline-block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
-.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px}
+.name{font-weight:600;font-size:var(--fs-strong)}
+.name .id{color:#9fb4af;font-weight:400;font-size:var(--fs-caption);margin-left:7px}
+.rowdesc{color:#71887f;font-size:var(--fs-minor);margin-top:3px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.expr{font-family:var(--ff-mono);font-size:var(--fs-minor);color:#0b6274;background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:6px;padding:4px 9px;display:inline-block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.tag{font-size:var(--fs-label);font-weight:600;padding:3px 9px;border-radius:11px}
 .tag.atom{color:var(--green);background:var(--green-soft)}
 .tag.table{color:var(--lemon);background:var(--lemon-soft)}
 .tag.cond{color:var(--green);background:var(--green-soft)}
 .tag.action{color:var(--cyan);background:var(--cyan-soft)}
-.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px}
+.pill{font-size:var(--fs-label);font-weight:600;padding:3px 9px;border-radius:11px}
 .pill.on{color:var(--green);background:var(--green-soft)}.pill.off{color:var(--grey);background:var(--grey-soft)}
 .refbadge{display:inline-flex;align-items:center;gap:5px;color:#3f5f58}
 .refbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
@@ -72,41 +78,83 @@ tbody tr:hover{background:#f7fcfb}
 .status-toggle.is-on{color:var(--teal-d);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--teal)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
 .status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
 .status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
-.status-toggle-label{font-size:12.5px;line-height:1;min-width:42px}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:13.5px}
-.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:12.5px}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer}.pager button:disabled{opacity:.45;cursor:not-allowed}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.status-toggle-label{font-size:var(--fs-meta);line-height:1;min-width:42px}
+.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
+.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:var(--fs-meta)}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer;font-size:var(--fs-meta)}.pager button:disabled{opacity:.45;cursor:not-allowed}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(460px,92vw)}
+dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(1280px,96vw)}
 dialog::backdrop{background:rgba(18,48,56,.3)}
-.dlg-head{padding:18px 22px 6px;font-size:16px;font-weight:700}
-.dlg-body{padding:12px 22px;display:flex;flex-direction:column;gap:14px}
-.dlg-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:10px}
-.field label{display:block;font-size:12.5px;color:#5c766f;margin-bottom:7px;font-weight:600}
-.field .hint{margin-top:6px;font-size:11.5px;color:#8aa39d;line-height:1.5}
-.field .CodeMirror{border:1px solid var(--border);border-radius:9px;height:auto;min-height:88px;font-family:"JetBrains Mono",Menlo,Consolas,monospace;font-size:13px;background:#fbfefe;padding:4px 2px;transition:border-color .15s,box-shadow .15s}
+.dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
+.dlg-body{padding:12px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch;max-height:80vh;overflow-y:auto}
+.dlg-body>.field.span-2{grid-column:1/-1}
+/* 编辑规则弹窗：左列 .rule-main（字段+参数模板），右列 .field-expr（表达式编辑器）。
+   高度自适应且设上限：参数少时按内容收缩（左侧不留白），
+   超过上限后只让左列参数区内部滚动，右列编辑器始终撑满（右侧不留白）。
+   上限必须落在 .rule-main 这个 flex 容器上：加在 grid 容器上只会裁切，不会触发子项收缩 */
+#ruleDlg .dlg-body{grid-template-columns:1fr 1fr;align-items:stretch;height:auto;max-height:none;overflow:hidden}
+#ruleDlg .rule-main{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;max-height:min(72vh,660px)}
+#ruleDlg .rule-row{display:grid;grid-template-columns:1fr 208px;gap:12px;align-items:start;flex:none}
+#ruleDlg .rule-main>.field{height:auto;flex:none}
+#ruleDlg .rule-main>.field>.hint{margin-top:6px;padding-top:0}
+/* 参数区按内容高度排布，超出可用高度时只由它收缩并内部滚动。
+   选择器须与上面的 .rule-main>.field 同级，否则 flex:none 会覆盖掉这里的可收缩设置 */
+#ruleDlg .rule-main>.field-params{flex:0 1 auto;min-height:96px;display:flex;flex-direction:column;gap:6px}
+#ruleDlg .field-params .params-editor{flex:0 1 auto;min-height:0;overflow-y:auto;padding-right:2px}
+#ruleDlg .field-params>label,#ruleDlg .field-params>.param-add,#ruleDlg .field-params>.hint{flex:none}
+#ruleDlg .field-expr{min-height:0;display:flex;flex-direction:column}
+#ruleDlg .field-expr .CodeMirror{flex:1;min-height:340px;height:auto}
+#ruleDlg .field-expr .CodeMirror-scroll{max-height:none;height:100%}
+/* 分段单选：替代原规则类型下拉，与规则名称同行，省一行高度 */
+#ruleDlg .segbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#ruleDlg .seg{position:relative;display:flex;align-items:center;justify-content:center;height:43px;border:1px solid var(--border);border-radius:9px;background:#fff;color:#5c766f;font-size:var(--fs-base);cursor:pointer;transition:border-color .15s,background .15s}
+#ruleDlg .seg:hover{border-color:#a9d3cc;background:#f8fcfb}
+#ruleDlg .seg input{position:absolute;opacity:0;width:0;height:0;margin:0}
+#ruleDlg .seg:has(input:checked){border-color:#9fd8cf;background:var(--teal-soft);color:var(--teal-d);font-weight:600}
+#ruleDlg .seg:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
+/* 左列变窄，参数表格收成四列：名称/中文名/类型/删除 一行，描述/默认值 次行 */
+#ruleDlg .param-head{display:none}
+#ruleDlg .param-card{grid-template-columns:1fr 1fr 76px 22px}
+#ruleDlg .param-card [data-p=name]{order:1;grid-column:1}
+#ruleDlg .param-card [data-p=label]{order:2;grid-column:2}
+#ruleDlg .param-card .param-type{order:3;grid-column:3}
+#ruleDlg .param-card .param-remove{order:4;grid-column:4;justify-self:center}
+#ruleDlg .param-card [data-p=description]{order:5;grid-column:1/3}
+#ruleDlg .param-card [data-p=default]{order:6;grid-column:3/-1}
+#ruleDlg .param-card [data-p=options]{order:7;grid-column:1/-1}
+.dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+.dlg-body>.field{display:flex;flex-direction:column;height:100%}
+.dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
+.field label{display:block;font-size:var(--fs-meta);color:#5c766f;margin-bottom:7px;font-weight:600}
+.field .hint{margin-top:6px;font-size:var(--fs-caption);color:#8aa39d;line-height:1.5}
+.field .CodeMirror{border:1px solid var(--border);border-radius:9px;height:auto;min-height:340px;font-family:var(--ff-mono);font-size:var(--fs-base);background:#fbfefe;padding:4px 2px;transition:border-color .15s,box-shadow .15s}.field .CodeMirror-scroll{max-height:60vh}#ruleDlg{position:relative}.CodeMirror-hints{position:absolute;z-index:100;max-height:220px;font-size:var(--fs-base);font-family:var(--ff-mono);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(18,48,56,.18);padding:4px}.CodeMirror-hint{padding:4px 10px;border-radius:5px;color:#123038}li.CodeMirror-hint-active{background:var(--teal);color:#fff}.CodeMirror-lint-tooltip{z-index:101;font-family:inherit;font-size:var(--fs-minor);border-radius:7px}
+.field .CodeMirror-scroll{max-height:320px}
 .field .CodeMirror-focused{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .field .CodeMirror-lines{padding:6px 0}
 .field .CodeMirror-gutters{background:#f2faf9;border-right:1px solid #e4efec}
 .field .CodeMirror-linenumber{color:#a7c0ba}
-.field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13.5px;color:#123038;background:#fff;font-family:inherit}
-.field textarea{min-height:64px;resize:vertical;font-family:"JetBrains Mono",Menlo,Consolas,monospace}
+.field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038;background:#fff;font-family:inherit}
+.field textarea{min-height:64px;resize:vertical;font-family:var(--ff-mono)}
 .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
-.params-editor{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto}
-.params-empty{font-size:12px;color:#8aa39d;padding:2px 0}
-.param-card{border:1px solid var(--border);border-radius:8px;padding:8px;background:#fbfefe;display:flex;flex-direction:column;gap:6px}
-.param-line{display:flex;gap:6px;align-items:center}
-.param-card input,.param-card select{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12.5px;color:#123038;background:#fff;font-family:inherit;min-width:0}
+.params-editor{display:flex;flex-direction:column;gap:6px}
+.params-empty{font-size:var(--fs-minor);color:#8aa39d;padding:2px 0}
+.param-head{display:grid;grid-template-columns:130px 1fr 88px 1.3fr 116px 26px;gap:6px;padding:0 8px 4px;font-size:var(--fs-caption);color:#8aa39d;font-weight:600}
+.param-card{border:1px solid var(--border);border-radius:8px;padding:7px 8px;background:#fbfefe;display:grid;grid-template-columns:130px 1fr 88px 1.3fr 116px 26px;gap:6px;align-items:center}
+.param-grid{display:contents}
+.param-card input,.param-card select{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:var(--fs-meta);color:#123038;background:#fff;font-family:inherit;min-width:0}
 .param-card input:focus,.param-card select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft)}
-.param-card .p-name,.param-card .p-label,.param-card .p-default{flex:1}
-.param-card .p-type{flex:0 0 82px}
-.param-card .p-desc,.param-card .p-options{width:100%}
-.param-req{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:12px;color:#5c766f;white-space:nowrap;cursor:pointer}
-.param-req input{width:auto;padding:0;margin:0}
-.param-remove{flex:0 0 auto;border:none;background:none;color:#c9504f;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1}
+.param-card [data-p=name]{order:1}
+.param-card [data-p=label]{order:2}
+.param-card .param-type{order:3}
+.param-card [data-p=description]{order:4}
+.param-card [data-p=default]{order:5}
+.param-card .param-remove{order:6;justify-self:center}
+.param-card [data-p=options]{order:7;grid-column:1/-1}
+.param-remove{border:none;background:none;color:#c9504f;font-size:14px/* × 字形，不纳入文字刻度 */;cursor:pointer;padding:2px 4px;line-height:1}
 .param-remove:hover{color:#a53a39}
-.param-add{align-self:flex-start;height:28px;padding:0 10px;border:1px dashed #9fd8cf;border-radius:7px;background:#f4faf9;color:var(--teal-d);font-size:12px;cursor:pointer;margin-top:2px}
+.param-add{align-self:flex-start;height:28px;padding:0 10px;border:1px dashed #9fd8cf;border-radius:7px;background:#f4faf9;color:var(--teal-d);font-size:var(--fs-minor);cursor:pointer;margin-top:2px}
 .param-add:hover{background:var(--teal-soft)}
+@media(max-width:900px){.dlg-body{grid-template-columns:1fr}.dlg-body>.field.span-2{grid-column:1}#ruleDlg .dlg-body{grid-template-columns:1fr;height:auto;max-height:80vh;overflow-y:auto}#ruleDlg .rule-row{grid-template-columns:1fr}#ruleDlg .rule-main{max-height:none}#ruleDlg .rule-main>.field-params{flex:none;min-height:0}#ruleDlg .field-params .params-editor{overflow:visible;min-height:0}#ruleDlg .field-expr .CodeMirror{min-height:260px}.param-head{display:none}.param-card{grid-template-columns:1fr 1fr 84px 24px}.param-card [data-p=description]{grid-column:1/3}.param-card [data-p=default]{grid-column:3/-1}}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.pager{justify-content:space-between}}
 </style>
 </head>
@@ -114,8 +162,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika 规则编排</b></div></div>
-      <div class="tabs"><a class="tab" href="/">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">UDF</a></div>
+      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
+      <div id="nsSlot"></div>
+      <div class="tabs"><a class="tab" href="/">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
@@ -124,7 +173,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">业务规则</span><span class="sub" id="subCount">供业务场景复用的判断条件与执行动作</span></div>
+      <div><h1>业务规则</h1><span class="sub" id="subCount">供业务场景复用的判断条件与执行动作</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-f="">全部</button>
         <button type="button" class="chip" data-f="condition">判断条件</button>
@@ -145,28 +194,40 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <dialog id="ruleDlg">
   <div class="dlg-head" id="dlgTitle">新建规则</div>
   <div class="dlg-body">
-    <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-    <div class="field"><label>命名空间 *</label><select id="fNamespace"></select><div class="hint">创建后不可修改，用于限制规则流引用范围</div></div>
-    <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">支持表达式插值：形如 ${$.字段}（入参）或 ${$$.字段}（上下文），运行时替换为实际值，如 ${$.agent.id}。</div></div>
-    <div class="field"><label>规则类型</label><select id="fKind"><option value="condition">判断条件（用于判断/条件节点）</option><option value="action">执行动作（用于动作节点）</option></select></div>
-    <div class="field"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
-    <div class="field">
-      <label>参数模板</label>
-      <div class="params-editor" id="paramsEditor"></div>
-      <button type="button" class="param-add" id="addParamBtn">＋ 添加参数</button>
-      <div class="hint">声明该规则可被参数化调用的模板参数（$args）。业务场景引用此规则时，画布会按此渲染录入表单并绑定到节点。</div>
+    <div class="rule-main">
+      <div class="rule-row">
+        <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
+        <div class="field field-kind">
+          <label>规则类型</label>
+          <div class="segbar" role="radiogroup" aria-label="规则类型">
+            <label class="seg" title="用于判断/条件节点"><input type="radio" name="fKind" value="condition" checked><span>判断条件</span></label>
+            <label class="seg" title="用于动作节点"><input type="radio" name="fKind" value="action"><span>执行动作</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">支持表达式插值：形如 ${$.字段}（入参）或 ${$$.字段}（上下文），运行时替换为实际值，如 ${$.agent.id}。</div></div>
+      <div class="field field-params">
+        <label>参数模板</label>
+        <div class="param-head"><span>参数名 *</span><span>中文名</span><span>类型</span><span>描述</span><span>默认值</span><span></span></div>
+        <div class="params-editor" id="paramsEditor"></div>
+        <button type="button" class="param-add" id="addParamBtn">＋ 添加参数</button>
+        <div class="hint">声明该规则可被参数化调用的模板参数（$args）。业务场景引用此规则时，画布会按此渲染录入表单并绑定到节点。</div>
+      </div>
     </div>
+    <div class="field field-expr"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
 </dialog>
 
 <div class="toast" id="toast"></div>
 
-<script src="/ui/api.js?v=20260802-1"></script>
+<script src="/ui/api.js?v=20260810-1"></script>
+<script src="/ui/ns.js?v=20260810-1"></script>
 <script>
 (() => {
   "use strict";
   const Api = window.MosikaApi;
+  const Ns = window.MosikaNs;
   const $ = (s) => document.querySelector(s);
   let filter = "";  // "" | atom | table | off
   let keyword = "";
@@ -203,7 +264,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <select class="param-type" data-p="type">
           ${PARAM_TYPES.map(([v, t]) => `<option value="${v}" ${v === type ? "selected" : ""}>${t}</option>`).join("")}
         </select>
-        <label class="param-req"><input type="checkbox" data-p="required" ${p.required ? "checked" : ""}>必填</label>
         <button type="button" class="param-remove" data-remove title="删除该参数">✕</button>
       </div>
       <input data-p="description" placeholder="描述 description" value="${esc(p.description)}">
@@ -215,6 +275,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function renderParams(list) {
     const editor = $("#paramsEditor");
     const items = parseParamsField(list);
+    const head = document.querySelector("#ruleDlg .param-head");
+    if (head) head.hidden = items.length === 0;
     editor.innerHTML = items.length
       ? items.map(paramCardHtml).join("")
       : `<div class="params-empty">暂无参数，该规则将作为无参规则调用。点下方「添加参数」以支持参数化。</div>`;
@@ -237,7 +299,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       if (label) param.label = label;
       const description = get("description").value.trim();
       if (description) param.description = description;
-      if (get("required").checked) param.required = true;
       if (type === "enum") {
         const options = get("options").value.split(",").map((s) => s.trim()).filter(Boolean);
         if (!options.length) return { error: `枚举参数「${name}」需至少一个选项` };
@@ -253,7 +314,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function loadRefCounts() {
     refCount = new Map();
     try {
-      const counts = await Api.getRuleRefCounts(); // { ruleId: 引用的已生效流程数 }
+      const counts = await Api.getRuleRefCounts(Ns.code()); // { ruleId: 引用的已生效流程数 }
       Object.entries(counts || {}).forEach(([rid, n]) => refCount.set(String(rid), n));
     } catch (_) {}
   }
@@ -261,7 +322,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function loadRules() {
     const sequence = ++loadSequence;
     $("#rows").innerHTML = `<tr><td colspan="5"><div class="loading">加载中…</div></td></tr>`;
-    const params = { keyword, pageNumber, pageSize };
+    const params = { keyword, pageNumber, pageSize, namespace: Ns.code() };
     if (filter === "condition") { params.kind = "condition"; params.status = 1; }
     else if (filter === "action") { params.kind = "action"; params.status = 1; }
     else if (filter === "off") params.status = 0;
@@ -294,7 +355,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   function renderRows() {
-    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
+    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
     $("#rows").innerHTML = rules.map((r) => {
       const live = r.status === 1;
       const dim = live ? "" : ' style="opacity:.62"';
@@ -317,6 +378,61 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   let exprEditor = null;
+  let udfPaths = [];   // 当前命名空间已注册的自定义函数调用路径，供补全使用
+
+  // 拉取自定义函数调用路径作为补全源；失败不影响编辑
+  async function loadUdfPaths() {
+    try {
+      const page = await Api.listUdfs({ status: 1, pageNumber: 1, pageSize: 200, namespace: Ns.code() });
+      udfPaths = (page.items || []).map((u) => (u.group ? `${u.group}.${u.name}` : u.name));
+    } catch (_) { udfPaths = []; }
+  }
+
+  // acorn 解析表达式，返回 CodeMirror lint 标注；表达式非完整语句，需用括号包裹后解析
+  function lintExpression(text) {
+    const src = String(text || "").trim();
+    if (!src || typeof window.acorn === "undefined") return [];
+    try {
+      window.acorn.parse(`(\n${src}\n)`, { ecmaVersion: 2020 });
+      return [];
+    } catch (e) {
+      const loc = e.loc || { line: 2, column: 0 };
+      const line = Math.max(0, loc.line - 2);
+      const col = Math.max(0, loc.column | 0);
+      return [{
+        message: String(e.message || "语法错误").replace(/\s*\(\d+:\d+\)\s*$/, ""),
+        severity: "error",
+        from: window.CodeMirror.Pos(line, col),
+        to: window.CodeMirror.Pos(line, col + 1)
+      }];
+    }
+  }
+
+  const JS_KEYWORDS = ["true", "false", "null", "undefined", "&&", "||", "!", "includes(", "startsWith(",
+    "endsWith(", "indexOf(", "length", "toLowerCase()", "toUpperCase()", "Number(", "String(", "Math.max(",
+    "Math.min(", "Array.isArray("];
+
+  // 补全源：$args 参数名 / 自定义函数路径 / 顶层变量与常用 JS
+  function exprHint(cm) {
+    const cur = cm.getCursor();
+    const line = cm.getLine(cur.line).slice(0, cur.ch);
+    const argsMatch = line.match(/\$args\.([A-Za-z0-9_]*)$/);
+    if (argsMatch) {
+      const typed = argsMatch[1];
+      const collected = collectParams();
+      const defs = collected.error ? [] : collected.params;
+      const list = defs
+        .filter((p) => p.name.startsWith(typed))
+        .map((p) => ({ text: p.name, displayText: `${p.name}　${p.label || ""} · ${p.type}` }));
+      return { list, from: window.CodeMirror.Pos(cur.line, cur.ch - typed.length), to: cur };
+    }
+    const wordMatch = line.match(/[A-Za-z0-9_.$]*$/);
+    const typed = wordMatch ? wordMatch[0] : "";
+    const pool = ["$", "$$", "$args"].concat(udfPaths).concat(JS_KEYWORDS);
+    const list = pool.filter((t) => t.toLowerCase().startsWith(typed.toLowerCase()) && t !== typed);
+    return { list, from: window.CodeMirror.Pos(cur.line, cur.ch - typed.length), to: cur };
+  }
+
   function ensureExprEditor() {
     if (exprEditor || typeof window.CodeMirror === "undefined") return exprEditor;
     exprEditor = window.CodeMirror.fromTextArea(document.getElementById("fExpr"), {
@@ -324,7 +440,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       lineNumbers: true,
       lineWrapping: true,
       matchBrackets: true,
-      tabSize: 2
+      autoCloseBrackets: true,
+      tabSize: 2,
+      gutters: ["CodeMirror-linenumbers", "CodeMirror-lint-markers"],
+      lint: { getAnnotations: lintExpression, async: false },
+      extraKeys: { "Ctrl-Space": (cm) => cm.showHint({ hint: exprHint, completeSingle: false, container: document.getElementById('ruleDlg') }) }
+    });
+    // 输入点号或字母时自动弹出补全，不自动选中唯一项以免打断输入
+    exprEditor.on("inputRead", (cm, change) => {
+      if (!/[A-Za-z0-9_.$]/.test(change.text[0] || "")) return;
+      cm.showHint({ hint: exprHint, completeSingle: false, container: document.getElementById('ruleDlg') });
     });
     return exprEditor;
   }
@@ -333,14 +458,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     editing = rule || null;
     $("#dlgTitle").textContent = rule ? "编辑规则" : "新建规则";
     $("#fName").value = rule ? (rule.name || "") : "";
-    $("#fNamespace").value = rule ? (rule.namespace || "default") : "default";
-    $("#fNamespace").disabled = Boolean(rule);
     $("#fDesc").value = rule ? (rule.description || "") : "";
-    $("#fKind").value = rule ? (rule.kind === "action" ? "action" : "condition") : "condition";
+    const kind = rule && rule.kind === "action" ? "action" : "condition";
+    $(`input[name="fKind"][value="${kind}"]`).checked = true;
     const expr = rule ? (rule.expression || "") : "";
     $("#fExpr").value = expr;
     renderParams(rule ? rule.params : null);
     $("#ruleDlg").showModal();
+    loadUdfPaths();
     const cm = ensureExprEditor();
     if (cm) {
       cm.setValue(expr);
@@ -358,8 +483,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const collected = collectParams();
     if (collected.error) { toast(collected.error); return; }
     const body = {
-      name, namespace: $("#fNamespace").value,
-      description: $("#fDesc").value.trim(), expression, kind: $("#fKind").value,
+      name, namespace: Ns.code(),
+      description: $("#fDesc").value.trim(), expression, kind: $('input[name="fKind"]:checked').value,
       params: JSON.stringify(collected.params)
     };
     try {
@@ -416,6 +541,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#addParamBtn").addEventListener("click", () => {
     const empty = $("#paramsEditor .params-empty");
     if (empty) empty.remove();
+    const head = document.querySelector("#ruleDlg .param-head");
+    if (head) head.hidden = false;
     $("#paramsEditor").insertAdjacentHTML("beforeend", paramCardHtml({}));
   });
   $("#paramsEditor").addEventListener("click", (e) => {
@@ -431,14 +558,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   });
 
   (async () => {
-    try {
-      const namespaces = await Api.listNamespaces();
-      $("#fNamespace").innerHTML = (namespaces || []).filter((item) => item.status === 1)
-        .map((item) => `<option value="${esc(item.code)}">${esc(item.name)}（${esc(item.code)}）</option>`)
-        .join("");
-    } catch (e) {
-      toast("命名空间加载失败：" + e.message);
-    }
+    const ctx = await Ns.boot();
+    if (!ctx) return;
+    Ns.mountSelector($("#nsSlot"));
+    Ns.applyTabs();
     await refresh();
   })();
 })();

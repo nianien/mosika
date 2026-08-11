@@ -1,5 +1,6 @@
 package com.skyfalling.mosika.ui.web.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,13 @@ public class UdfDefinitionEntity {
 
     /** 数据库自增主键 */
     private Long id;
+
+    /** 命名空间数据库主键 */
+    @JsonIgnore
+    private Long namespaceId;
+
+    /** 命名空间业务编码 */
+    private String namespace;
 
     /** 点分隔的命名空间，如 content.generation；空字符串表示顶层 */
     private String group;

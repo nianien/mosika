@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>场景 · Mosika 规则编排</title>
+<title>业务场景 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
 <style>
 :root{
-  color-scheme:light;
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   color:#123038;background:#edf4f3;
   --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
   --cyan:#0891b2;--cyan-soft:#e3fafd;
@@ -17,20 +16,19 @@
   --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-button,input,textarea,select{font:inherit}
 .app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr);position:relative}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
 .brandwrap{display:flex;align-items:center}
 .brand{display:flex;align-items:center;gap:11px}
 .brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
-.brand b{font-size:15px}.brand small{display:block;color:#6f8b86;font-size:11.5px;margin-top:1px}
+.brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
 .tabs{display:flex;gap:6px;margin-left:26px}
-.tab{height:32px;padding:0 14px;border-radius:8px;font-size:13px;color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
+.tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
 .tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
 .top-right{display:flex;align-items:center;gap:12px}
-.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff}
-.search input{border:none;outline:none;font-size:13px;width:200px;background:transparent;color:#123038}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:13px;cursor:pointer}
+.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
+.search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
+.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
 .btn:hover{border-color:#a9d3cc;background:#f5faf9}
 .btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
 .btn.primary:hover{background:var(--teal-d)}
@@ -39,27 +37,28 @@ button,input,textarea,select{font:inherit}
 .btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;height:auto;cursor:pointer}
 .main{overflow:auto;padding:22px 26px}
 .page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.page-head h1{font-size:19px}.page-head .sub{color:#6f8b86;font-size:13px;margin-left:10px;font-weight:400}
+.page-head>div:first-child{display:flex;align-items:baseline}
+.page-head h1{font-size:var(--fs-page)}.page-head .sub{color:#6f8b86;font-size:var(--fs-base);margin-left:10px;font-weight:400}
 .filters{display:flex;gap:8px}
-.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:12.5px;display:flex;align-items:center;cursor:pointer;white-space:nowrap}
+.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:var(--fs-meta);display:flex;align-items:center;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
 .panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:13.2px}
-thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:12.5px;background:#f4faf9;border-bottom:1px solid var(--border)}
+.table-scroll{overflow-x:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:var(--fs-base)}
+thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
 tbody td{padding:15px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#f7fcfb}
-.name{font-weight:600;font-size:14px}
-.name .id{color:#9fb4af;font-weight:400;font-size:11.5px;margin-left:7px}
-.rowdesc{color:#71887f;font-size:12.3px;margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:11px;white-space:nowrap}
+.name{font-weight:600;font-size:var(--fs-strong)}
+.name .id{color:#9fb4af;font-weight:400;font-size:var(--fs-caption);margin-left:7px}
+.rowdesc{color:#71887f;font-size:var(--fs-minor);margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{font-size:var(--fs-label);font-weight:600;padding:3px 9px;border-radius:11px;white-space:nowrap}
 .pill.live{color:var(--green);background:var(--green-soft)}
 .pill.draft{color:#b5852a;background:#fbf1d9}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
 .num{font-variant-numeric:tabular-nums;color:#3f5f58}
 .time{color:#8aa39d;font-variant-numeric:tabular-nums}
 .actions{display:flex;gap:14px;align-items:center;justify-content:flex-end;white-space:nowrap}
-.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 16px;font-weight:600;font-size:12.5px;cursor:pointer}
+.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 16px;font-weight:600;font-size:var(--fs-meta);cursor:pointer}
 .actions .open:hover{background:#cdeee7;border-color:#7fccc0}
 .status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
 .status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
@@ -69,45 +68,51 @@ tbody tr:hover{background:#f7fcfb}
 .status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
 .status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
 .status-toggle:disabled{cursor:wait;opacity:.58}.status-toggle.is-pending .status-toggle-track{animation:switchPulse .8s ease-in-out infinite alternate}
-.status-toggle-label{font-size:12.5px;line-height:1}
+.status-toggle-label{font-size:var(--fs-meta);line-height:1}
 @keyframes switchPulse{to{opacity:.5}}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:13.5px}
-.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:12.5px}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer}.pager button:disabled{opacity:.45;cursor:not-allowed}
+.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
+.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:var(--fs-meta)}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer;font-size:var(--fs-meta)}.pager button:disabled{opacity:.45;cursor:not-allowed}
 /* drawer */
 .scrim{position:absolute;inset:58px 0 0 0;background:rgba(18,48,56,.28);display:none}
 .scrim.show{display:block}
 .drawer{position:absolute;top:0;right:0;bottom:0;width:460px;max-width:92vw;background:#fff;box-shadow:-14px 0 40px rgba(18,48,56,.18);display:none;flex-direction:column;border-left:1px solid var(--border);z-index:6}
 .drawer.show{display:flex}
 .dw-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #eef4f2}
-.dw-head h2{font-size:16px;display:flex;align-items:center;gap:10px}
-.x{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#6f8b86;cursor:pointer;font-size:15px}
+.dw-head h2{font-size:var(--fs-title);display:flex;align-items:center;gap:10px}
+.x{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#6f8b86;cursor:pointer;font-size:15px}/* × 字形，不纳入文字刻度 */
 .dw-body{padding:20px 22px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:18px}
-.field label{display:block;font-size:12.5px;color:#5c766f;margin-bottom:7px;font-weight:600}
-.field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13.5px;color:#123038;background:#fff;font-family:inherit}
+.field label{display:block;font-size:var(--fs-meta);color:#5c766f;margin-bottom:7px;font-weight:600}
+.field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038;background:#fff;font-family:inherit}
 .field input:focus,.field textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .field textarea{min-height:80px;resize:vertical;line-height:1.55}
-.hint{font-size:11.5px;color:#93a89f;margin-top:6px}
+.hint{font-size:var(--fs-caption);color:#93a89f;margin-top:6px}
 .metarow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .metabox{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#f8fcfb}
-.metabox .k{font-size:11.5px;color:#6f8b86}.metabox .v{font-size:17px;font-weight:700;color:#234;margin-top:3px}
-.sec-title{font-size:12px;color:#6f8b86;font-weight:600;letter-spacing:.3px;margin-bottom:10px}
+.metabox .k{font-size:var(--fs-caption);color:#6f8b86}.metabox .v{font-size:var(--fs-title);font-weight:700;color:#234;margin-top:3px}
+.sec-title{font-size:var(--fs-minor);color:#6f8b86;font-weight:600;letter-spacing:.3px;margin-bottom:10px}
 .rules{display:flex;flex-wrap:wrap;gap:7px}
-.rtag{background:#f4faf9;border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;color:#3f5f58;display:flex;gap:6px;align-items:center}
-.rtag .rid{color:#a7c0ba;font-size:10.5px}
+.rtag{background:#f4faf9;border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:var(--fs-minor);color:#3f5f58;display:flex;gap:6px;align-items:center}
+.rtag .rid{color:#a7c0ba;font-size:var(--fs-note)}
 .statusseg{display:flex;gap:8px}
-.seg{flex:1;text-align:center;padding:8px 0;border:1px solid var(--border);border-radius:9px;font-size:12.5px;color:#5c766f;cursor:pointer;background:#fff}
+.seg{flex:1;text-align:center;padding:8px 0;border:1px solid var(--border);border-radius:9px;font-size:var(--fs-meta);color:#5c766f;cursor:pointer;background:#fff}
 .seg.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
 .dw-foot{display:flex;align-items:center;gap:10px;padding:16px 22px;border-top:1px solid #eef4f2}
 .dw-foot .grow{flex:1}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.95}
 dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(420px,92vw)}
 dialog::backdrop{background:rgba(18,48,56,.3)}
-.dlg-head{padding:18px 22px 6px;font-size:16px;font-weight:700}
-.dlg-body{padding:12px 22px;display:flex;flex-direction:column;gap:14px}
-.dlg-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;gap:10px}
-.confirm-message{font-size:14px;color:#23443d;line-height:1.6}
-.confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:12px;line-height:1.55}
+#newDlg{width:min(720px,94vw)}
+#newDlg .dlg-body{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch}
+#newDlg .dlg-body>.field{display:flex;flex-direction:column;height:100%}
+#newDlg .dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
+#newDlg .dlg-body>.field.span-2{grid-column:1/-1}
+@media(max-width:900px){#newDlg .dlg-body{grid-template-columns:1fr}#newDlg .dlg-body>.field.span-2{grid-column:1}}
+.dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
+.dlg-body{padding:12px 24px;display:flex;flex-direction:column;gap:14px}
+.dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+.confirm-message{font-size:var(--fs-base);color:#23443d;line-height:1.6}
+.confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:var(--fs-minor);line-height:1.55}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.drawer{width:100%;max-width:100vw}.pager{justify-content:space-between}}
 </style>
 </head>
@@ -115,8 +120,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika 规则编排</b></div></div>
-      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a><a class="tab" href="/udfs">UDF</a></div>
+      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
+      <div id="nsSlot"></div>
+      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索场景名称 / 描述"></div>
@@ -125,7 +131,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><span style="font-size:19px;font-weight:700">业务场景</span><span class="sub" id="subCount">加载中…</span></div>
+      <div><h1>业务场景</h1><span class="sub" id="subCount">加载中…</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-status="">全部</button>
         <button type="button" class="chip" data-status="1">已生效</button>
@@ -154,7 +160,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
           <div class="metabox"><div class="k">引用规则</div><div class="v" id="dwRuleCount">0</div></div>
           <div class="metabox"><div class="k">流程节点</div><div class="v" id="dwNodeCount">0</div></div>
           <div class="metabox"><div class="k">版本</div><div class="v" id="dwVersion">v0</div></div>
-          <div class="metabox"><div class="k">最近更新</div><div class="v" id="dwUpdated" style="font-size:13px;padding-top:4px">-</div></div>
+          <div class="metabox"><div class="k">最近更新</div><div class="v" id="dwUpdated" style="font-size:var(--fs-base);padding-top:4px">-</div></div>
         </div>
       </div>
       <div>
@@ -170,8 +176,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-head">新建场景</div>
   <div class="dlg-body">
     <div class="field"><label>场景名称 *</label><input id="newName" placeholder="如：准入场景"></div>
-    <div class="field"><label>命名空间 *</label><select id="newNamespace"></select><div class="hint">规则流只能引用同一命名空间内的规则和规则流</div></div>
-    <div class="field"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
+    <div class="field span-2"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并编排</button></div>
 </dialog>
@@ -196,11 +201,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast"></div>
 
-<script src="/ui/api.js?v=20260802-1"></script>
+<script src="/ui/api.js?v=20260810-1"></script>
+<script src="/ui/ns.js?v=20260810-1"></script>
 <script>
 (() => {
   "use strict";
   const Api = window.MosikaApi;
+  const Ns = window.MosikaNs;
   const $ = (s) => document.querySelector(s);
   let statusFilter = "";
   let keyword = "";
@@ -252,11 +259,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function loadReferenceNames() {
     ruleNameById = new Map();
-    const namespaces = [...new Set(flows.map((flow) => flow.namespace).filter(Boolean))];
     try {
-      const groups = await Promise.all(namespaces.flatMap((namespace) => [
-        Api.listRuleReferences(namespace), Api.listFlowReferences(namespace)
-      ]));
+      const groups = await Promise.all([
+        Api.listRuleReferences(Ns.code()), Api.listFlowReferences(Ns.code())
+      ]);
       groups.flat().forEach((item) => {
         const id = item.ruleId || item.flowId;
         if (id) ruleNameById.set(String(id), item.name || item.description || String(id));
@@ -264,19 +270,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     } catch (_) { /* 引用名称不是列表主链路 */ }
   }
 
-  async function loadNamespaces() {
-    const namespaces = await Api.listNamespaces();
-    $("#newNamespace").innerHTML = (namespaces || [])
-      .filter((item) => item.status === 1)
-      .map((item) => `<option value="${esc(item.code)}">${esc(item.name)}（${esc(item.code)}）</option>`)
-      .join("");
-  }
-
   async function loadFlows() {
     const sequence = ++loadSequence;
     $("#rows").innerHTML = `<tr><td colspan="4"><div class="loading">加载中…</div></td></tr>`;
     try {
-      const page = await Api.listFlows({ status: statusFilter, keyword, pageNumber, pageSize });
+      const page = await Api.listFlows({ status: statusFilter, keyword, pageNumber, pageSize, namespace: Ns.code() });
       if (sequence !== loadSequence) return;
       flows = page.items || [];
       total = page.total || 0;
@@ -284,7 +282,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadFlows();
       }
-      $("#subCount").textContent = `将业务规则编排为可执行的业务流程 · 共 ${page.total} 个`;
+      $("#subCount").textContent = `将业务规则编排为可执行流程 · 共 ${page.total} 个`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -309,7 +307,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   };
 
   function renderRows() {
-    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">暂无业务场景，点右上角「新建场景」开始。</div></td></tr>`; return; }
+    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">暂无业务场景，点右上角「新建场景」添加。</div></td></tr>`; return; }
     $("#rows").innerHTML = flows.map((f) => {
       const ruleIds = f.referencedRuleIds || [];
       const meta = STATUS_META[f.status] || STATUS_META[0];
@@ -332,7 +330,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }).join("");
   }
 
-  function openCanvas(id) { location.href = `/flow/${id}`; }
+  function openCanvas(id) { location.href = Ns.link(`/flow/${id}`); }
 
   function openDrawer(id) {
     current = flows.find((f) => f.flowId === id);
@@ -472,7 +470,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     if (!name) { toast("请填写场景名称"); return; }
     try {
       const created = await Api.createFlow({
-        name, namespace: $("#newNamespace").value, description: $("#newDesc").value.trim(),
+        name, namespace: Ns.code(), description: $("#newDesc").value.trim(),
         ruleTree: JSON.stringify({
           type: "T", name: "",
           next: { type: "A", name: "", rule: { type: "R", name: "", expr: "∅" } }
@@ -516,7 +514,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && current) closeDrawer(); });
 
-  (async () => { await Promise.all([loadNamespaces(), loadFlows()]); await loadReferenceNames(); })();
+  (async () => {
+    const ctx = await Ns.boot();
+    if (!ctx) return;
+    Ns.mountSelector($("#nsSlot"));
+    Ns.applyTabs();
+    await loadFlows();
+    await loadReferenceNames();
+  })();
 })();
 </script>
 </body>

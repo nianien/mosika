@@ -1,5 +1,7 @@
 package com.skyfalling.mosika.ui.web.common;
 
+import com.skyfalling.mosika.exception.RuleEvalException;
+import com.skyfalling.mosika.exception.RuleNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -108,6 +110,35 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.fail(404, "resource not found"));
+    }
+
+    /**
+     * 把引用不存在的规则映射为 HTTP 404
+     * <p>
+     * 表达式引用了当前命名空间中未注册的规则属于调用方引用错误，
+     * 与规则执行失败区分处理
+     *
+     * @param e 规则未注册异常
+     * @return 包含规则标识的资源不存在响应
+     */
+    @ExceptionHandler(RuleNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuleNotFound(RuleNotFoundException e) {
+        log.warn("rule not found: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(404, e.getMessage()));
+    }
+
+    /**
+     * 把规则执行失败映射为 HTTP 400
+     *
+     * @param e 规则评估异常
+     * @return 包含失败规则标识的错误响应
+     */
+    @ExceptionHandler(RuleEvalException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuleEval(RuleEvalException e) {
+        log.warn("rule eval failed: ruleId={}, msg={}", e.getRuleId(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(400, "rule evaluation failed: " + e.getRuleId()));
     }
 
     /**

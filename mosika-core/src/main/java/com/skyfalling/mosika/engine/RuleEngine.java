@@ -1,6 +1,7 @@
 package com.skyfalling.mosika.engine;
 
 import com.skyfalling.mosika.eval.result.NaResult;
+import com.skyfalling.mosika.exception.RuleNotFoundException;
 import com.skyfalling.mosika.utils.Constants;
 import com.skyfalling.mosika.utils.JsRuntime;
 import lombok.Builder;
@@ -87,12 +88,12 @@ public class RuleEngine {
      * @param context  规则执行上下文，通过 {@code $$} 访问
      * @param arguments 当前规则调用绑定的参数对象，通过 {@code $args} 访问
      * @return JavaScript 表达式返回值
-     * @throws IllegalArgumentException 规则未注册时抛出
+     * @throws RuleNotFoundException 规则未注册时抛出
      */
     public Object evalRule(String ruleId, Object root, Object context, Map<String, Object> arguments) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
         if (ruleDefinition == null) {
-            throw new IllegalArgumentException("unregistered rule:" + ruleId);
+            throw new RuleNotFoundException(ruleId);
         }
         return doEval(compile(ruleDefinition.getExpression()), root, context, arguments);
     }
@@ -118,12 +119,12 @@ public class RuleEngine {
      * @param context  规则执行上下文，通过 {@code $$} 访问
      * @param arguments 当前规则调用绑定的参数对象，通过 {@code $args} 访问
      * @return 完成表达式插值的规则描述
-     * @throws IllegalArgumentException 规则未注册时抛出
+     * @throws RuleNotFoundException 规则未注册时抛出
      */
     public String evalRuleDesc(String ruleId, Object root, Object context, Map<String, Object> arguments) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
         if (ruleDefinition == null) {
-            throw new IllegalArgumentException("unregistered rule:" + ruleId);
+            throw new RuleNotFoundException(ruleId);
         }
         return (String) doEval(compileDesc(ruleDefinition.getDesc()), root, context, arguments);
     }

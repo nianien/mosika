@@ -62,8 +62,8 @@ public class AtomicRuleController {
 
     /** 查询每条原子规则被运行态规则流闭包直接引用的次数 */
     @GetMapping("/ref-counts")
-    public ApiResponse<Map<String, Integer>> refCounts() {
-        return ApiResponse.ok(service.refCounts());
+    public ApiResponse<Map<String, Integer>> refCounts(@RequestParam(required = false) String namespace) {
+        return ApiResponse.ok(service.refCounts(namespace));
     }
 
     /** 查询指定命名空间内可引用的启用原子规则 */

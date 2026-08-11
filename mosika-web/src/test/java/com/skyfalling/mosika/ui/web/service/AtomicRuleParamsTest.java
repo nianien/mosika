@@ -24,8 +24,8 @@ public class AtomicRuleParamsTest {
 
     @Test
     public void testValidParamsPassthroughUnchanged() {
-        String params = "[{\"name\":\"limit\",\"label\":\"上限\",\"type\":\"number\",\"required\":true},"
-                + "{\"name\":\"mode\",\"type\":\"enum\",\"options\":[\"a\",\"b\"]}]";
+        String params = "[{\"name\":\"limit\",\"label\":\"上限\",\"type\":\"number\",\"default\":100},"
+                + "{\"name\":\"mode\",\"type\":\"enum\",\"options\":[\"a\",\"b\"],\"default\":\"a\"}]";
         // 结构合法时原样返回，不改写内部结构（原始 JSON 透传）
         assertEquals(params, AtomicRuleService.validateParams(params));
     }

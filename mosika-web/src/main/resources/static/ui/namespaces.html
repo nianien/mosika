@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>命名空间 · Mosika</title>
+<link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+<link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
+<style>
+:root{
+  color:#123038;background:#edf4f3;
+  --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
+  --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;--muted:#6f8b86;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+.app-shell{min-height:100vh;display:grid;grid-template-rows:58px 1fr}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 22px;border-bottom:1px solid var(--border);background:#fff}
+.brandwrap,.brand,.top-right,.actions,.pager{display:flex;align-items:center}
+.brand{gap:11px}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,#2fd6c6,#0f9d8a)}
+.brand b{font-size:var(--fs-panel)}
+.back-link{margin-left:26px;font-size:var(--fs-base);color:#5c766f;text-decoration:none;padding:0 10px;height:32px;display:none;align-items:center;border-radius:8px}
+.back-link.show{display:flex}
+.back-link:hover{background:var(--teal-soft);color:var(--teal-d)}
+.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
+.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
+.btn.link{border:0;background:none;color:var(--teal-d);padding:0 5px}
+.btn.link.danger{color:#c2503c}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.main{padding:22px 26px;overflow:auto}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.page-head h1{font-size:var(--fs-page)}
+.page-head p{font-size:var(--fs-base);color:var(--muted);margin-top:5px;line-height:1.6}
+.panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{width:100%;min-width:880px;border-collapse:collapse;font-size:var(--fs-base)}
+th{text-align:left;padding:13px 18px;color:var(--muted);font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
+td{padding:14px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+.code{font-weight:600;font-size:var(--fs-base);font-family:var(--ff-mono);color:#086b60}
+.desc{color:#71887f;font-size:var(--fs-minor);margin-top:4px}
+.usage{color:#4d6b64;font-size:var(--fs-meta)}
+.usage b{font-weight:600;color:#123038}
+.pill{font-size:var(--fs-label);font-weight:600;padding:3px 9px;border-radius:11px}
+.pill.on{color:#1f7a43;background:#dcf9e4}
+.pill.off{color:var(--grey);background:var(--grey-soft)}
+.actions{gap:11px;justify-content:flex-end}
+.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:.2s;pointer-events:none;z-index:20;max-width:70vw;text-align:center;line-height:1.5}
+.toast.show{opacity:.95}
+dialog{border:0;border-radius:16px;padding:0;margin:auto;width:min(560px,94vw);box-shadow:0 24px 70px rgba(18,48,56,.28)}
+dialog::backdrop{background:rgba(18,48,56,.32)}
+.dlg-head{padding:22px 26px 0}
+.dlg-title{font-size:var(--fs-title);font-weight:700}
+.dlg-sub{margin-top:6px;font-size:var(--fs-meta);color:var(--muted);line-height:1.55}
+.dlg-body{padding:18px 26px 4px;display:grid;gap:17px}
+.field label{display:block;font-size:var(--fs-meta);color:#3f5c56;margin-bottom:7px;font-weight:600}
+.field .req{color:#e0654e;margin-left:2px}
+.field input{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038}
+.field input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.field input:disabled{background:#f4faf9;color:#6f8b86}
+.hint{font-size:var(--fs-caption);color:#8aa39d;line-height:1.55;margin-top:6px}
+.dlg-foot{padding:14px 26px 22px;display:flex;align-items:center;justify-content:flex-end;gap:10px}
+@media(max-width:800px){.topbar{height:auto;padding:12px 14px;flex-wrap:wrap}.main{padding:16px 12px}.page-head{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brandwrap">
+      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
+      <a class="back-link" id="backLink" href="/">返回业务场景</a>
+    </div>
+    <div class="top-right"><button class="btn primary" id="newBtn">＋ 新建命名空间</button></div>
+  </div>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>命名空间</h1>
+        <p id="summary">运行态的隔离边界：规则、业务场景与自定义函数都归属于其中一个，彼此不可跨界引用，同名函数调用路径互不影响。请先选择一个再进行其他操作。</p>
+      </div>
+    </div>
+    <section class="panel">
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th style="width:28%">标识 / 名称</th>
+            <th style="width:30%">描述</th>
+            <th style="width:20%">内容</th>
+            <th>状态</th>
+            <th style="text-align:right">操作</th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="createDlg">
+  <div class="dlg-head"><div class="dlg-title">新建命名空间</div><div class="dlg-sub">命名空间创建后标识不可修改，其下的规则、场景与函数与其他命名空间完全隔离。</div></div>
+  <div class="dlg-body">
+    <div class="field"><label>标识<span class="req">*</span></label><input id="cCode" placeholder="如 sales" autocomplete="off"><div class="hint">字母开头，可含字母、数字、下划线、点与连字符，最长 64 个字符；作为接口参数与链接参数使用，创建后不可修改。</div></div>
+    <div class="field"><label>名称<span class="req">*</span></label><input id="cName" placeholder="如 销售规则域" autocomplete="off"></div>
+    <div class="field"><label>描述</label><input id="cDesc" placeholder="简要说明该命名空间的业务边界" autocomplete="off"></div>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="cCancel">取消</button><button class="btn primary" id="cSave">创建</button></div>
+</dialog>
+
+<dialog id="editDlg">
+  <div class="dlg-head"><div class="dlg-title">编辑命名空间</div><div class="dlg-sub">标识作为引用键不可修改，仅可调整展示名称与描述。</div></div>
+  <div class="dlg-body">
+    <div class="field"><label>标识</label><input id="eCode" disabled></div>
+    <div class="field"><label>名称<span class="req">*</span></label><input id="eName" autocomplete="off"></div>
+    <div class="field"><label>描述</label><input id="eDesc" autocomplete="off"></div>
+  </div>
+  <div class="dlg-foot"><button class="btn" id="eCancel">取消</button><button class="btn primary" id="eSave">保存</button></div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+<script src="/ui/api.js?v=20260810-1"></script>
+<script>
+(() => {
+  "use strict";
+  const Api = window.MosikaApi;
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+  const STORE_KEY = "mosika.ns";
+
+  let items = [];
+  let toastTimer = null;
+
+  function toast(msg) {
+    const el = $("#toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+  }
+
+  function remembered() {
+    try { return localStorage.getItem(STORE_KEY); } catch (_) { return null; }
+  }
+
+  function enter(code) {
+    try { localStorage.setItem(STORE_KEY, code); } catch (_) { /* 隐私模式下仅靠 URL 传递 */ }
+    location.href = `/?ns=${encodeURIComponent(code)}`;
+  }
+
+  function usageOf(n) {
+    const rule = n.ruleCount ?? 0, flow = n.flowCount ?? 0, udf = n.udfCount ?? 0;
+    return { rule, flow, udf, total: rule + flow + udf };
+  }
+
+  function renderRows() {
+    const body = $("#rows");
+    if (!items.length) {
+      body.innerHTML = '<tr><td colspan="5"><div class="empty">暂无命名空间，点右上角「新建命名空间」添加。</div></td></tr>';
+      return;
+    }
+    body.innerHTML = items.map(n => {
+      const u = usageOf(n);
+      const on = n.status === 1;
+      const isDefault = n.code === "default";
+      return `<tr>
+        <td><div class="code">${esc(n.code)}</div><div class="desc">${esc(n.name || "")}</div></td>
+        <td><div class="usage">${esc(n.description || "—")}</div></td>
+        <td><div class="usage">规则 <b>${u.rule}</b> · 场景 <b>${u.flow}</b> · 函数 <b>${u.udf}</b></div></td>
+        <td><span class="pill ${on ? "on" : "off"}">${on ? "已启用" : "已停用"}</span></td>
+        <td><div class="actions">
+          ${on ? `<button class="btn link" data-enter="${esc(n.code)}">进入</button>` : ""}
+          <button class="btn link" data-edit="${esc(n.code)}">编辑</button>
+          ${on
+            ? (isDefault ? "" : `<button class="btn link danger" data-disable="${esc(n.code)}">停用</button>`)
+            : `<button class="btn link" data-enable="${esc(n.code)}">启用</button>`}
+        </div></td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function load() {
+    try {
+      items = (await Api.listNamespaces()) || [];
+    } catch (e) {
+      $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
+      return;
+    }
+    renderRows();
+    const back = remembered();
+    if (back && items.some(n => n.code === back && n.status === 1)) {
+      const link = $("#backLink");
+      link.setAttribute("href", `/?ns=${encodeURIComponent(back)}`);
+      link.classList.add("show");
+    }
+  }
+
+  $("#rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const { enter: toEnter, edit, disable, enable } = btn.dataset;
+    if (toEnter) { enter(toEnter); return; }
+    if (edit) {
+      const n = items.find(x => x.code === edit);
+      if (!n) return;
+      $("#eCode").value = n.code;
+      $("#eName").value = n.name || "";
+      $("#eDesc").value = n.description || "";
+      $("#editDlg").showModal();
+      return;
+    }
+    if (disable) {
+      const n = items.find(x => x.code === disable);
+      const u = usageOf(n || {});
+      if (u.total > 0) {
+        toast(`「${disable}」还有 ${u.rule} 条规则、${u.flow} 个场景、${u.udf} 个函数，清空后才能停用`);
+        return;
+      }
+      if (!window.confirm(`停用命名空间「${disable}」？停用后其下内容不再进入运行态。`)) return;
+      btn.disabled = true;
+      try { await Api.disableNamespace(disable); toast("已停用"); await load(); }
+      catch (err) { toast(err.message); btn.disabled = false; }
+      return;
+    }
+    if (enable) {
+      btn.disabled = true;
+      try { await Api.enableNamespace(enable); toast("已启用"); await load(); }
+      catch (err) { toast(err.message); btn.disabled = false; }
+    }
+  });
+
+  $("#newBtn").addEventListener("click", () => {
+    $("#cCode").value = ""; $("#cName").value = ""; $("#cDesc").value = "";
+    $("#createDlg").showModal();
+    $("#cCode").focus();
+  });
+  $("#cCancel").addEventListener("click", () => $("#createDlg").close());
+  $("#eCancel").addEventListener("click", () => $("#editDlg").close());
+
+  $("#cSave").addEventListener("click", async () => {
+    const code = $("#cCode").value.trim(), name = $("#cName").value.trim();
+    if (!code) { toast("请填写标识"); return; }
+    if (!name) { toast("请填写名称"); return; }
+    const btn = $("#cSave");
+    btn.disabled = true;
+    try {
+      await Api.createNamespace({ code, name, description: $("#cDesc").value.trim() });
+      $("#createDlg").close();
+      toast("已创建");
+      await load();
+    } catch (e) { toast(e.message); }
+    btn.disabled = false;
+  });
+
+  $("#eSave").addEventListener("click", async () => {
+    const code = $("#eCode").value, name = $("#eName").value.trim();
+    if (!name) { toast("请填写名称"); return; }
+    const btn = $("#eSave");
+    btn.disabled = true;
+    try {
+      await Api.updateNamespace(code, { name, description: $("#eDesc").value.trim() });
+      $("#editDlg").close();
+      toast("已保存");
+      await load();
+    } catch (e) { toast(e.message); }
+    btn.disabled = false;
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

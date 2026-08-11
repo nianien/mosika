@@ -26,9 +26,15 @@ public class UdfDefinitionDao {
     /** Spring JDBC 操作入口 */
     private final JdbcTemplate jdbc;
 
+    /** 带命名空间编码的基础查询 */
+    private static final String SELECT = "SELECT u.*, n.code AS namespace_code "
+            + "FROM udf_definition u JOIN rule_namespace n ON n.id=u.namespace_id";
+
     /** 把数据库列映射为 UDF 定义实体的统一行映射器 */
     private static final RowMapper<UdfDefinitionEntity> MAPPER = (rs, i) -> UdfDefinitionEntity.builder()
             .id(rs.getLong("id"))
+            .namespaceId(rs.getLong("namespace_id"))
+            .namespace(rs.getString("namespace_code"))
             .group(rs.getString("group_name"))
             .name(rs.getString("name"))
             .description(rs.getString("description"))
@@ -50,14 +56,16 @@ public class UdfDefinitionDao {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO udf_definition (group_name, name, description, source, status, version, created_at, updated_at) " +
-                            "VALUES (?, ?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
+                    "INSERT INTO udf_definition "
+                            + "(namespace_id, group_name, name, description, source, status, version, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now','localtime'), datetime('now','localtime'))",
                     Statement.RETURN_GENERATED_KEYS);
-            statement.setString(1, entity.getGroup());
-            statement.setString(2, entity.getName());
-            statement.setString(3, entity.getDescription() == null ? "" : entity.getDescription());
-            statement.setString(4, entity.getSource());
-            statement.setInt(5, entity.getStatus() == null ? 1 : entity.getStatus());
+            statement.setLong(1, entity.getNamespaceId());
+            statement.setString(2, entity.getGroup());
+            statement.setString(3, entity.getName());
+            statement.setString(4, entity.getDescription() == null ? "" : entity.getDescription());
+            statement.setString(5, entity.getSource());
+            statement.setInt(6, entity.getStatus() == null ? 1 : entity.getStatus());
             return statement;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -115,20 +123,22 @@ public class UdfDefinitionDao {
      * @return UDF 定义，不存在时返回 {@code null}
      */
     public UdfDefinitionEntity findById(long id) {
-        List<UdfDefinitionEntity> rows = jdbc.query("SELECT * FROM udf_definition WHERE id=?", MAPPER, id);
+        List<UdfDefinitionEntity> rows = jdbc.query(SELECT + " WHERE u.id=?", MAPPER, id);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     /**
      * 按完整注册路径查询 UDF 定义
      *
-     * @param group 点分隔命名空间
-     * @param name  函数名称
+     * @param namespace 规则命名空间
+     * @param group     点分隔 UDF 分组
+     * @param name      函数名称
      * @return 占用该路径的 UDF 定义，不存在时返回 {@code null}
      */
-    public UdfDefinitionEntity findByPath(String group, String name) {
+    public UdfDefinitionEntity findByPath(String namespace, String group, String name) {
         List<UdfDefinitionEntity> rows = jdbc.query(
-                "SELECT * FROM udf_definition WHERE group_name=? AND name=?", MAPPER, group, name);
+                SELECT + " WHERE n.code=? AND u.group_name=? AND u.name=?",
+                MAPPER, namespace, group, name);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
@@ -136,16 +146,18 @@ public class UdfDefinitionDao {
      * 按可选条件分页查询 UDF 定义
      *
      * @param status  启停状态，传 {@code null} 表示不过滤
-     * @param keyword 命名空间、名称、描述或源码关键字，传空值表示不过滤
-     * @param offset  从零开始的结果偏移量
-     * @param limit   最大返回条数
+     * @param namespace 规则命名空间，传空值表示不过滤
+     * @param keyword   UDF 分组、名称、描述或源码关键字，传空值表示不过滤
+     * @param offset    从零开始的结果偏移量
+     * @param limit     最大返回条数
      * @return 按命名空间和函数名称升序排列的 UDF 定义列表
      */
-    public List<UdfDefinitionEntity> list(Integer status, String keyword, long offset, int limit) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM udf_definition WHERE 1=1");
+    public List<UdfDefinitionEntity> list(Integer status, String namespace, String keyword,
+                                          long offset, int limit) {
+        StringBuilder sql = new StringBuilder(SELECT + " WHERE 1=1");
         List<Object> args = new ArrayList<>();
-        appendFilters(sql, args, status, keyword);
-        sql.append(" ORDER BY group_name ASC, name ASC LIMIT ? OFFSET ?");
+        appendFilters(sql, args, status, namespace, keyword);
+        sql.append(" ORDER BY u.group_name ASC, u.name ASC LIMIT ? OFFSET ?");
         args.add(limit);
         args.add(offset);
         return jdbc.query(sql.toString(), MAPPER, args.toArray());
@@ -155,13 +167,16 @@ public class UdfDefinitionDao {
      * 统计满足可选过滤条件的 UDF 定义数量
      *
      * @param status  启停状态，传 {@code null} 表示不过滤
-     * @param keyword 命名空间、名称、描述或源码关键字，传空值表示不过滤
+     * @param namespace 规则命名空间，传空值表示不过滤
+     * @param keyword   UDF 分组、名称、描述或源码关键字，传空值表示不过滤
      * @return 匹配记录数量
      */
-    public int count(Integer status, String keyword) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM udf_definition WHERE 1=1");
+    public int count(Integer status, String namespace, String keyword) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT COUNT(*) FROM udf_definition u "
+                        + "JOIN rule_namespace n ON n.id=u.namespace_id WHERE 1=1");
         List<Object> args = new ArrayList<>();
-        appendFilters(sql, args, status, keyword);
+        appendFilters(sql, args, status, namespace, keyword);
         Integer count = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         return count == null ? 0 : count;
     }
@@ -172,7 +187,17 @@ public class UdfDefinitionDao {
      * @return 按 ID 升序排列的启用 UDF 列表
      */
     public List<UdfDefinitionEntity> listActive() {
-        return jdbc.query("SELECT * FROM udf_definition WHERE status=1 ORDER BY id ASC", MAPPER);
+        return jdbc.query(SELECT + " WHERE u.status=1 ORDER BY u.id ASC", MAPPER);
+    }
+
+    /** 按命名空间加载全部启用 UDF */
+    public List<UdfDefinitionEntity> listActive(String namespace) {
+        if (namespace == null || namespace.isBlank()) {
+            return listActive();
+        }
+        return jdbc.query(
+                SELECT + " WHERE u.status=1 AND n.code=? ORDER BY u.id ASC",
+                MAPPER, namespace);
     }
 
     /**
@@ -181,15 +206,21 @@ public class UdfDefinitionDao {
      * @param sql     待追加条件的 SQL
      * @param args    与 SQL 占位符顺序一致的位置参数
      * @param status  启停状态
-     * @param keyword 模糊查询关键字
+     * @param namespace 规则命名空间
+     * @param keyword   模糊查询关键字
      */
-    private static void appendFilters(StringBuilder sql, List<Object> args, Integer status, String keyword) {
+    private static void appendFilters(StringBuilder sql, List<Object> args, Integer status,
+                                      String namespace, String keyword) {
         if (status != null) {
-            sql.append(" AND status=?");
+            sql.append(" AND u.status=?");
             args.add(status);
         }
+        if (namespace != null && !namespace.isBlank()) {
+            sql.append(" AND n.code=?");
+            args.add(namespace);
+        }
         if (keyword != null && !keyword.isBlank()) {
-            sql.append(" AND (group_name LIKE ? OR name LIKE ? OR description LIKE ? OR source LIKE ?)");
+            sql.append(" AND (u.group_name LIKE ? OR u.name LIKE ? OR u.description LIKE ? OR u.source LIKE ?)");
             String like = "%" + keyword + "%";
             args.add(like);
             args.add(like);

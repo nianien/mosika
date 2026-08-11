@@ -47,4 +47,37 @@ public class RuleNamespaceDao {
                 entity.getCode(), entity.getName(),
                 entity.getDescription() == null ? "" : entity.getDescription());
     }
+
+    /** 更新命名空间名称和说明 */
+    public int update(String code, String name, String description) {
+        return jdbc.update(
+                "UPDATE rule_namespace SET name=?, description=?, "
+                        + "updated_at=datetime('now','localtime') WHERE code=?",
+                name, description == null ? "" : description, code);
+    }
+
+    /** 更新命名空间启停状态 */
+    public int updateStatus(String code, int status) {
+        return jdbc.update(
+                "UPDATE rule_namespace SET status=?, updated_at=datetime('now','localtime') WHERE code=?",
+                status, code);
+    }
+
+    /** 统计命名空间下的规则、规则流和 UDF 数量 */
+    public Usage countUsage(long namespaceId) {
+        return jdbc.queryForObject(
+                "SELECT "
+                        + "(SELECT COUNT(*) FROM atomic_rule WHERE namespace_id=?) AS rule_count, "
+                        + "(SELECT COUNT(*) FROM rule_flow WHERE namespace_id=?) AS flow_count, "
+                        + "(SELECT COUNT(*) FROM udf_definition WHERE namespace_id=?) AS udf_count",
+                (rs, i) -> new Usage(
+                        rs.getInt("rule_count"),
+                        rs.getInt("flow_count"),
+                        rs.getInt("udf_count")),
+                namespaceId, namespaceId, namespaceId);
+    }
+
+    /** 命名空间内容使用量 */
+    public record Usage(int ruleCount, int flowCount, int udfCount) {
+    }
 }

@@ -25,6 +25,7 @@ import java.util.Map;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -75,7 +76,7 @@ class MosikaWebIntegrationTest {
 
     @Test
     void invalidRuleRollsBackWithoutReplacingRuntimeSuite() throws Exception {
-        RuleSuite active = suiteManager.getSuite();
+        RuleSuite active = suiteManager.getSuite("default");
 
         mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -84,15 +85,18 @@ class MosikaWebIntegrationTest {
                 .andExpect(jsonPath("$.code").value(400));
 
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
-        assertSame(active, suiteManager.getSuite());
+        assertSame(active, suiteManager.getSuite("default"));
     }
 
     @Test
-    void namespaceRestrictsNewReferencesButDoesNotSplitRuleSuite() throws Exception {
+    void namespaceIsolatesRuntimeSuitePerNamespace() throws Exception {
         mvc.perform(post("/api/namespaces")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("code", "sales", "name", "销售"))))
                 .andExpect(status().isOk());
+        RuleSuite initialSalesSuite = suiteManager.getSuite("sales");
+        assertSame(initialSalesSuite, suiteManager.getSuite("sales"));
+
         String defaultRule = createRule("default-condition", "condition");
         Map<String, Object> salesFlow = flowBody("sales-flow", judgeTree(defaultRule), null);
         salesFlow.put("namespace", "sales");
@@ -132,7 +136,11 @@ class MosikaWebIntegrationTest {
 
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
         assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM rule_flow", Integer.class));
-        assertTrue(suiteManager.getSuite() != null);
+        RuleSuite defaultSuite = suiteManager.getSuite("default");
+        RuleSuite salesSuite = suiteManager.getSuite("sales");
+        assertNotSame(defaultSuite, salesSuite);
+        assertSame(defaultSuite, suiteManager.getSuite("default"));
+        assertSame(salesSuite, suiteManager.getSuite("sales"));
     }
 
     @Test
@@ -249,6 +257,165 @@ class MosikaWebIntegrationTest {
         mvc.perform(post("/api/udfs").contentType(MediaType.APPLICATION_JSON).content(json(valid)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    void udfPathAndEvaluationAreIsolatedByNamespace() throws Exception {
+        mvc.perform(post("/api/namespaces")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("code", "sales", "name", "销售"))))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("scope", "value", "target => 'default'"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.namespace").value("default"))
+                .andExpect(jsonPath("$.data.namespaceId").doesNotExist());
+
+        Map<String, Object> salesUdf = udfBody("scope", "value", "target => 'sales'");
+        salesUdf.put("namespace", "sales");
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesUdf)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.namespace").value("sales"));
+
+        String defaultRuleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(ruleBody("默认域取值", "scope.value($)"))))
+                .andExpect(status().isOk()).andReturn()).path("ruleId").asText();
+
+        Map<String, Object> salesRule = ruleBody("销售域取值", "scope.value($)");
+        salesRule.put("namespace", "sales");
+        String salesRuleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesRule)))
+                .andExpect(status().isOk()).andReturn()).path("ruleId").asText();
+
+        mvc.perform(post("/api/eval/rule/{ruleId}", defaultRuleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("target", Map.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result").value("default"));
+        mvc.perform(post("/api/eval/rule/{ruleId}", salesRuleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("target", Map.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result").value("sales"));
+
+        mvc.perform(post("/api/eval/expr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "namespace", "sales",
+                                "expression", salesRuleId,
+                                "target", Map.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result").value("sales"));
+        mvc.perform(post("/api/eval/expr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "namespace", "sales",
+                                "expression", defaultRuleId,
+                                "target", Map.of()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("unregistered rule:" + defaultRuleId));
+        mvc.perform(post("/api/eval/expr")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "expression", defaultRuleId,
+                                "target", Map.of()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("namespace is required"));
+    }
+
+    @Test
+    void runtimeRuleFailureUsesHttp400() throws Exception {
+        String ruleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(ruleBody("执行期失败", "$.missing.deep"))))
+                .andExpect(status().isOk()).andReturn()).path("ruleId").asText();
+
+        mvc.perform(post("/api/eval/rule/{ruleId}", ruleId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("target", Map.of()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("rule evaluation failed: " + ruleId));
+    }
+
+    @Test
+    void namespaceDisableRequiresEmptyContentAndRemovesRuntimeSuite() throws Exception {
+        mvc.perform(post("/api/namespaces")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("code", "sales", "name", "销售"))))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/namespaces/sales")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("name", "销售规则", "description", "销售域"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("销售规则"));
+
+        Map<String, Object> salesFlow = flowBody("sales-flow", EMPTY_TREE, null);
+        salesFlow.put("namespace", "sales");
+        String flowId = data(mvc.perform(post("/api/flows")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesFlow)))
+                .andExpect(status().isOk())
+                .andReturn()).path("flowId").asText();
+        salesFlow.put("version", 0);
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(salesFlow)))
+                .andExpect(status().isOk());
+
+        JsonNode namespaces = data(mvc.perform(get("/api/namespaces"))
+                .andExpect(status().isOk())
+                .andReturn());
+        JsonNode sales = null;
+        for (JsonNode namespace : namespaces) {
+            if ("sales".equals(namespace.path("code").asText())) {
+                sales = namespace;
+            }
+        }
+        assertEquals(0, sales.path("ruleCount").asInt());
+        assertEquals(1, sales.path("flowCount").asInt());
+        assertEquals(0, sales.path("udfCount").asInt());
+
+        mvc.perform(post("/api/namespaces/sales/disable"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("rules=0, flows=1, udfs=0")));
+        mvc.perform(post("/api/namespaces/default/disable"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("cannot be disabled")));
+
+        long flowDatabaseId = RuleIds.parseFlowId(flowId);
+        jdbc.update("DELETE FROM flow_atomic_ref WHERE flow_id=?", flowDatabaseId);
+        jdbc.update("DELETE FROM flow_flow_ref WHERE flow_id=?", flowDatabaseId);
+        jdbc.update("DELETE FROM rule_flow WHERE id=?", flowDatabaseId);
+
+        mvc.perform(post("/api/namespaces/sales/disable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(0));
+
+        jdbc.update("""
+                INSERT INTO rule_flow
+                    (id, namespace_id, name, description, rule_tree, status, version)
+                VALUES (?, (SELECT id FROM rule_namespace WHERE code='sales'),
+                        'disabled-flow', 'disabled-flow', ?, 1, 0)
+                """, flowDatabaseId, EMPTY_TREE);
+        mvc.perform(post("/api/eval/flow/{flowId}", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("namespace not found or disabled: sales")));
+
+        mvc.perform(post("/api/namespaces/sales/enable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1));
+        mvc.perform(post("/api/eval/flow/{flowId}", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -577,13 +744,13 @@ class MosikaWebIntegrationTest {
 
     @Test
     void explicitRefreshReportsFailureAndKeepsPreviousSnapshot() throws Exception {
-        RuleSuite active = suiteManager.getSuite();
+        RuleSuite active = suiteManager.getSuite("default");
         String flowId = createFlow("broken-later", EMPTY_TREE);
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("broken-later", EMPTY_TREE, 0))))
                 .andExpect(status().isOk());
-        RuleSuite published = suiteManager.getSuite();
+        RuleSuite published = suiteManager.getSuite("default");
         jdbc.update("UPDATE rule_flow SET rule_tree='not-json' WHERE id=?", RuleIds.parseFlowId(flowId));
 
         mvc.perform(post("/api/rules")
@@ -592,12 +759,12 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM atomic_rule", Integer.class));
-        assertSame(published, suiteManager.getSuite());
+        assertSame(published, suiteManager.getSuite("default"));
 
         mvc.perform(post("/api/system/refresh"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value(500));
-        assertSame(published, suiteManager.getSuite());
+        assertSame(published, suiteManager.getSuite("default"));
         org.junit.jupiter.api.Assertions.assertNotSame(active, published);
     }
 
@@ -613,6 +780,7 @@ class MosikaWebIntegrationTest {
 
     private Map<String, Object> udfBody(String group, String name, String source) {
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("namespace", "default");
         body.put("group", group);
         body.put("name", name);
         body.put("description", name);

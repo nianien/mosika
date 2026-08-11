@@ -26,7 +26,7 @@
         S: { name: "串行节点", kind: "structure", short: "串", help: "子节点按顺序执行，顺序由树中从左到右的位置表达。" },
         P: { name: "并行节点", kind: "structure", short: "并", help: "多个子节点并发执行；结构节点本身不承载业务结果。" },
         D: { name: "分支节点", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
-        C: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的布尔规则树，next 表示条件命中分支。" },
+        C: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的布尔规则树，命中后执行其后续流程。" },
         L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
         H: { name: "命中数", kind: "structure", short: "H", help: "表达 some(min,max,...)；例如至少命中 2 项。" },
         R: { name: "动作规则", kind: "action", short: "R", help: "动作节点内部引用的原子规则。" },
@@ -147,6 +147,8 @@
     let ruleJudgeId = null;
     let ruleSelectedId = null;
     let ruleAddRuleIds = [];
+    // 暂存面板每行已录入的 $args（JSON 文本），与 ruleAddRuleIds 同下标；确认添加时写入新建节点
+    let ruleAddArgs = [];
     // 后端接线：当前打开的 flow 元数据（null=独立演示，无法保存）。
     let flowMeta = null;
     let savingFlow = false;
@@ -567,6 +569,22 @@
         } catch (_) { return {}; }
     }
 
+    // 按类型校验录入原始值，返回错误文案；合法或空值返回空串（空值由必填校验负责）
+    function argTypeError(p, raw) {
+        if (raw === "" || raw == null) return "";
+        if (p.type === "number") {
+            return Number.isFinite(Number(raw)) ? "" : "必须为数字";
+        }
+        if (p.type === "boolean") {
+            return raw === "true" || raw === "false" ? "" : "必须为是或否";
+        }
+        if (p.type === "enum") {
+            const opts = (Array.isArray(p.options) ? p.options : []).map((o) => String(o));
+            return opts.includes(String(raw)) ? "" : "必须为枚举项之一";
+        }
+        return "";
+    }
+
     // 按类型把录入的原始字符串转换为 $args 中的规范值。
     function coerceArgValue(type, raw) {
         if (type === "boolean") return raw === "true";
@@ -578,11 +596,14 @@
         return value !== undefined && value !== null && String(value) !== "";
     }
 
+    function paramValue(p, current) {
+        return argValueFilled(current[p.name]) ? current[p.name] : p.default;
+    }
+
     function paramControlHtml(p, current) {
         const name = escapeText(p.name);
-        const has = current[p.name] !== undefined && current[p.name] !== null;
-        const val = has ? String(current[p.name])
-            : (p.default !== undefined && p.default !== null ? String(p.default) : "");
+        const value = paramValue(p, current);
+        const val = argValueFilled(value) ? String(value) : "";
         if (p.type === "boolean") {
             return `<select class="field-control arg-control" data-arg="${name}" data-arg-type="boolean">
                 <option value="">未设置</option>
@@ -597,10 +618,16 @@
                 ${opts.map((o) => `<option value="${escapeText(o)}" ${String(o) === val ? "selected" : ""}>${escapeText(o)}</option>`).join("")}
             </select>`;
         }
-        const numeric = p.type === "number" ? ' inputmode="decimal"' : "";
+        // 当前值非法时退化为文本框，否则原生 type=number 会丢弃该值、让脏数据在界面上凭空消失
+        const numeric = p.type === "number" && !argTypeError(p, val)
+            ? ' type="number" inputmode="decimal" step="any"' : "";
+        const placeholder = p.type === "number" ? "请输入数字，如 18" : "请输入文本";
         return `<input class="field-control arg-control" data-arg="${name}" data-arg-type="${escapeText(p.type)}"${numeric}
-            value="${escapeText(val)}" placeholder="${escapeText(p.description || "")}" autocomplete="off">`;
+            value="${escapeText(val)}" placeholder="${escapeText(placeholder)}" autocomplete="off">`;
     }
+
+    // 参数类型中文名，与规则页参数模板的类型下拉保持一致
+    const ARG_TYPE_LABELS = { string: "文本", number: "数字", boolean: "布尔", enum: "枚举" };
 
     // 渲染参数录入区 HTML（无参返回空串）。
     function renderParamsSectionHtml(node) {
@@ -609,13 +636,18 @@
         const current = parseArgs(argsHost(node));
         const rows = defs.map((p) => {
             const label = escapeText(p.label || p.name);
-            const req = p.required ? ` <span class="arg-req">*</span>` : "";
-            const missing = p.required && !argValueFilled(current[p.name]) ? " arg-missing" : "";
+            const value = paramValue(p, current);
+            const error = argTypeError(p, argValueFilled(value) ? String(value) : "");
+            const state = error ? " arg-invalid" : (!argValueFilled(value) ? " arg-missing" : "");
             const hint = p.description ? `<span class="arg-hint">${escapeText(p.description)}</span>` : "";
-            return `<div class="detail-field arg-field${missing}" data-arg-name="${escapeText(p.name)}">
-                <span class="detail-label">${label}${req}</span>
+            const optionCount = p.type === "enum" && Array.isArray(p.options) ? p.options.length : 0;
+            const typeText = (ARG_TYPE_LABELS[p.type] || p.type)
+                + (optionCount ? ` ${optionCount} 项` : "");
+            return `<div class="detail-field arg-field${state}" data-arg-name="${escapeText(p.name)}">
+                <span class="detail-label">${label} <span class="arg-req">*</span><span class="arg-type">${escapeText(typeText)}</span></span>
                 ${paramControlHtml(p, current)}
                 ${hint}
+                <span class="arg-error" ${error ? "" : "hidden"}>${escapeText(error)}</span>
             </div>`;
         }).join("");
         return `<div class="args-section" data-args-section><div class="args-title">规则参数</div>${rows}</div>`;
@@ -632,6 +664,7 @@
             if (!control) return;
             const raw = control.value;
             if (raw === "" || raw == null) return; // 未填写：不写入该键
+            if (argTypeError(p, raw)) return;      // 类型不符：不写入，保持 args 与声明类型一致
             values[p.name] = coerceArgValue(p.type, raw);
         });
         const next = Object.keys(values).length ? JSON.stringify(values) : "";
@@ -640,32 +673,62 @@
         return true;
     }
 
-    // 刷新参数录入区各行的必填缺失标记（不重渲染，避免打断输入焦点）。
-    function refreshArgMissingMarks(node, container) {
+    // 刷新参数录入区各行的必填缺失与类型错误标记（不重渲染，避免打断输入焦点）。
+    function refreshArgMarks(node, container) {
         const section = container && container.querySelector("[data-args-section]");
         if (!section) return;
         const current = parseArgs(argsHost(node));
         nodeParamDefs(node).forEach((p) => {
             const row = section.querySelector(`[data-arg-name="${CSS.escape(p.name)}"]`);
-            if (row) row.classList.toggle("arg-missing", !!p.required && !argValueFilled(current[p.name]));
+            if (!row) return;
+            const control = row.querySelector(`[data-arg="${CSS.escape(p.name)}"]`);
+            const error = control ? argTypeError(p, control.value) : "";
+            row.classList.toggle("arg-invalid", Boolean(error));
+            row.classList.toggle("arg-missing", !error && !argValueFilled(paramValue(p, current)));
+            const errorEl = row.querySelector(".arg-error");
+            if (errorEl) {
+                errorEl.textContent = error;
+                errorEl.hidden = !error;
+            }
         });
     }
 
-    // 收集规则子树内必填参数未填写的原子规则节点（含未填参数名），供规则弹窗保存前校验。
+    // 收集规则子树内参数未填写或类型不符的原子规则节点（含问题参数名），供保存前校验。
     function missingRequiredInRule(ruleRoot) {
         const missing = [];
-        const walkRule = (node) => {
-            if (!node) return;
+        if (!ruleRoot) return missing;
+        walk(ruleRoot, (node) => {
             if (["R", "B"].includes(node.type)) {
                 const defs = nodeParamDefs(node);
                 const current = parseArgs(node);
-                const unfilled = defs.filter((p) => p.required && !argValueFilled(current[p.name])).map((p) => p.label || p.name);
-                if (unfilled.length) missing.push({ node, params: unfilled });
+                const problems = [];
+                defs.forEach((p) => {
+                    const value = paramValue(p, current);
+                    if (!argValueFilled(value)) { problems.push(p.label || p.name); return; }
+                    const error = argTypeError(p, String(value));
+                    if (error) problems.push(`${p.label || p.name}（${error}）`);
+                });
+                if (problems.length) missing.push({ node, params: problems });
             }
-            (node.rules || []).forEach(walkRule);
-        };
-        walkRule(ruleRoot);
+            return true;
+        });
         return missing;
+    }
+
+    function materializeParamDefaults(ruleRoot) {
+        walk(ruleRoot, (node) => {
+            if (!["R", "B"].includes(node.type)) return true;
+            const current = parseArgs(node);
+            let changed = false;
+            nodeParamDefs(node).forEach((p) => {
+                if (argValueFilled(current[p.name]) || !argValueFilled(p.default)) return;
+                if (argTypeError(p, String(p.default))) return; // 默认值与声明类型不符：不注入
+                current[p.name] = coerceArgValue(p.type, String(p.default));
+                changed = true;
+            });
+            if (changed) node.args = JSON.stringify(current);
+            return true;
+        });
     }
 
     function editKey(nodeId, field) { return `${nodeId}:${field}`; }
@@ -756,7 +819,7 @@
         if (node.type === "T") {
             readonlyField("流程入口", node.next ? flowNodeDisplayName(node.next) : "未设置");
         } else if (node.type === "C") {
-            readonlyField("命中分支", node.next ? flowNodeDisplayName(node.next) : "未设置");
+            readonlyField("命中流程", node.next ? flowNodeDisplayName(node.next) : "未设置");
         }
         if (node.type === "A") parts.push(renderParamsSectionHtml(node));
         $("#nodeDetailFields").innerHTML = parts.join("");
@@ -1327,8 +1390,15 @@
         return node;
     }
 
+    // 暂存行的临时原子规则节点：仅用于复用参数区渲染与回填，不进入规则树
+    function stagingRuleNode(index) {
+        return { type: "B", expr: ruleAddRuleIds[index] || "", args: ruleAddArgs[index] || "" };
+    }
+
     function renderRuleAddRows(focusIndex = -1) {
-        $("#ruleAddRows").innerHTML = ruleAddRuleIds.map((ruleId, index) => `
+        $("#ruleAddRows").innerHTML = ruleAddRuleIds.map((ruleId, index) => {
+            const params = renderParamsSectionHtml(stagingRuleNode(index));
+            return `
             <div class="rule-add-row">
                 <label>
                     引用规则 ${index + 1}
@@ -1340,7 +1410,9 @@
                     </select>
                 </label>
                 <button type="button" data-rule-add-remove="${index}" aria-label="删除规则 ${index + 1}" ${ruleAddRuleIds.length === 1 ? "disabled" : ""}>×</button>
-            </div>`).join("");
+            </div>
+            ${params ? `<div class="rule-add-params" data-rule-add-params="${index}">${params}</div>` : ""}`;
+        }).join("");
         $("#ruleAddLogicField").hidden = ruleAddRuleIds.length <= 1;
         requestAnimationFrame(() => {
             if (focusIndex >= 0) $(`[data-rule-add-select="${focusIndex}"]`)?.focus();
@@ -1350,12 +1422,14 @@
     function appendRuleAddRow() {
         const unused = RULE_DEFINITIONS.find((definition) => !ruleAddRuleIds.includes(definition.ruleId));
         ruleAddRuleIds.push(unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "");
+        ruleAddArgs.push("");
         renderRuleAddRows(ruleAddRuleIds.length - 1);
     }
 
     function removeRuleAddRow(index) {
         if (ruleAddRuleIds.length <= 1 || index < 0 || index >= ruleAddRuleIds.length) return;
         ruleAddRuleIds.splice(index, 1);
+        ruleAddArgs.splice(index, 1);
         renderRuleAddRows(Math.min(index, ruleAddRuleIds.length - 1));
     }
 
@@ -1371,6 +1445,7 @@
         $("#ruleReferenceField").hidden = true;
         $("#ruleAddTitle").textContent = "配置根规则";
         ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
+        ruleAddArgs = [""];
         document.querySelector('input[name="ruleAddLogic"][value="&&"]').checked = true;
         $("#ruleEditorFooter").hidden = true;
         $("#ruleAddPanel").hidden = false;
@@ -1379,6 +1454,7 @@
 
     function cancelRuleAdd() {
         ruleAddRuleIds = [];
+        ruleAddArgs = [];
         $("#ruleAddPanel").hidden = true;
         updateRuleEditor();
     }
@@ -1392,9 +1468,17 @@
         if (!node) return;
         const blocked = limitBlockReason(judge, node);
         if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
+        if (node.type === "B") {
+            if (ruleAddArgs[0]) node.args = ruleAddArgs[0];
+        } else if (Array.isArray(node.rules)) {
+            node.rules.forEach((child, index) => {
+                if (child.type === "B" && ruleAddArgs[index]) child.args = ruleAddArgs[index];
+            });
+        }
         judge.rule = node;
         ruleSelectedId = idOf(node);
         ruleAddRuleIds = [];
+        ruleAddArgs = [];
         hideRulePopover();
         renderRuleDialog();
         render({ preserveView: true });
@@ -1773,11 +1857,21 @@
         return false;
     }
 
+    function requiredParamGate() {
+        const missing = missingRequiredInRule(tree);
+        if (!missing.length) return false;
+        const names = [...new Set(missing.flatMap((item) => item.params))];
+        openConfirm(`请先修正规则参数：${names.join("、")}`,
+            { title: "参数不完整或类型不符", confirmLabel: "知道了" });
+        return true;
+    }
+
     // 保存到后端：过滤瞬时态后 serialize(tree) → 草稿走 PUT /api/flows/{id}，生效走 POST /publish；
     // 不再由前端传 status（后端按端点决定草稿/生效，PUT 不能发布）。
     async function saveToBackend(makeFormal) {
         if (savingFlow) return true;
-        if (placeholderGate()) return false;
+        if (placeholderGate() || requiredParamGate()) return false;
+        materializeParamDefaults(tree);
         if (!flowMeta || !window.MosikaApi) {
             docStatus = makeFormal ? "formal" : "draft";
             dirty = false;
@@ -1799,7 +1893,7 @@
             dirty = false;
             updateDocStatus(); pulseStatus();
             // 保存/生效成功后自动返回场景列表（dirty 已清空，不再触发离开提醒）。
-            setTimeout(() => { location.href = "/"; }, 300);
+            setTimeout(() => { location.href = window.MosikaNs ? window.MosikaNs.link("/") : "/"; }, 300);
             return true;
         } catch (e) {
             openConfirm(`${makeFormal ? "生效" : "保存"}失败：${e.message}`,
@@ -2137,7 +2231,7 @@
         if (!node) return;
         const container = $("#nodeDetailFields");
         if (commitArgsFromInputs(node, container)) markDraft();
-        refreshArgMissingMarks(node, container);
+        refreshArgMarks(node, container);
     };
     $("#nodeDetailFields").addEventListener("input", onFlowArgInput);
     $("#nodeDetailFields").addEventListener("change", onFlowArgInput);
@@ -2151,7 +2245,7 @@
         if (!node) return;
         const container = $("#ruleEditorParamsField");
         if (commitArgsFromInputs(node, container)) markDraft();
-        refreshArgMissingMarks(node, container);
+        refreshArgMarks(node, container);
     };
     $("#ruleEditorParamsField").addEventListener("input", onRuleArgInput);
     $("#ruleEditorParamsField").addEventListener("change", onRuleArgInput);
@@ -2163,7 +2257,7 @@
             ruleSelectedId = idOf(missing[0].node);
             renderRuleDialog();
             const names = [...new Set(missing.flatMap((m) => m.params))];
-            openConfirm(`请先填写规则必填参数：${names.join("、")}`, { title: "参数未填写", confirmLabel: "知道了" });
+            openConfirm(`请先修正规则参数：${names.join("、")}`, { title: "参数不完整或类型不符", confirmLabel: "知道了" });
             return;
         }
         ruleDialogCommitted = true;
@@ -2174,9 +2268,27 @@
     $("#ruleAddCancelButton").addEventListener("click", cancelRuleAdd);
     $("#ruleAddConfirmButton").addEventListener("click", confirmRuleAdd);
     $("#ruleAddRowButton").addEventListener("click", appendRuleAddRow);
+    // 暂存行参数录入：就地写回该行 args 暂存值，不重渲染以保留输入焦点
+    const onRuleAddArgInput = (event) => {
+        if (!event.target.classList.contains("arg-control")) return false;
+        const wrap = event.target.closest("[data-rule-add-params]");
+        if (!wrap) return false;
+        const index = Number(wrap.dataset.ruleAddParams);
+        if (!Number.isInteger(index) || ruleAddRuleIds[index] === undefined) return false;
+        const staging = stagingRuleNode(index);
+        commitArgsFromInputs(staging, wrap);
+        ruleAddArgs[index] = staging.args || "";
+        refreshArgMarks(staging, wrap);
+        return true;
+    };
+    $("#ruleAddRows").addEventListener("input", onRuleAddArgInput);
     $("#ruleAddRows").addEventListener("change", (event) => {
+        if (onRuleAddArgInput(event)) return;
         const index = Number(event.target.dataset.ruleAddSelect);
-        if (Number.isInteger(index) && ruleAddRuleIds[index] !== undefined) ruleAddRuleIds[index] = event.target.value;
+        if (!Number.isInteger(index) || ruleAddRuleIds[index] === undefined) return;
+        if (ruleAddRuleIds[index] !== event.target.value) ruleAddArgs[index] = "";
+        ruleAddRuleIds[index] = event.target.value;
+        renderRuleAddRows(index);
     });
     $("#ruleAddRows").addEventListener("click", (event) => {
         const button = event.target.closest("[data-rule-add-remove]");
@@ -2199,8 +2311,10 @@
         const idx = Number(select.dataset.subruleSelect);
         const target = node.type === "B" ? node : node.rules[idx];
         if (target && target.type === "B") {
+            if (target.expr !== select.value) target.args = "";
             target.expr = select.value;
             renderRuleTree();
+            renderRuleEditorParams(target);
             render({ preserveView: true });
         }
     });
@@ -2505,6 +2619,17 @@
             ]);
             applyRuleDefinitions(atomics, flows.filter((candidate) => candidate.flowId !== flow.flowId));
             $("#loadErrorBanner").hidden = true;
+            if (window.MosikaNs) {
+                window.MosikaNs.adopt(flow.namespace);
+                const nsEl = document.getElementById("flowCrumbNs");
+                const nsWrap = document.getElementById("flowCrumbNsWrap");
+                if (nsEl && flow.namespace) {
+                    nsEl.textContent = flow.namespace;
+                    if (nsWrap) nsWrap.hidden = false;
+                }
+                const backEl = document.getElementById("backToFlows");
+                if (backEl) backEl.setAttribute("href", window.MosikaNs.link("/"));
+            }
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = flow.name || "流程画布";
             const crumbEl = document.getElementById("flowCrumbName");

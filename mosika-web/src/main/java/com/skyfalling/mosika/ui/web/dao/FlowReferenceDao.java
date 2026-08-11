@@ -39,18 +39,19 @@ public class FlowReferenceDao {
                 flowId, referencedFlowIds);
     }
 
-    /** 统计每条原子规则被运行态规则流闭包直接引用的次数 */
-    public Map<String, Integer> atomicRefCountsByActiveFlow() {
+    /** 按命名空间统计每条原子规则被运行态规则流闭包直接引用的次数 */
+    public Map<String, Integer> atomicRefCountsByActiveFlow(long namespaceId) {
         Map<String, Integer> counts = new HashMap<>();
         jdbc.query(
                 "WITH RECURSIVE runtime(id) AS ("
-                        + "SELECT id FROM rule_flow WHERE status=1 "
+                        + "SELECT id FROM rule_flow WHERE status=1 AND namespace_id=? "
                         + "UNION SELECT r.referenced_flow_id FROM flow_flow_ref r "
                         + "JOIN runtime p ON p.id=r.flow_id"
                         + ") SELECT r.rule_id, COUNT(*) AS c FROM flow_atomic_ref r "
                         + "JOIN runtime f ON f.id=r.flow_id GROUP BY r.rule_id",
                 (org.springframework.jdbc.core.RowCallbackHandler) rs ->
-                        counts.put(RuleIds.ruleId(rs.getLong("rule_id")), rs.getInt("c")));
+                        counts.put(RuleIds.ruleId(rs.getLong("rule_id")), rs.getInt("c")),
+                namespaceId);
         return counts;
     }
 
@@ -66,6 +67,19 @@ public class FlowReferenceDao {
                 (rs, i) -> rs.getLong(1)));
     }
 
+    /** 按命名空间查询生效根规则流及其递归引用的全部规则流数据库主键 */
+    public Set<Long> runtimeFlowIds(long namespaceId) {
+        return new HashSet<>(jdbc.query(
+                "WITH RECURSIVE runtime(id) AS ("
+                        + "SELECT id FROM rule_flow WHERE status=1 AND namespace_id=? "
+                        + "UNION "
+                        + "SELECT r.referenced_flow_id FROM flow_flow_ref r "
+                        + "JOIN runtime p ON p.id=r.flow_id"
+                        + ") SELECT id FROM runtime",
+                (rs, i) -> rs.getLong(1),
+                namespaceId));
+    }
+
     /** 查询运行态规则流闭包直接或间接依赖的全部原子规则数据库主键 */
     public Set<Long> runtimeRuleIds() {
         return new HashSet<>(jdbc.query(
@@ -77,6 +91,20 @@ public class FlowReferenceDao {
                         + ") SELECT DISTINCT a.rule_id FROM flow_atomic_ref a "
                         + "JOIN runtime f ON f.id=a.flow_id",
                 (rs, i) -> rs.getLong(1)));
+    }
+
+    /** 按命名空间查询运行态规则流闭包依赖的全部原子规则数据库主键 */
+    public Set<Long> runtimeRuleIds(long namespaceId) {
+        return new HashSet<>(jdbc.query(
+                "WITH RECURSIVE runtime(id) AS ("
+                        + "SELECT id FROM rule_flow WHERE status=1 AND namespace_id=? "
+                        + "UNION "
+                        + "SELECT r.referenced_flow_id FROM flow_flow_ref r "
+                        + "JOIN runtime p ON p.id=r.flow_id"
+                        + ") SELECT DISTINCT a.rule_id FROM flow_atomic_ref a "
+                        + "JOIN runtime f ON f.id=a.flow_id",
+                (rs, i) -> rs.getLong(1),
+                namespaceId));
     }
 
     /** 批量写入同一来源规则流的引用 */

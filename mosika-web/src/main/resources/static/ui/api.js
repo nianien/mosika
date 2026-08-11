@@ -44,7 +44,7 @@
         // rules
         listRules: (params) => request("GET", `/rules${qs(params)}`),
         listRuleReferences: (namespace) => request("GET", `/rules/references${qs({ namespace })}`),
-        getRuleRefCounts: () => request("GET", "/rules/ref-counts"),
+        getRuleRefCounts: (namespace) => request("GET", `/rules/ref-counts${qs({ namespace })}`),
         createRule: (rule) => request("POST", "/rules", rule),
         updateRule: (ruleId, rule) => request("PUT", `/rules/${ruleId}`, rule),
         enableRule: (ruleId, version) => request("POST", `/rules/${ruleId}/enable${qs({ version })}`),
@@ -52,6 +52,9 @@
         // namespaces
         listNamespaces: () => request("GET", "/namespaces"),
         createNamespace: (namespace) => request("POST", "/namespaces", namespace),
+        updateNamespace: (code, meta) => request("PUT", `/namespaces/${encodeURIComponent(code)}`, meta),
+        disableNamespace: (code) => request("POST", `/namespaces/${encodeURIComponent(code)}/disable`),
+        enableNamespace: (code) => request("POST", `/namespaces/${encodeURIComponent(code)}/enable`),
         // user-registered JavaScript UDFs
         listUdfs: (params) => request("GET", `/udfs${qs(params)}`),
         createUdf: (udf) => request("POST", "/udfs", udf),
