@@ -3,6 +3,7 @@ package com.skyfalling.mosika.ui.web.controller;
 import com.skyfalling.mosika.eval.result.NodeResult;
 import com.skyfalling.mosika.ui.web.common.ApiResponse;
 import com.skyfalling.mosika.ui.web.service.RuleSuiteManager;
+import com.skyfalling.mosika.utils.JsonUtils;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,16 @@ public class EvalController {
         private String expression;
     }
 
+    @Data
+    @EqualsAndHashCode(callSuper = false)
+    public static class TryEvalRequest extends EvalRequest {
+        private String namespace;
+        /** 待试运行的原子规则表达式（JavaScript），取编辑器当前内容，规则可以尚未保存。 */
+        private String expression;
+        /** 模板参数取值（对应 core 里的 $args），可为空。 */
+        private Map<String, Object> args;
+    }
+
     /** 执行一条规则流：POST /api/eval/flow/{flowId} */
     @PostMapping("/flow/{flowId}")
     public ApiResponse<NodeResult> evalFlow(@PathVariable String flowId,
@@ -61,5 +72,22 @@ public class EvalController {
         }
         return ApiResponse.ok(suiteManager.evalExpr(
                 req.getNamespace(), req.getExpression(), req.getTarget()));
+    }
+
+    /**
+     * 试运行编辑中的原子规则：POST /api/eval/try
+     * <p>
+     * body 包含 namespace/expression/args/target/context，规则不必已保存或已启用。
+     * 传了 context 时 core 不返回规则详情，结果里的 details 会为空。
+     */
+    @PostMapping("/try")
+    public ApiResponse<NodeResult> tryRule(@RequestBody TryEvalRequest req) {
+        if (req.getNamespace() == null || req.getNamespace().isBlank()) {
+            throw new IllegalArgumentException("namespace is required");
+        }
+        String argsJson = req.getArgs() == null || req.getArgs().isEmpty()
+                ? null : JsonUtils.toJson(req.getArgs());
+        return ApiResponse.ok(suiteManager.tryRule(req.getNamespace(), req.getExpression(),
+                argsJson, req.getTarget(), req.getContext()));
     }
 }

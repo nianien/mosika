@@ -16,6 +16,8 @@
   --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
+[hidden]{display:none!important}
 .app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr);position:relative}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
 .brandwrap{display:flex;align-items:center}

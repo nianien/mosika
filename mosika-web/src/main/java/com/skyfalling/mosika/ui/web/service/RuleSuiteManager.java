@@ -2,6 +2,8 @@ package com.skyfalling.mosika.ui.web.service;
 
 import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.engine.UdfDefinition;
+import com.skyfalling.mosika.eval.node.ExprNode;
+import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.result.NodeResult;
 import com.skyfalling.mosika.suite.RuleSuite;
 import com.skyfalling.mosika.ui.tree.node.TreeNode;
@@ -45,6 +47,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class RuleSuiteManager {
+
+    /** 试运行临时预览规则的 ID，不与真实规则 ID 命名空间冲突 */
+    private static final String TRY_RULE_ID = "tryRulePreview";
 
     /** 数据库结构迁移入口，确保套件初始化前已完成迁移和 schema 初始化 */
     private final DatabaseMigrationInitializer databaseMigrationInitializer;
@@ -257,6 +262,53 @@ public class RuleSuiteManager {
             throw new IllegalArgumentException("expression is required");
         }
         return getSuite(namespace).eval(expression, target);
+    }
+
+    /**
+     * 试运行一段原子规则表达式，规则可以尚未保存或尚未启用
+     * <p>
+     * Core 没有 (ruleId, target, args) 求值入口，$args 只能由 {@link ExprNode} 携带。
+     * 这里用当前命名空间的已启用 UDF 加一条临时预览定义编译出一次性套件，
+     * 与 {@link #assertAtomicRuleBuildable} 的编译方式一致，不触碰运行态快照。
+     * <p>
+     * 注意：core 的 {@code eval(RuleNode, data, context)} 不返回规则详情，
+     * 因此传入上下文时结果里没有命中详情，不传上下文时才有。
+     *
+     * @param namespace  命名空间编码
+     * @param expression 原子规则表达式（JavaScript）
+     * @param argsJson   模板参数 JSON 对象文本，空表示不带参数
+     * @param target     求值参数对象（$）
+     * @param context    附加上下文（$$），可为空
+     * @return 执行结果
+     */
+    public NodeResult tryRule(String namespace, String expression, String argsJson,
+                              Object target, Map<String, Object> context) {
+        if (expression == null || expression.isBlank()) {
+            throw new IllegalArgumentException("expression is required");
+        }
+        RuleSuite suite;
+        try {
+            RuleDefinition preview = new RuleDefinition(TRY_RULE_ID, expression, "", RuleDefinition.RULE_TYPE_ATOMIC);
+            suite = new RuleSuite(List.of(preview), runtimeUdfs(namespace));
+        } catch (Exception e) {
+            throw new BusinessException(400, "rule expression compile failed: " + rootMessage(e));
+        }
+        RuleNode node;
+        try {
+            node = argsJson == null || argsJson.isBlank()
+                    ? new ExprNode(TRY_RULE_ID)
+                    : new ExprNode(TRY_RULE_ID, argsJson);
+        } catch (Exception e) {
+            throw new BusinessException(400, "invalid rule arguments: " + rootMessage(e));
+        }
+        try {
+            if (context == null || context.isEmpty()) {
+                return suite.eval(node, target);
+            }
+            return suite.eval(node, target, context);
+        } catch (Exception e) {
+            throw new BusinessException(400, "rule eval failed: " + rootMessage(e));
+        }
     }
 
     /** 提取异常链最深层的稳定错误信息 */

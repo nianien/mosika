@@ -14,6 +14,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <style>
 :root{
@@ -25,6 +27,8 @@
   --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
+[hidden]{display:none!important}
 .app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
 .brandwrap{display:flex;align-items:center}
@@ -88,40 +92,136 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
 .dlg-body{padding:12px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch;max-height:80vh;overflow-y:auto}
 .dlg-body>.field.span-2{grid-column:1/-1}
-/* 编辑规则弹窗：左列 .rule-main（字段+参数模板），右列 .field-expr（表达式编辑器）。
-   高度自适应且设上限：参数少时按内容收缩（左侧不留白），
-   超过上限后只让左列参数区内部滚动，右列编辑器始终撑满（右侧不留白）。
-   上限必须落在 .rule-main 这个 flex 容器上：加在 grid 容器上只会裁切，不会触发子项收缩 */
-#ruleDlg .dlg-body{grid-template-columns:1fr 1fr;align-items:stretch;height:auto;max-height:none;overflow:hidden}
-#ruleDlg .rule-main{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;max-height:min(72vh,660px)}
-#ruleDlg .rule-row{display:grid;grid-template-columns:1fr 208px;gap:12px;align-items:start;flex:none}
-#ruleDlg .rule-main>.field{height:auto;flex:none}
-#ruleDlg .rule-main>.field>.hint{margin-top:6px;padding-top:0}
-/* 参数区按内容高度排布，超出可用高度时只由它收缩并内部滚动。
-   选择器须与上面的 .rule-main>.field 同级，否则 flex:none 会覆盖掉这里的可收缩设置 */
-#ruleDlg .rule-main>.field-params{flex:0 1 auto;min-height:96px;display:flex;flex-direction:column;gap:6px}
-#ruleDlg .field-params .params-editor{flex:0 1 auto;min-height:0;overflow-y:auto;padding-right:2px}
-#ruleDlg .field-params>label,#ruleDlg .field-params>.param-add,#ruleDlg .field-params>.hint{flex:none}
-#ruleDlg .field-expr{min-height:0;display:flex;flex-direction:column}
-#ruleDlg .field-expr .CodeMirror{flex:1;min-height:340px;height:auto}
+/* ── 编辑规则弹窗（方案 A）：信息行通栏 + 左主区（固定高编辑器 + 可滚动参数表）+ 右列常驻试运行 ──
+   高度上限落在 .rule-work 这个 flex 容器上：加在 grid 容器上只会裁切，不会触发子项收缩 */
+/* 标题与底部按钮固定，中间内容区自己滚。弹窗顶部锚定（不做垂直居中），
+   这样切换页签导致高度变化时只向下伸展，标题位置恒定不跳 */
+#ruleDlg{width:min(940px,96vw);max-height:92vh;margin:4vh auto auto;display:flex;flex-direction:column}
+#ruleDlg .dlg-head,#ruleDlg .dlg-foot{flex:none}
+#ruleDlg .dlg-body{flex:1 1 auto;min-height:0}
+#ruleDlg .dlg-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-top:12px;scroll-padding-block-end:12px;scroll-behavior:smooth}
+#ruleDlg .dpane{min-height:min(452px,42vh)}
+#ruleDlg .dlg-body{display:flex;flex-direction:column;gap:0;height:auto;max-height:none;overflow:hidden}
+/* 名称/描述/类型与页签常驻不滚，只有页内容滚，避免滚动时顶部剩半截输入框 */
+#ruleDlg .dlg-fixed{flex:none;display:flex;flex-direction:column;gap:12px}
+#ruleDlg .rule-info{display:grid;grid-template-columns:1fr 1.5fr;gap:10px 14px;align-items:start}
+/* 弹窗分页：表达式与参数 / 试运行 */
+.dlg-tabs{display:flex;gap:4px;border-bottom:1px solid #eef4f2}
+.dtab{padding:8px 14px;border:0;background:none;color:#6f8b86;font-size:var(--fs-base);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.dtab:hover{color:var(--teal-d)}
+.dtab.on{color:var(--teal-d);font-weight:600;border-bottom-color:var(--teal)}
+/* 试运行页：左侧三页输入，右侧结果，避免纵向堆叠 */
+#ruleDlg .test-pane{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+#ruleDlg .test-inputs,#ruleDlg .test-output{min-width:0;display:flex;flex-direction:column}
+#ruleDlg .test-inputs .mono-area{min-height:210px}
+#ruleDlg .test-output .test-result{min-height:210px}
+/* 类型独占一行，标签与单选框横向排在同一行，避免上下两行的空白 */
+#ruleDlg .rule-info>.field-kind{grid-column:1/-1;display:flex;align-items:center;gap:12px}
+#ruleDlg .rule-info>.field-kind>label{margin-bottom:0;flex:none}
+#ruleDlg .rule-info>.field-kind .radiobar{height:auto}
+#ruleDlg .rule-info>.field{height:auto}
+#ruleDlg .rule-info>.field>.hint{margin-top:6px;padding-top:0}
+#ruleDlg .rule-work{min-width:0;display:flex;flex-direction:column;gap:14px}
+#ruleDlg .rule-work>.field{height:auto;flex:none;min-width:0}
+/* 参数区按内容自然展开，不再套第二层滚动条：整个弹窗体只保留一个滚动容器，
+   否则矮屏下参数区会被压到不足一行高，看起来像「显示不全」 */
+#ruleDlg .rule-work>.field-params{display:flex;flex-direction:column;gap:6px}
+#ruleDlg .field-params .params-editor{display:flex;flex-direction:column;gap:6px}
+/* 新加的参数行短暂高亮，让「手动添加」有明确反馈 */
+@keyframes paramFlash{from{background:#e3fafd;border-color:var(--cyan)}to{background:#fff;border-color:var(--border)}}
+.param-card.flash{animation:paramFlash .9s ease-out}
+
+/* 行内圆点单选：条件 / 动作 */
+.radiobar{display:flex;align-items:center;gap:8px;height:43px}
+.radiobar .rd{position:relative;display:inline-flex;align-items:center;gap:6px;height:31px;padding:0 11px 0 9px;border:1px solid var(--border);border-radius:16px;background:#fff;color:#5c766f;font-size:var(--fs-base);cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s}
+.radiobar .rd:hover{border-color:#a9d3cc;background:#f8fcfb}
+.radiobar .rd input{position:absolute;opacity:0;width:0;height:0;margin:0}
+.radiobar .rd .dot{width:14px;height:14px;border-radius:50%;border:1.5px solid #b9cfca;background:#fff;position:relative;flex:none}
+.radiobar .rd:has(input:checked){border-color:#9fd8cf;background:var(--teal-soft);color:var(--teal-d);font-weight:600}
+.radiobar .rd:has(input:checked) .dot{border-color:var(--teal)}
+.radiobar .rd:has(input:checked) .dot::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--teal)}
+.radiobar .rd:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
+
+/* 字段头：标签 + 右侧工具 */
+.field-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.field-bar label{margin-bottom:0}
+.field-tools{display:flex;align-items:center;gap:8px}
+.tag-lang{font-size:var(--fs-note);font-weight:700;letter-spacing:.04em;color:#5a6b86;background:var(--grey-soft);border-radius:4px;padding:3px 6px}
+.lint-state{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-minor);font-weight:600}
+.lint-state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.lint-state.ok{color:#1f9d5c}
+.lint-state.bad{color:#d64545}
+.mini-btn{height:26px;padding:0 11px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#2c5049;font-size:var(--fs-minor);cursor:pointer}
+.mini-btn:hover{border-color:var(--teal);color:var(--teal-d);background:var(--teal-soft)}
+.mini-btn.dashed{border-style:dashed;border-color:#9fd8cf;color:var(--teal-d);background:#f4faf9}
+
+/* 代码编辑器外壳：文件条 + 固定高正文 + 行列状态栏 */
+.editor-shell{border:1px solid #c2d4d1;border-radius:10px;overflow:hidden;background:#fbfefe}
+.editor-shell:focus-within{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.editor-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;height:30px;padding:0 8px 0 10px;background:#f2f7f6;border-bottom:1px solid #e0ebe9}
+.editor-file{font-size:var(--fs-note);color:#7b8f8b;font-family:var(--ff-mono)}
+.editor-acts{display:flex;align-items:center;gap:6px}
+.chip-btn{height:20px;padding:0 7px;border:1px solid #d6e5e2;border-radius:5px;background:#fff;color:#4d6b64;font-size:var(--fs-note);cursor:pointer;line-height:1}
+.chip-btn:hover{border-color:var(--teal);color:var(--teal-d);background:var(--teal-soft)}
+.editor-status{display:flex;align-items:center;justify-content:space-between;height:26px;padding:0 10px;background:#f2f7f6;border-top:1px solid #e0ebe9;font-size:var(--fs-note);font-family:var(--ff-mono);color:#8aa39d}
+/* 编辑器仍是固定尺寸（不随内容伸缩），但按视口分档，矮屏下不至于把参数区挤出可视区 */
+#ruleDlg .field-expr .CodeMirror{border:0;border-radius:0;height:clamp(104px,19vh,196px);min-height:0;background:#fbfefe;padding:4px 2px}
 #ruleDlg .field-expr .CodeMirror-scroll{max-height:none;height:100%}
-/* 分段单选：替代原规则类型下拉，与规则名称同行，省一行高度 */
-#ruleDlg .segbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-#ruleDlg .seg{position:relative;display:flex;align-items:center;justify-content:center;height:43px;border:1px solid var(--border);border-radius:9px;background:#fff;color:#5c766f;font-size:var(--fs-base);cursor:pointer;transition:border-color .15s,background .15s}
-#ruleDlg .seg:hover{border-color:#a9d3cc;background:#f8fcfb}
-#ruleDlg .seg input{position:absolute;opacity:0;width:0;height:0;margin:0}
-#ruleDlg .seg:has(input:checked){border-color:#9fd8cf;background:var(--teal-soft);color:var(--teal-d);font-weight:600}
-#ruleDlg .seg:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
-/* 左列变窄，参数表格收成四列：名称/中文名/类型/删除 一行，描述/默认值 次行 */
-#ruleDlg .param-head{display:none}
-#ruleDlg .param-card{grid-template-columns:1fr 1fr 76px 22px}
-#ruleDlg .param-card [data-p=name]{order:1;grid-column:1}
-#ruleDlg .param-card [data-p=label]{order:2;grid-column:2}
-#ruleDlg .param-card .param-type{order:3;grid-column:3}
-#ruleDlg .param-card .param-remove{order:4;grid-column:4;justify-self:center}
-#ruleDlg .param-card [data-p=description]{order:5;grid-column:1/3}
-#ruleDlg .param-card [data-p=default]{order:6;grid-column:3/-1}
-#ruleDlg .param-card [data-p=options]{order:7;grid-column:1/-1}
+#ruleDlg .field-expr .CodeMirror-activeline-background{background:#eef7f5}
+
+/* 参数表：参数名只读 chip，说明与枚举项落到第二行 */
+.params-auto{font-size:var(--fs-note);font-weight:600;color:var(--cyan);background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:10px;padding:2px 8px;margin-left:4px}
+#ruleDlg .param-head{display:grid;grid-template-columns:142px 1fr 80px 92px 1fr 22px;gap:6px;padding:0 8px 4px;font-size:var(--fs-caption);color:#8aa39d;font-weight:600}
+#ruleDlg .param-card{grid-template-columns:142px 1fr 80px 92px 1fr 22px}
+/* 归零旧六列布局遗留的 order，否则 grid 按 order 而非 DOM 顺序排布，默认值会被挤到第三行 */
+#ruleDlg .param-card>*{order:0}
+#ruleDlg .param-card .param-name-fixed{display:inline-flex;align-items:center;height:27px;padding:0 8px;font-family:var(--ff-mono);font-size:var(--fs-minor);font-weight:600;color:#0b6274;background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ruleDlg .param-card [data-p=name]{grid-column:1}
+#ruleDlg .param-card [data-p=label]{grid-column:2}
+#ruleDlg .param-card .param-type{grid-column:3}
+#ruleDlg .param-card [data-p=default]{grid-column:4}
+#ruleDlg .param-card [data-p=description]{grid-column:5}
+#ruleDlg .param-card .param-remove{grid-column:6;justify-self:center}
+#ruleDlg .param-card [data-p=options]{grid-column:1/-1}
+.param-card.stale{background:#fcfaf5;border-color:#f0e2b0}
+.param-card.stale .param-name-fixed{color:#8a6d0e;background:#fdf6d5;border-color:#f0e2b0;text-decoration:line-through}
+.param-stale-note{grid-column:2/6;font-size:var(--fs-caption);color:#a67823;line-height:1.4}
+.param-keep{grid-column:2/6;justify-self:start;height:22px;padding:0 8px;border:1px solid #e2cf8f;border-radius:6px;background:#fff;color:#8a6d0e;font-size:var(--fs-note);cursor:pointer}
+
+.mono-area{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:var(--ff-mono);font-size:var(--fs-minor);line-height:1.6;color:#123038;background:#fff;resize:vertical;min-height:66px}
+.mono-area:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.mono-area.invalid{border-color:#d64545}
+.mono-area.invalid:focus{border-color:#d64545;box-shadow:0 0 0 3px #fbe3e3}
+.json-err{margin-top:5px;font-size:var(--fs-caption);color:#c0392b;line-height:1.5}
+.targs{display:flex;flex-direction:column;gap:8px}
+.targs .targ{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:center}
+.targs .targ-name{font-family:var(--ff-mono);font-size:var(--fs-minor);font-weight:600;color:#0b6274;overflow:hidden;text-overflow:ellipsis}
+.targs .targ-name small{display:block;margin-top:3px;font-family:var(--ff-sans);font-size:var(--fs-note);font-weight:400;color:#93a89f}
+.targs input,.targs select{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:var(--fs-meta);color:#123038;background:#fff}
+.targs-empty{font-size:var(--fs-minor);color:#8aa39d}
+/* 入参 / 上下文 分页填写，避免下面再另起一块 */
+.test-tabs{display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #e6f0ee}
+.ttab{position:relative;padding:6px 10px;border:0;background:none;color:#6f8b86;font-size:var(--fs-minor);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ttab:hover{color:var(--teal-d)}
+.ttab.on{color:var(--teal-d);font-weight:600;border-bottom-color:var(--teal)}
+.ttab .filled-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-left:5px;vertical-align:middle}
+.ttab .tab-count{display:inline-block;margin-left:5px;padding:0 5px;border-radius:8px;background:var(--cyan-soft);color:var(--cyan);font-size:var(--fs-note);font-weight:700;font-style:normal;vertical-align:middle}
+.test-result:empty{display:none}
+.result-box{border:1px solid #bfe4d4;border-radius:8px;background:#fff;overflow:hidden}
+.result-box.bad{border-color:#f0c3c3}
+.result-top{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--green-soft);border-bottom:1px solid #cdeadb;flex-wrap:wrap}
+.result-box.bad .result-top{background:#fdeeee;border-bottom-color:#f5d6d6}
+.result-badge{font-size:var(--fs-minor);font-weight:700;color:#fff;background:#1f9d5c;border-radius:5px;padding:2px 8px}
+.result-badge.no{background:#8a97a8}
+.result-badge.err{background:#d64545}
+.result-top small{font-size:var(--fs-note);color:#5d7a6c;font-family:var(--ff-mono)}
+.result-value,.result-echo{padding:9px 11px;display:grid;gap:6px}
+.result-value{border-bottom:1px solid #eef4f2}
+.result-value>div,.result-echo>div{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:baseline}
+.result-echo span{font-family:var(--ff-mono);font-size:var(--fs-minor);font-weight:600;color:#0b6274}
+.result-value span{font-family:var(--ff-sans);font-size:var(--fs-minor);font-weight:600;color:#4a6bd3}
+.result-value code,.result-echo code{font-family:var(--ff-mono);font-size:var(--fs-minor);line-height:1.6;color:#40566a;word-break:break-all;white-space:pre-wrap;display:block;max-height:130px;overflow:auto}
+.result-message{padding:9px 11px;font-size:var(--fs-minor);line-height:1.65;color:#8c3b3b;word-break:break-word}
 .dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
 .dlg-body>.field{display:flex;flex-direction:column;height:100%}
 .dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
@@ -154,7 +254,36 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .param-remove:hover{color:#a53a39}
 .param-add{align-self:flex-start;height:28px;padding:0 10px;border:1px dashed #9fd8cf;border-radius:7px;background:#f4faf9;color:var(--teal-d);font-size:var(--fs-minor);cursor:pointer;margin-top:2px}
 .param-add:hover{background:var(--teal-soft)}
-@media(max-width:900px){.dlg-body{grid-template-columns:1fr}.dlg-body>.field.span-2{grid-column:1}#ruleDlg .dlg-body{grid-template-columns:1fr;height:auto;max-height:80vh;overflow-y:auto}#ruleDlg .rule-row{grid-template-columns:1fr}#ruleDlg .rule-main{max-height:none}#ruleDlg .rule-main>.field-params{flex:none;min-height:0}#ruleDlg .field-params .params-editor{overflow:visible;min-height:0}#ruleDlg .field-expr .CodeMirror{min-height:260px}.param-head{display:none}.param-card{grid-template-columns:1fr 1fr 84px 24px}.param-card [data-p=description]{grid-column:1/3}.param-card [data-p=default]{grid-column:3/-1}}
+/* 矮屏（笔记本外接小屏、缩放后视口）适配：把纵向像素挤出来，
+   避免参数行被裁。类型行并回名称/描述那一行，隐去说明与多余留白 */
+@media(max-height:740px){
+  #ruleDlg{margin-top:2vh}
+  #ruleDlg .dlg-head{padding:12px 24px 4px}
+  #ruleDlg .dlg-foot{padding:10px 24px 14px}
+  #ruleDlg .dlg-body{gap:8px}
+  #ruleDlg .rule-info{grid-template-columns:1fr 138px 1.4fr;gap:8px 14px}
+  #ruleDlg .rule-info>.field-kind{grid-column:auto;display:block}
+  #ruleDlg .rule-info>.field-kind>label{margin-bottom:7px}
+  #ruleDlg .dtab{padding:6px 12px}
+  #ruleDlg .dpane{min-height:0}
+  #ruleDlg .field-expr .CodeMirror{height:clamp(88px,16vh,196px)}
+  #ruleDlg .field-params>.hint{display:none}
+  #ruleDlg .rule-work{gap:10px}
+}
+@media(max-width:900px){
+  #ruleDlg{width:96vw}
+  #ruleDlg .rule-info{grid-template-columns:1fr}
+  #ruleDlg .test-pane{grid-template-columns:1fr}
+  #ruleDlg .rule-work{max-height:none}
+  #ruleDlg .rule-work>.field-params{flex:none;min-height:0}
+  #ruleDlg .field-params .params-editor{overflow:visible;min-height:0}
+  #ruleDlg .field-expr .CodeMirror{height:168px}
+  #ruleDlg .param-head{display:none}
+  #ruleDlg .param-card{grid-template-columns:130px 1fr 76px 22px}
+  #ruleDlg .param-card [data-p=default]{grid-column:1/-1}
+  #ruleDlg .param-card .param-remove{grid-column:4}
+  .dlg-body{grid-template-columns:1fr}.dlg-body>.field.span-2{grid-column:1}
+}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.pager{justify-content:space-between}}
 </style>
 </head>
@@ -194,27 +323,86 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <dialog id="ruleDlg">
   <div class="dlg-head" id="dlgTitle">新建规则</div>
   <div class="dlg-body">
-    <div class="rule-main">
-      <div class="rule-row">
-        <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-        <div class="field field-kind">
-          <label>规则类型</label>
-          <div class="segbar" role="radiogroup" aria-label="规则类型">
-            <label class="seg" title="用于判断/条件节点"><input type="radio" name="fKind" value="condition" checked><span>判断条件</span></label>
-            <label class="seg" title="用于动作节点"><input type="radio" name="fKind" value="action"><span>执行动作</span></label>
-          </div>
+    <div class="dlg-fixed">
+    <div class="rule-info">
+      <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
+      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明" title="支持表达式插值：${$.字段} 取入参，${$$.字段} 取上下文，运行时替换为实际值"></div>
+      <div class="field field-kind">
+        <label>类型</label>
+        <div class="radiobar" role="radiogroup" aria-label="规则类型">
+          <label class="rd" title="用于判断/条件节点"><input type="radio" name="fKind" value="condition" checked><i class="dot"></i><span>条件</span></label>
+          <label class="rd" title="用于动作节点"><input type="radio" name="fKind" value="action"><i class="dot"></i><span>动作</span></label>
         </div>
       </div>
-      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明"><div class="hint">支持表达式插值：形如 ${$.字段}（入参）或 ${$$.字段}（上下文），运行时替换为实际值，如 ${$.agent.id}。</div></div>
+    </div>
+
+    <div class="dlg-tabs" role="tablist">
+      <button type="button" class="dtab on" data-dtab="edit" role="tab">表达式与参数</button>
+      <button type="button" class="dtab" data-dtab="test" role="tab">试运行</button>
+    </div>
+    </div>
+
+    <div class="dlg-scroll">
+
+    <div class="dpane rule-work" data-dpane="edit">
+      <div class="field field-expr">
+        <div class="field-bar">
+          <label>表达式 *</label>
+          <div class="field-tools">
+            <span class="tag-lang">JAVASCRIPT</span>
+            <span class="lint-state ok" id="lintState">语法通过</span>
+          </div>
+        </div>
+        <div class="editor-shell">
+          <div class="editor-bar">
+            <span class="editor-file">expression.js</span>
+            <span class="editor-acts">
+              <button type="button" class="chip-btn" id="fmtExprBtn">格式化</button>
+              <button type="button" class="chip-btn" id="insArgsBtn">插入 $args</button>
+              <button type="button" class="chip-btn" id="insUdfBtn">插入 UDF</button>
+            </span>
+          </div>
+          <textarea id="fExpr" placeholder="如：$.age >= $args.min"></textarea>
+          <div class="editor-status"><span id="exprPos">行 1 : 列 1</span><span id="exprMeta">1 行</span></div>
+        </div>
+      </div>
+
       <div class="field field-params">
-        <label>参数模板</label>
-        <div class="param-head"><span>参数名 *</span><span>中文名</span><span>类型</span><span>描述</span><span>默认值</span><span></span></div>
+        <div class="field-bar">
+          <label>参数模板 <span class="params-auto" id="paramsAuto" hidden></span></label>
+          <div class="field-tools">
+            <button type="button" class="mini-btn" id="reExtractBtn">重新提取</button>
+            <button type="button" class="mini-btn dashed" id="addParamBtn">＋ 手动添加</button>
+          </div>
+        </div>
+        <div class="param-head"><span>参数名</span><span>中文名</span><span>类型</span><span>默认值</span><span>说明</span><span></span></div>
         <div class="params-editor" id="paramsEditor"></div>
-        <button type="button" class="param-add" id="addParamBtn">＋ 添加参数</button>
-        <div class="hint">声明该规则可被参数化调用的模板参数（$args）。业务场景引用此规则时，画布会按此渲染录入表单并绑定到节点。</div>
+        <div class="hint">表达式里的 <b>$args.xxx</b> 会自动成为参数，参数名不可手工改；中文名、类型、默认值与枚举项需手动补全。</div>
       </div>
     </div>
-    <div class="field field-expr"><label>表达式 *</label><textarea id="fExpr" placeholder="如：$.age >= 18"></textarea></div>
+
+    <div class="dpane test-pane" data-dpane="test" hidden>
+      <div class="test-inputs">
+        <div class="test-tabs" role="tablist">
+          <button type="button" class="ttab on" data-tab="target" role="tab">入参 $</button>
+          <button type="button" class="ttab" data-tab="args" role="tab">参数 $args<i class="tab-count" id="argsCount" hidden></i></button>
+          <button type="button" class="ttab" data-tab="context" role="tab">上下文 $$<i class="filled-dot" id="ctxDot" hidden title="已填写"></i></button>
+        </div>
+        <textarea id="tTarget" class="mono-area tpane" spellcheck="false" data-pane="target" data-json>{}</textarea>
+        <div class="json-err" data-json-err="target" hidden></div>
+        <div class="targs tpane" id="tArgs" data-pane="args" hidden></div>
+        <textarea id="tContext" class="mono-area tpane" spellcheck="false" data-pane="context" data-json hidden>{}</textarea>
+        <div class="json-err" data-json-err="context" hidden></div>
+      </div>
+      <div class="test-output">
+        <div class="field-bar">
+          <label>运行结果</label>
+          <button type="button" class="btn primary sm" id="runExprBtn">▶ 运行</button>
+        </div>
+        <div class="test-result" id="tResult"></div>
+      </div>
+    </div>
+    </div>
   </div>
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
 </dialog>
@@ -242,8 +430,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
   const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 
-  // 参数模板编辑：每行声明一个可被参数化调用的模板参数（$args）。
+  // 参数模板编辑：参数名由表达式里的 $args.xxx 自动提取，其余字段手工补全。
   const PARAM_TYPES = [["string", "文本"], ["number", "数字"], ["boolean", "布尔"], ["enum", "枚举"]];
+
+  // 当前弹窗的参数状态，manual 表示参数名由人工维护，stale 表示表达式里已不再引用
+  let paramState = [];
 
   // 后端以原始 JSON 字符串透传 params（entity 的 String 字段），此处解析为数组供编辑；非法归一为空数组。
   function parseParamsField(raw) {
@@ -252,59 +443,147 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch (_) { return []; }
   }
 
-  function paramCardHtml(p) {
-    p = p || {};
+  // 去掉注释与字符串字面量，避免把注释或字符串里的 $args.xxx 当成真参数
+  function stripNonCode(src) {
+    return String(src || "")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/\/\/[^\n]*/g, " ")
+      .replace(/`(?:\\[\s\S]|[^`\\])*`/g, '""')
+      .replace(/'(?:\\[\s\S]|[^'\\\n])*'/g, '""')
+      .replace(/"(?:\\[\s\S]|[^"\\\n])*"/g, '""');
+  }
+
+  // 提取表达式里引用的参数名，支持 $args.name 与 $args["name"] 两种写法，按出现顺序去重
+  function extractArgNames(src) {
+    const code = stripNonCode(src);
+    const re = /\$args\s*(?:\.\s*([A-Za-z_$][\w$]*)|\[\s*(['"])([^'"\]]+)\2\s*\])/g;
+    const names = [];
+    let m;
+    while ((m = re.exec(code)) !== null) {
+      const name = m[1] || m[3];
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+  }
+
+  // 按表达式重算参数列表：新参数追加，已有配置按参数名保留，消失的自动参数标为失效
+  function syncParamsFromExpr() {
+    const names = extractArgNames(currentExpression());
+    const byName = new Map(paramState.map((p) => [p.name, p]));
+    const next = [];
+    names.forEach((name) => {
+      const hit = byName.get(name);
+      next.push(hit ? { ...hit, stale: false } : { name, label: "", type: "string", description: "", options: "", default: "", manual: false, stale: false });
+      byName.delete(name);
+    });
+    byName.forEach((p) => {
+      if (p.manual) next.push({ ...p, stale: false });
+      else next.push({ ...p, stale: true });
+    });
+    const grew = paramState.length < next.length;
+    paramState = next;
+    renderParams();
+    if (grew) {
+      const cards = document.querySelectorAll("#paramsEditor .param-card");
+      const last = cards[cards.length - 1];
+      if (last) last.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // 把界面上的编辑内容回写到 paramState，避免重渲染丢用户输入
+  function absorbParamInputs() {
+    document.querySelectorAll("#paramsEditor .param-card").forEach((card) => {
+      const idx = Number(card.dataset.idx);
+      const p = paramState[idx];
+      if (!p) return;
+      const get = (k) => card.querySelector(`[data-p="${k}"]`);
+      if (p.manual && get("name")) p.name = get("name").value.trim();
+      ["label", "type", "description", "options", "default"].forEach((k) => {
+        const el = get(k);
+        if (el) p[k] = el.value;
+      });
+    });
+  }
+
+  function paramCardHtml(p, idx) {
     const type = PARAM_TYPES.some(([v]) => v === p.type) ? p.type : "string";
     const opts = Array.isArray(p.options) ? p.options.join(", ") : (p.options || "");
     const def = p.default === undefined || p.default === null ? "" : String(p.default);
-    return `<div class="param-card" data-param>
-      <div class="param-grid">
-        <input data-p="name" placeholder="参数名 name *" value="${esc(p.name)}">
-        <input data-p="label" placeholder="中文名 label" value="${esc(p.label)}">
-        <select class="param-type" data-p="type">
-          ${PARAM_TYPES.map(([v, t]) => `<option value="${v}" ${v === type ? "selected" : ""}>${t}</option>`).join("")}
-        </select>
-        <button type="button" class="param-remove" data-remove title="删除该参数">✕</button>
-      </div>
-      <input data-p="description" placeholder="描述 description" value="${esc(p.description)}">
+    const nameCell = p.manual
+      ? `<input data-p="name" placeholder="参数名 name *" value="${esc(p.name)}">`
+      : `<span class="param-name-fixed" data-name title="来自表达式，不可改名">$args.${esc(p.name)}</span>`;
+    if (p.stale) {
+      return `<div class="param-card stale" data-param data-idx="${idx}">
+        ${nameCell}
+        <div class="param-stale-note">表达式中已不再引用，保存时会丢弃</div>
+        <button type="button" class="param-remove" data-remove title="立即删除">✕</button>
+        <button type="button" class="param-keep" data-keep>仍要保留</button>
+      </div>`;
+    }
+    return `<div class="param-card" data-param data-idx="${idx}">
+      ${nameCell}
+      <input data-p="label" placeholder="中文名 label" value="${esc(p.label)}">
+      <select class="param-type" data-p="type">
+        ${PARAM_TYPES.map(([v, t]) => `<option value="${v}" ${v === type ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      <input data-p="default" placeholder="默认值" value="${esc(def)}">
+      <input data-p="description" placeholder="说明" value="${esc(p.description)}">
+      <button type="button" class="param-remove" data-remove title="删除该参数">✕</button>
       <input data-p="options" placeholder="枚举项，逗号分隔" value="${esc(opts)}" ${type === "enum" ? "" : "hidden"}>
-      <input data-p="default" placeholder="默认值 default" value="${esc(def)}">
     </div>`;
   }
 
-  function renderParams(list) {
+  function renderParams() {
     const editor = $("#paramsEditor");
-    const items = parseParamsField(list);
     const head = document.querySelector("#ruleDlg .param-head");
-    if (head) head.hidden = items.length === 0;
-    editor.innerHTML = items.length
-      ? items.map(paramCardHtml).join("")
-      : `<div class="params-empty">暂无参数，该规则将作为无参规则调用。点下方「添加参数」以支持参数化。</div>`;
+    if (head) head.hidden = paramState.length === 0;
+    editor.innerHTML = paramState.length
+      ? paramState.map(paramCardHtml).join("")
+      : `<div class="params-empty">表达式里还没有引用 $args，该规则将作为无参规则调用。</div>`;
+    const autoCount = paramState.filter((p) => !p.manual && !p.stale).length;
+    const badge = $("#paramsAuto");
+    badge.hidden = paramState.length === 0;
+    badge.textContent = paramState.length === autoCount
+      ? `${autoCount} 个，全部来自表达式`
+      : `共 ${paramState.length} 个 · 表达式自动提取 ${autoCount} 个`;
+    renderTestArgs();
+    requestAnimationFrame(markParamsScrollable);
   }
 
-  // 汇总编辑区的参数行为规范化对象数组；name 为空的行忽略。校验失败返回 {error}。
+  // 参数多到超出弹窗可视区时，在标签上标注需要滚动查看
+  function markParamsScrollable() {
+    const body = document.querySelector("#ruleDlg .dlg-scroll");
+    const badge = $("#paramsAuto");
+    if (!body || !badge || badge.hidden) return;
+    if (body.scrollHeight - body.clientHeight > 2 && !badge.textContent.includes("滚动")) {
+      badge.textContent += " · 向下滚动查看";
+    }
+  }
+
+  // 汇总参数为规范化对象数组；失效参数丢弃，name 为空的行忽略。校验失败返回 {error}。
   function collectParams() {
-    const cards = Array.from(document.querySelectorAll("#paramsEditor .param-card"));
+    absorbParamInputs();
     const result = [];
     const seen = new Set();
-    for (const card of cards) {
-      const get = (k) => card.querySelector(`[data-p="${k}"]`);
-      const name = get("name").value.trim();
-      if (!name) continue; // 空行视为未填写，直接跳过
+    for (const p of paramState) {
+      if (p.stale) continue;
+      const name = String(p.name || "").trim();
+      if (!name) continue;
       if (seen.has(name)) return { error: `参数名重复：${name}` };
       seen.add(name);
-      const type = get("type").value;
+      const type = PARAM_TYPES.some(([v]) => v === p.type) ? p.type : "string";
       const param = { name, type };
-      const label = get("label").value.trim();
+      const label = String(p.label || "").trim();
       if (label) param.label = label;
-      const description = get("description").value.trim();
+      const description = String(p.description || "").trim();
       if (description) param.description = description;
       if (type === "enum") {
-        const options = get("options").value.split(",").map((s) => s.trim()).filter(Boolean);
+        const raw = Array.isArray(p.options) ? p.options.join(",") : String(p.options || "");
+        const options = raw.split(",").map((s) => s.trim()).filter(Boolean);
         if (!options.length) return { error: `枚举参数「${name}」需至少一个选项` };
         param.options = options;
       }
-      const def = get("default").value.trim();
+      const def = String(p.default === undefined || p.default === null ? "" : p.default).trim();
       if (def) param.default = def;
       result.push(param);
     }
@@ -433,6 +712,42 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     return { list, from: window.CodeMirror.Pos(cur.line, cur.ch - typed.length), to: cur };
   }
 
+  function currentExpression() {
+    return exprEditor ? exprEditor.getValue() : ($("#fExpr") ? $("#fExpr").value : "");
+  }
+
+  // 语法状态灯与行列状态栏跟随编辑器
+  function refreshEditorStatus() {
+    const cm = exprEditor;
+    const text = currentExpression();
+    const state = $("#lintState");
+    const problems = lintExpression(text);
+    if (!text.trim()) {
+      state.className = "lint-state";
+      state.textContent = "未填写";
+    } else if (problems.length) {
+      state.className = "lint-state bad";
+      state.textContent = "语法错误";
+    } else {
+      state.className = "lint-state ok";
+      state.textContent = "语法通过";
+    }
+    if (cm) {
+      const cur = cm.getCursor();
+      $("#exprPos").textContent = `行 ${cur.line + 1} : 列 ${cur.ch + 1}`;
+      $("#exprMeta").textContent = `${cm.lineCount()} 行`;
+    }
+  }
+
+  let extractTimer = null;
+  function scheduleExtract() {
+    clearTimeout(extractTimer);
+    extractTimer = setTimeout(() => {
+      absorbParamInputs();
+      syncParamsFromExpr();
+    }, 400);
+  }
+
   function ensureExprEditor() {
     if (exprEditor || typeof window.CodeMirror === "undefined") return exprEditor;
     exprEditor = window.CodeMirror.fromTextArea(document.getElementById("fExpr"), {
@@ -441,6 +756,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       lineWrapping: true,
       matchBrackets: true,
       autoCloseBrackets: true,
+      styleActiveLine: true,
       tabSize: 2,
       gutters: ["CodeMirror-linenumbers", "CodeMirror-lint-markers"],
       lint: { getAnnotations: lintExpression, async: false },
@@ -451,7 +767,208 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       if (!/[A-Za-z0-9_.$]/.test(change.text[0] || "")) return;
       cm.showHint({ hint: exprHint, completeSingle: false, container: document.getElementById('ruleDlg') });
     });
+    exprEditor.on("change", () => { refreshEditorStatus(); scheduleExtract(); });
+    exprEditor.on("cursorActivity", refreshEditorStatus);
     return exprEditor;
+  }
+
+  // 在光标处插入片段并唤出补全，供「插入 $args / 插入 UDF」使用
+  function insertSnippet(text) {
+    const cm = ensureExprEditor();
+    if (!cm) return;
+    cm.focus();
+    cm.replaceSelection(text);
+    cm.showHint({ hint: exprHint, completeSingle: false, container: document.getElementById('ruleDlg') });
+  }
+
+  function formatExpression() {
+    const cm = ensureExprEditor();
+    if (!cm) return;
+    const beautify = window.js_beautify || (window.beautify && window.beautify.js);
+    if (typeof beautify !== "function") { toast("格式化组件未加载"); return; }
+    const src = cm.getValue().trim();
+    if (!src) return;
+    try {
+      cm.setValue(beautify(src, { indent_size: 2, brace_style: "collapse,preserve-inline", wrap_line_length: 0 }));
+    } catch (_) { toast("表达式无法格式化，请先修正语法"); }
+  }
+
+  // ── 试运行面板 ─────────────────────────────────────────────
+  // 按参数模板渲染取值表单。数字一律用文本框：input[type=number] 在初值非法时会直接丢弃内容
+  function renderTestArgs() {
+    const box = $("#tArgs");
+    if (!box) return;
+    const prev = readTestArgsRaw();
+    const items = paramState.filter((p) => !p.stale && String(p.name || "").trim());
+    if (!items.length) {
+      box.innerHTML = `<div class="targs-empty">该规则无参数，直接运行即可。</div>`;
+      refreshArgsCount();
+      return;
+    }
+    box.innerHTML = items.map((p) => {
+      const name = String(p.name).trim();
+      const type = PARAM_TYPES.some(([v]) => v === p.type) ? p.type : "string";
+      const typeText = (PARAM_TYPES.find(([v]) => v === type) || [, type])[1];
+      const had = Object.prototype.hasOwnProperty.call(prev, name);
+      const value = had ? prev[name] : (p.default === undefined || p.default === null ? "" : String(p.default));
+      const meta = `${p.label ? esc(p.label) + " · " : ""}${typeText}`;
+      let control;
+      if (type === "boolean") {
+        control = `<select data-arg="${esc(name)}" data-type="boolean">
+          <option value="true" ${value === "true" ? "selected" : ""}>true</option>
+          <option value="false" ${value !== "true" ? "selected" : ""}>false</option>
+        </select>`;
+      } else if (type === "enum") {
+        const raw = Array.isArray(p.options) ? p.options.join(",") : String(p.options || "");
+        const options = raw.split(",").map((s) => s.trim()).filter(Boolean);
+        control = `<select data-arg="${esc(name)}" data-type="enum">
+          ${options.map((o) => `<option value="${esc(o)}" ${o === value ? "selected" : ""}>${esc(o)}</option>`).join("")}
+        </select>`;
+      } else {
+        control = `<input data-arg="${esc(name)}" data-type="${type}" value="${esc(value)}" placeholder="${type === "number" ? "数字" : "文本"}">`;
+      }
+      return `<div class="targ"><span class="targ-name">${esc(name)}<small>${meta}</small></span>${control}</div>`;
+    }).join("");
+    refreshArgsCount();
+  }
+
+  function readTestArgsRaw() {
+    const out = {};
+    document.querySelectorAll("#tArgs [data-arg]").forEach((el) => { out[el.dataset.arg] = el.value; });
+    return out;
+  }
+
+  // 按声明类型转换取值；空字符串视为未填写，不进 args
+  function collectTestArgs() {
+    const args = {};
+    for (const el of document.querySelectorAll("#tArgs [data-arg]")) {
+      const name = el.dataset.arg;
+      const raw = String(el.value ?? "").trim();
+      if (!raw) continue;
+      if (el.dataset.type === "number") {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return { error: `参数「${name}」不是合法数字：${raw}` };
+        args[name] = n;
+      } else if (el.dataset.type === "boolean") {
+        args[name] = raw === "true";
+      } else {
+        args[name] = raw;
+      }
+    }
+    return { args };
+  }
+
+  function parseJsonField(text, label) {
+    const raw = String(text || "").trim();
+    if (!raw) return { value: undefined };
+    try { return { value: JSON.parse(raw) }; }
+    catch (e) { return { error: `${label} 不是合法 JSON：${e.message}` }; }
+  }
+
+  function renderTestResult(html) { $("#tResult").innerHTML = html; }
+
+  function renderTestError(message) {
+    renderTestResult(`<div class="result-box bad">
+      <div class="result-top"><span class="result-badge err">失败</span></div>
+      <div class="result-message">${esc(message)}</div>
+    </div>`);
+  }
+
+  async function runExpression() {
+    const expression = currentExpression().trim();
+    if (!expression) { renderTestError("表达式不能为空"); return; }
+    if (!validateJsonField($("#tTarget"))) { switchTestPane("target"); $("#tTarget").focus(); return; }
+    if (!validateJsonField($("#tContext"))) { switchTestPane("context"); $("#tContext").focus(); return; }
+    const target = parseJsonField($("#tTarget").value, "入参 $");
+    const context = parseJsonField($("#tContext").value, "上下文 $$");
+    const collected = collectTestArgs();
+    if (collected.error) { renderTestError(collected.error); return; }
+    const btn = $("#runExprBtn");
+    btn.disabled = true;
+    renderTestResult(`<div class="result-box"><div class="result-body">运行中…</div></div>`);
+    const started = performance.now();
+    try {
+      const data = await Api.tryRule({
+        namespace: Ns.code(), expression,
+        args: collected.args,
+        target: target.value === undefined ? null : target.value,
+        context: context.value === undefined ? null : context.value
+      });
+      const cost = Math.round(performance.now() - started);
+      const result = data ? data.result : undefined;
+      const isBool = typeof result === "boolean";
+      const badge = isBool
+        ? `<span class="result-badge ${result ? "" : "no"}">${result}</span>`
+        : `<span class="result-badge">已返回</span>`;
+      const desc = data && data.details && data.details[0] ? (data.details[0].desc || "") : "";
+      // 布尔结果已经在徽标上，正文只回显本次实际输入；非布尔结果单独展示返回值
+      const echo = [["$", target.value === undefined ? null : target.value]];
+      if (Object.keys(collected.args).length) echo.push(["$args", collected.args]);
+      if (context.value !== undefined && context.value !== null) echo.push(["$$", context.value]);
+      const returned = isBool ? "" : `<div class="result-value"><div><span>返回值</span><code>${
+        esc(typeof result === "object" && result !== null ? JSON.stringify(result, null, 2) : String(result))}</code></div></div>`;
+      const rows = echo.map(([k, v]) => `<div><span>${k}</span><code>${esc(JSON.stringify(v))}</code></div>`).join("");
+      renderTestResult(`<div class="result-box">
+        <div class="result-top">${badge}<small>${cost} ms${desc ? " · " + esc(desc) : ""}</small></div>
+        ${returned}
+        <div class="result-echo">${rows}</div>
+      </div>`);
+    } catch (e) {
+      renderTestError(e.message || "运行失败");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // 入参 / 参数 / 上下文 三页切换。非当前页的内容一样参与运行，
+  // 所以参数页标出个数、上下文页标出已填写，避免看不见的输入悄悄影响结果
+  function switchTestPane(pane) {
+    document.querySelectorAll("#ruleDlg .ttab").forEach((b) => b.classList.toggle("on", b.dataset.tab === pane));
+    document.querySelectorAll("#ruleDlg .tpane").forEach((a) => { a.hidden = a.dataset.pane !== pane; });
+  }
+
+  // {} 视为空上下文，只有填了实际内容才点亮圆点
+  function refreshCtxDot() {
+    const v = String($("#tContext").value || "").trim();
+    $("#ctxDot").hidden = v === "" || v === "{}";
+  }
+
+  // 实时校验 JSON 输入框；合法返回 true，非法标红并给出错误行
+  function validateJsonField(area) {
+    const errBox = document.querySelector(`[data-json-err="${area.dataset.pane}"]`);
+    const raw = String(area.value || "").trim();
+    let ok = true, msg = "";
+    if (raw) {
+      try { JSON.parse(raw); }
+      catch (e) { ok = false; msg = String(e.message || "").replace(/^JSON\.parse:\s*/, "").replace(/\s+in JSON.*$/, ""); }
+    }
+    area.classList.toggle("invalid", !ok);
+    if (errBox) { errBox.hidden = ok; errBox.textContent = ok ? "" : `不是合法 JSON：${msg}`; }
+    return ok;
+  }
+
+  function refreshArgsCount() {
+    const count = document.querySelectorAll("#tArgs [data-arg]").length;
+    const badge = $("#argsCount");
+    badge.hidden = count === 0;
+    badge.textContent = count;
+  }
+
+  // 弹窗分页：编辑页藏起来时 CodeMirror 量不到尺寸，切回来必须 refresh
+  function switchDialogPane(pane) {
+    document.querySelectorAll("#ruleDlg .dtab").forEach((b) => b.classList.toggle("on", b.dataset.dtab === pane));
+    document.querySelectorAll("#ruleDlg .dpane").forEach((p) => { p.hidden = p.dataset.dpane !== pane; });
+    if (pane === "edit" && exprEditor) requestAnimationFrame(() => exprEditor.refresh());
+  }
+
+  function resetTestPanel() {
+    $("#tTarget").value = "{}";
+    $("#tContext").value = "{}";
+    document.querySelectorAll("#ruleDlg [data-json]").forEach((a) => validateJsonField(a));
+    switchTestPane("target");
+    switchDialogPane("edit");
+    refreshCtxDot();
+    renderTestResult("");
   }
 
   function openDialog(rule) {
@@ -463,7 +980,19 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     $(`input[name="fKind"][value="${kind}"]`).checked = true;
     const expr = rule ? (rule.expression || "") : "";
     $("#fExpr").value = expr;
-    renderParams(rule ? rule.params : null);
+    // 已保存参数里在表达式中找不到的，按手动参数处理，避免打开旧规则时一片标黄
+    const exprNames = extractArgNames(expr);
+    paramState = parseParamsField(rule ? rule.params : null).map((p) => ({
+      name: String(p.name || ""),
+      label: p.label || "",
+      type: p.type || "string",
+      description: p.description || "",
+      options: Array.isArray(p.options) ? p.options.join(", ") : (p.options || ""),
+      default: p.default === undefined || p.default === null ? "" : String(p.default),
+      manual: !exprNames.includes(String(p.name || "")),
+      stale: false
+    }));
+    resetTestPanel();
     $("#ruleDlg").showModal();
     loadUdfPaths();
     const cm = ensureExprEditor();
@@ -472,6 +1001,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       // 弹窗 showModal 后编辑器才可见，需 refresh 才能正确布局高度/行号
       requestAnimationFrame(() => { cm.refresh(); });
     }
+    syncParamsFromExpr();
+    refreshEditorStatus();
     requestAnimationFrame(() => $("#fName").focus());
   }
 
@@ -539,22 +1070,63 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#dlgCancel").addEventListener("click", () => $("#ruleDlg").close());
   $("#dlgSave").addEventListener("click", saveRule);
   $("#addParamBtn").addEventListener("click", () => {
-    const empty = $("#paramsEditor .params-empty");
-    if (empty) empty.remove();
-    const head = document.querySelector("#ruleDlg .param-head");
-    if (head) head.hidden = false;
-    $("#paramsEditor").insertAdjacentHTML("beforeend", paramCardHtml({}));
+    absorbParamInputs();
+    paramState.push({ name: "", label: "", type: "string", description: "", options: "", default: "", manual: true, stale: false });
+    renderParams();
+    // 新行常在滚动区外，必须滚过去并聚焦，否则看起来像没反应
+    const cards = document.querySelectorAll("#paramsEditor .param-card");
+    const last = cards[cards.length - 1];
+    if (!last) return;
+    last.scrollIntoView({ block: "nearest" });
+    last.classList.add("flash");
+    setTimeout(() => last.classList.remove("flash"), 900);
+    const input = last.querySelector('[data-p="name"]');
+    if (input) input.focus();
   });
+  $("#reExtractBtn").addEventListener("click", () => { absorbParamInputs(); syncParamsFromExpr(); });
   $("#paramsEditor").addEventListener("click", (e) => {
-    const rm = e.target.closest("[data-remove]"); if (!rm) return;
-    rm.closest(".param-card").remove();
-    if (!$("#paramsEditor").querySelector(".param-card")) renderParams(null);
+    const card = e.target.closest(".param-card");
+    if (!card) return;
+    const idx = Number(card.dataset.idx);
+    if (e.target.closest("[data-remove]")) {
+      absorbParamInputs();
+      paramState.splice(idx, 1);
+      renderParams();
+      return;
+    }
+    if (e.target.closest("[data-keep]")) {
+      absorbParamInputs();
+      if (paramState[idx]) { paramState[idx].stale = false; paramState[idx].manual = true; }
+      renderParams();
+    }
   });
   $("#paramsEditor").addEventListener("change", (e) => {
     if (e.target.matches('[data-p="type"]')) {
-      const options = e.target.closest(".param-card").querySelector('[data-p="options"]');
-      options.hidden = e.target.value !== "enum";
+      const card = e.target.closest(".param-card");
+      const options = card.querySelector('[data-p="options"]');
+      if (options) options.hidden = e.target.value !== "enum";
+      absorbParamInputs();
+      renderTestArgs();
     }
+  });
+  // 参数名/中文名/默认值等改动要同步到试运行表单的取值行
+  $("#paramsEditor").addEventListener("input", (e) => {
+    if (!e.target.matches("[data-p]")) return;
+    absorbParamInputs();
+    renderTestArgs();
+  });
+  $("#fmtExprBtn").addEventListener("click", formatExpression);
+  $("#insArgsBtn").addEventListener("click", () => insertSnippet("$args."));
+  $("#insUdfBtn").addEventListener("click", () => insertSnippet(""));
+  $("#runExprBtn").addEventListener("click", runExpression);
+  document.querySelectorAll("#ruleDlg .ttab").forEach((b) => {
+    b.addEventListener("click", () => switchTestPane(b.dataset.tab));
+  });
+  document.querySelectorAll("#ruleDlg [data-json]").forEach((a) => {
+    a.addEventListener("input", () => { validateJsonField(a); if (a.id === "tContext") refreshCtxDot(); });
+  });
+  document.querySelectorAll("#ruleDlg .dtab").forEach((b) => {
+    b.addEventListener("click", () => switchDialogPane(b.dataset.dtab));
   });
 
   (async () => {
