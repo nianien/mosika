@@ -221,6 +221,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .result-echo span{font-family:var(--ff-mono);font-size:var(--fs-minor);font-weight:600;color:#0b6274}
 .result-value span{font-family:var(--ff-sans);font-size:var(--fs-minor);font-weight:600;color:#4a6bd3}
 .result-value code,.result-echo code{font-family:var(--ff-mono);font-size:var(--fs-minor);line-height:1.6;color:#40566a;word-break:break-all;white-space:pre-wrap;display:block;max-height:130px;overflow:auto}
+.result-desc{padding:9px 11px;display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:baseline;border-bottom:1px solid #eef4f2}
+.result-desc span{font-size:var(--fs-minor);font-weight:600;color:#5c766f}
+.result-desc code{font-family:var(--ff-sans);font-size:var(--fs-minor);line-height:1.6;color:#123038;word-break:break-word}
+.result-desc.bad code{color:#c0392b;font-family:var(--ff-mono)}
 .result-message{padding:9px 11px;font-size:var(--fs-minor);line-height:1.65;color:#8c3b3b;word-break:break-word}
 .dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
 .dlg-body>.field{display:flex;flex-direction:column;height:100%}
@@ -849,6 +853,19 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   function renderTestResult(html) { $("#tResult").innerHTML = html; }
 
+  // 规则说明按本次输入插值。core 用 String.raw`...` 求值，这里用同样语义在本地渲染，
+  // $ / $$ / $args 三样输入测试面板里都有，不必绕后端
+  function renderDescription(template, target, context, args) {
+    const raw = String(template || "");
+    if (!raw.trim()) return { text: "" };
+    try {
+      const render = new Function("$", "$$", "$args", "return String.raw`" + raw + "`");
+      return { text: String(render(target, context, args)) };
+    } catch (e) {
+      return { error: String(e && e.message ? e.message : e) };
+    }
+  }
+
   function renderTestError(message) {
     renderTestResult(`<div class="result-box bad">
       <div class="result-top"><span class="result-badge err">失败</span></div>
@@ -882,7 +899,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const badge = isBool
         ? `<span class="result-badge ${result ? "" : "no"}">${result}</span>`
         : `<span class="result-badge">已返回</span>`;
-      const desc = data && data.details && data.details[0] ? (data.details[0].desc || "") : "";
+      // 规则说明按本次输入渲染，和结果一起给出
+      const rendered = renderDescription($("#fDesc").value,
+        target.value === undefined ? null : target.value,
+        context.value === undefined ? {} : context.value,
+        collected.args);
+      const descRow = rendered.error
+        ? `<div class="result-desc bad"><span>说明</span><code>渲染失败：${esc(rendered.error)}</code></div>`
+        : (rendered.text ? `<div class="result-desc"><span>说明</span><code>${esc(rendered.text)}</code></div>` : "");
       // 布尔结果已经在徽标上，正文只回显本次实际输入；非布尔结果单独展示返回值
       const echo = [["$", target.value === undefined ? null : target.value]];
       if (Object.keys(collected.args).length) echo.push(["$args", collected.args]);
@@ -891,7 +915,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         esc(typeof result === "object" && result !== null ? JSON.stringify(result, null, 2) : String(result))}</code></div></div>`;
       const rows = echo.map(([k, v]) => `<div><span>${k}</span><code>${esc(JSON.stringify(v))}</code></div>`).join("");
       renderTestResult(`<div class="result-box">
-        <div class="result-top">${badge}<small>${cost} ms${desc ? " · " + esc(desc) : ""}</small></div>
+        <div class="result-top">${badge}<small>${cost} ms</small></div>
+        ${descRow}
         ${returned}
         <div class="result-echo">${rows}</div>
       </div>`);
