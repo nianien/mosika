@@ -99,11 +99,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 #ruleDlg{width:min(940px,96vw);max-height:92vh;margin:4vh auto auto;display:flex;flex-direction:column}
 #ruleDlg .dlg-head,#ruleDlg .dlg-foot{flex:none}
 #ruleDlg .dlg-body{flex:1 1 auto;min-height:0}
-#ruleDlg .dlg-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-top:12px;scroll-padding-block-end:12px;scroll-behavior:smooth}
+#ruleDlg .dlg-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 24px 0;scroll-padding-block-end:12px;scroll-behavior:smooth}
 #ruleDlg .dpane{min-height:min(452px,42vh)}
-#ruleDlg .dlg-body{display:flex;flex-direction:column;gap:0;height:auto;max-height:none;overflow:hidden}
+#ruleDlg .dlg-body{display:flex;flex-direction:column;gap:0;height:auto;max-height:none;overflow:hidden;padding-left:0;padding-right:0}
 /* 名称/描述/类型与页签常驻不滚，只有页内容滚，避免滚动时顶部剩半截输入框 */
-#ruleDlg .dlg-fixed{flex:none;display:flex;flex-direction:column;gap:12px}
+#ruleDlg .dlg-fixed{flex:none;display:flex;flex-direction:column;gap:12px;padding:0 24px}
 #ruleDlg .rule-info{display:grid;grid-template-columns:1fr 1.5fr;gap:10px 14px;align-items:start}
 /* 弹窗分页：表达式与参数 / 试运行 */
 .dlg-tabs{display:flex;gap:4px;border-bottom:1px solid #eef4f2}
@@ -170,7 +170,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 #ruleDlg .field-expr .CodeMirror-activeline-background{background:#eef7f5}
 
 /* 参数表：参数名只读 chip，说明与枚举项落到第二行 */
-.params-auto{font-size:var(--fs-note);font-weight:600;color:var(--cyan);background:var(--cyan-soft);border:1px solid #c6ecf3;border-radius:10px;padding:2px 8px;margin-left:4px}
+.field-sub{margin-left:8px;font-size:var(--fs-caption);font-weight:400;color:#93a89f}
 #ruleDlg .param-head{display:grid;grid-template-columns:142px 1fr 80px 92px 1fr 22px;gap:6px;padding:0 8px 4px;font-size:var(--fs-caption);color:#8aa39d;font-weight:600}
 #ruleDlg .param-card{grid-template-columns:142px 1fr 80px 92px 1fr 22px}
 /* 归零旧六列布局遗留的 order，否则 grid 按 order 而非 DOM 顺序排布，默认值会被挤到第三行 */
@@ -337,8 +337,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     </div>
 
     <div class="dlg-tabs" role="tablist">
-      <button type="button" class="dtab on" data-dtab="edit" role="tab">表达式与参数</button>
-      <button type="button" class="dtab" data-dtab="test" role="tab">试运行</button>
+      <button type="button" class="dtab on" data-dtab="edit" role="tab">编辑</button>
+      <button type="button" class="dtab" data-dtab="test" role="tab">测试</button>
     </div>
     </div>
 
@@ -347,7 +347,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dpane rule-work" data-dpane="edit">
       <div class="field field-expr">
         <div class="field-bar">
-          <label>表达式 *</label>
+          <label>表达式</label>
           <div class="field-tools">
             <span class="tag-lang">JAVASCRIPT</span>
             <span class="lint-state ok" id="lintState">语法通过</span>
@@ -369,7 +369,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
       <div class="field field-params">
         <div class="field-bar">
-          <label>参数模板 <span class="params-auto" id="paramsAuto" hidden></span></label>
+          <label>参数<span class="field-sub">$args.xxx 自动提取，参数名不可改；其余手动补全</span></label>
           <div class="field-tools">
             <button type="button" class="mini-btn" id="reExtractBtn">重新提取</button>
             <button type="button" class="mini-btn dashed" id="addParamBtn">＋ 手动添加</button>
@@ -377,7 +377,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         </div>
         <div class="param-head"><span>参数名</span><span>中文名</span><span>类型</span><span>默认值</span><span>说明</span><span></span></div>
         <div class="params-editor" id="paramsEditor"></div>
-        <div class="hint">表达式里的 <b>$args.xxx</b> 会自动成为参数，参数名不可手工改；中文名、类型、默认值与枚举项需手动补全。</div>
       </div>
     </div>
 
@@ -511,7 +510,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const def = p.default === undefined || p.default === null ? "" : String(p.default);
     const nameCell = p.manual
       ? `<input data-p="name" placeholder="参数名 name *" value="${esc(p.name)}">`
-      : `<span class="param-name-fixed" data-name title="来自表达式，不可改名">$args.${esc(p.name)}</span>`;
+      : `<span class="param-name-fixed" data-name title="来自表达式，不可改名">${esc(p.name)}</span>`;
     if (p.stale) {
       return `<div class="param-card stale" data-param data-idx="${idx}">
         ${nameCell}
@@ -540,24 +539,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     editor.innerHTML = paramState.length
       ? paramState.map(paramCardHtml).join("")
       : `<div class="params-empty">表达式里还没有引用 $args，该规则将作为无参规则调用。</div>`;
-    const autoCount = paramState.filter((p) => !p.manual && !p.stale).length;
-    const badge = $("#paramsAuto");
-    badge.hidden = paramState.length === 0;
-    badge.textContent = paramState.length === autoCount
-      ? `${autoCount} 个，全部来自表达式`
-      : `共 ${paramState.length} 个 · 表达式自动提取 ${autoCount} 个`;
     renderTestArgs();
-    requestAnimationFrame(markParamsScrollable);
-  }
-
-  // 参数多到超出弹窗可视区时，在标签上标注需要滚动查看
-  function markParamsScrollable() {
-    const body = document.querySelector("#ruleDlg .dlg-scroll");
-    const badge = $("#paramsAuto");
-    if (!body || !badge || badge.hidden) return;
-    if (body.scrollHeight - body.clientHeight > 2 && !badge.textContent.includes("滚动")) {
-      badge.textContent += " · 向下滚动查看";
-    }
   }
 
   // 汇总参数为规范化对象数组；失效参数丢弃，name 为空的行忽略。校验失败返回 {error}。
