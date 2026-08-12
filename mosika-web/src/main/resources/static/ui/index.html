@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260812-5">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260812-6">
 </head>
 <body>
 <main class="app-shell">
@@ -65,8 +65,8 @@
                         <button id="saveDraftButton" type="button">保存</button>
                         <button id="publishFlowButton" class="primary" type="button">发布</button>
                     </div>
-                    <button id="createVersionButton" class="primary" type="button"
-                            title="基于当前选中版本修改并创建新草稿" hidden>基于此版本修改</button>
+                    <button id="createVersionButton" class="primary flow-modify-button" type="button"
+                            title="修改当前版本（将创建新草稿）" hidden>修改</button>
                     <span class="status" id="docStatus"><i></i> <span id="docStatusText">已保存</span></span>
                 </div>
             </div>
@@ -350,6 +350,6 @@
 <script src="/ui/treenode.js?v=20260810-1"></script>
 <script src="/ui/api.js?v=20260812-3"></script>
 <script src="/ui/ns.js?v=20260810-1"></script>
-<script src="/ui/app.js?v=20260812-9"></script>
+<script src="/ui/app.js?v=20260812-10"></script>
 </body>
 </html>

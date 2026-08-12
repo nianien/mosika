@@ -154,6 +154,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .canvas-tools .flow-draft-actions button:last-child {
     position: relative; min-width: 48px; margin-left: -1px; border-radius: 0 7px 7px 0;
 }
+.canvas-tools .flow-modify-button { min-width: 58px; }
 .status {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 3px 10px; margin-left: 6px;

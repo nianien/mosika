@@ -331,7 +331,7 @@
         inspectorEditingField = null;
         docStatus = "draft";
         dirty = false;
-        updateDocStatus();
+        syncFlowHeader();
         render({ preserveView: false });
     }
 
@@ -2004,44 +2004,29 @@
         return "草稿";
     }
 
-    function updateDocStatus() {
+    function syncFlowHeader() {
         const textEl = $("#docStatusText");
         const pill = $("#docStatus");
-        if (!textEl || !pill) return;
-        textEl.textContent = dirty ? "未保存"
-            : docStatus === "published" ? "当前发布"
-                : docStatus === "disabled" ? "已停用"
-                    : docStatus === "historical" ? "历史版本" : "已保存";
-        pill.classList.toggle("status-formal", !dirty && docStatus === "published");
-        pill.classList.toggle("status-disabled", !dirty && docStatus === "disabled");
-        pill.classList.toggle("status-historical", !dirty && docStatus === "historical");
-    }
-
-    function markDraft() {
-        if (editorReadOnly) return;
-        if (executedPaths.size) {
-            executedPaths.clear();
-            treeRoot.querySelector("#executionTrace")?.remove();
-            treeRoot.querySelectorAll(".trace-node").forEach((node) => node.classList.remove("trace-node"));
-        }
-        $("#testResult").hidden = true;
-        dirty = true;
-        updateDocStatus();
-        setSaveBusy(savingFlow);
-    }
-
-    function pulseStatus() {
-        const pill = $("#docStatus");
-        if (pill) { pill.classList.remove("status-pulse"); void pill.offsetWidth; pill.classList.add("status-pulse"); }
-    }
-
-    function setSaveBusy(busy) {
+        const draftActions = $("#flowDraftActions");
         const save = $("#saveDraftButton");
         const publish = $("#publishFlowButton");
         const createVersion = $("#createVersionButton");
         const test = $("#testFlowButton");
         const versionSelect = $("#flowVersionSelect");
-        const off = busy || switchingVersion || flowLoadFailed;
+        const off = savingFlow || switchingVersion || flowLoadFailed;
+
+        if (textEl) {
+            textEl.textContent = dirty ? "未保存"
+            : docStatus === "published" ? "当前发布"
+                : docStatus === "disabled" ? "已停用"
+                    : docStatus === "historical" ? "历史版本" : "已保存";
+        }
+        if (pill) {
+            pill.classList.toggle("status-formal", !dirty && docStatus === "published");
+            pill.classList.toggle("status-disabled", !dirty && docStatus === "disabled");
+            pill.classList.toggle("status-historical", !dirty && docStatus === "historical");
+        }
+        if (draftActions) draftActions.hidden = editorReadOnly;
         if (save) {
             save.textContent = pendingFlowAction === "save" ? "保存中…" : "保存";
             save.title = dirty ? "保存当前修改" : "当前没有未保存修改";
@@ -2053,19 +2038,36 @@
             publish.disabled = off || editorReadOnly;
         }
         if (createVersion) {
-            createVersion.textContent = pendingFlowAction === "create" ? "创建中…" : "基于此版本修改";
+            createVersion.hidden = !flowMeta || !editorReadOnly;
+            createVersion.textContent = pendingFlowAction === "create" ? "处理中…" : "修改";
+            createVersion.title = flowMeta
+                ? `修改 V${flowMeta.version}（将创建新草稿）`
+                : "修改当前版本（将创建新草稿）";
             createVersion.disabled = off || !flowMeta || !editorReadOnly;
         }
         if (test) test.disabled = off || !flowMeta;
         if (versionSelect) versionSelect.disabled = off || !flowMeta;
     }
 
+    function markDraft() {
+        if (editorReadOnly) return;
+        if (executedPaths.size) {
+            executedPaths.clear();
+            treeRoot.querySelector("#executionTrace")?.remove();
+            treeRoot.querySelectorAll(".trace-node").forEach((node) => node.classList.remove("trace-node"));
+        }
+        $("#testResult").hidden = true;
+        dirty = true;
+        syncFlowHeader();
+    }
+
+    function pulseStatus() {
+        const pill = $("#docStatus");
+        if (pill) { pill.classList.remove("status-pulse"); void pill.offsetWidth; pill.classList.add("status-pulse"); }
+    }
+
     function syncReadonlyControls() {
         document.body.classList.toggle("editor-readonly", editorReadOnly);
-        const draftActions = $("#flowDraftActions");
-        const createVersion = $("#createVersionButton");
-        if (draftActions) draftActions.hidden = editorReadOnly;
-        if (createVersion) createVersion.hidden = !flowMeta || !editorReadOnly;
 
         if (editorReadOnly) {
             document.querySelectorAll("#inspectorForm input, #inspectorForm select, #inspectorForm textarea, #inspectorForm button")
@@ -2088,7 +2090,7 @@
             cancelRule.disabled = false;
             cancelRule.hidden = editorReadOnly;
         }
-        setSaveBusy(savingFlow);
+        syncFlowHeader();
     }
 
     function applyEditorMode() {
@@ -2333,12 +2335,12 @@
         if (!flowMeta || !window.MosikaApi) {
             docStatus = makeFormal ? "published" : "draft";
             dirty = false;
-            updateDocStatus(); pulseStatus();
+            syncFlowHeader(); pulseStatus();
             return true;
         }
         savingFlow = true;
         pendingFlowAction = makeFormal ? "publish" : "save";
-        setSaveBusy(true);
+        syncFlowHeader();
         try {
             const payload = {
                 flowId: flowMeta.flowId, namespace: flowMeta.namespace,
@@ -2362,7 +2364,7 @@
             } catch (error) {
                 console.error("刷新版本列表失败", error);
             }
-            updateDocStatus(); pulseStatus();
+            syncFlowHeader(); pulseStatus();
             return true;
         } catch (e) {
             openConfirm(`${makeFormal ? "发布" : "保存"}失败：${e.message}`,
@@ -2371,7 +2373,7 @@
         } finally {
             savingFlow = false;
             pendingFlowAction = null;
-            setSaveBusy(false);
+            syncFlowHeader();
         }
     }
 
@@ -3106,7 +3108,7 @@
 
     new ResizeObserver(() => { if (fitMode) fitTree(); }).observe(viewport);
     render({ preserveView: false });
-    updateDocStatus();
+    syncFlowHeader();
 
     // 对外桥接层，供页面接线和浏览器交互测试使用。
     window.__mosikaEditor = {
@@ -3114,7 +3116,7 @@
         loadTreeJson(json, opts) { loadTree(json, opts || {}); },
         setDocStatus(status) {
             docStatus = status === "formal" ? "published" : status;
-            updateDocStatus();
+            syncFlowHeader();
         },
         markDraft
     };
@@ -3166,9 +3168,9 @@
         dirty = false;
         renderFlowVersions(flow.version);
         updateVersionUrl(flow.version);
-        updateDocStatus();
+        syncFlowHeader();
         applyEditorMode();
-        setSaveBusy(savingFlow);
+        syncFlowHeader();
     }
 
     async function loadFlowVersion(version) {
@@ -3179,7 +3181,7 @@
             return;
         }
         switchingVersion = true;
-        setSaveBusy(false);
+        syncFlowHeader();
         try {
             const flow = await window.MosikaApi.getFlow(flowMeta.flowId, version);
             if (!flow) throw new Error("场景版本不存在");
@@ -3189,7 +3191,7 @@
             openConfirm(`切换版本失败：${error.message}`, { title: "切换失败", confirmLabel: "知道了" });
         } finally {
             switchingVersion = false;
-            setSaveBusy(false);
+            syncFlowHeader();
         }
     }
 
@@ -3202,7 +3204,7 @@
         }
         savingFlow = true;
         pendingFlowAction = "create";
-        setSaveBusy(true);
+        syncFlowHeader();
         try {
             const draft = await window.MosikaApi.createFlowVersion(flowMeta.flowId, flowMeta.version);
             if (!draft) throw new Error("创建草稿版本失败");
@@ -3215,7 +3217,7 @@
         } finally {
             savingFlow = false;
             pendingFlowAction = null;
-            setSaveBusy(false);
+            syncFlowHeader();
         }
     }
 
@@ -3258,7 +3260,7 @@
             console.error("加载场景失败", e);
             // 只读错误态：禁用保存/发布，避免把空白画布当成真实流程覆盖后端。
             flowLoadFailed = true;
-            setSaveBusy(false);
+            syncFlowHeader();
             showLoadError(`场景加载失败：${e.message}`);
             const titleEl = document.querySelector(".canvas-titlebar strong");
             if (titleEl) titleEl.textContent = "加载失败";
