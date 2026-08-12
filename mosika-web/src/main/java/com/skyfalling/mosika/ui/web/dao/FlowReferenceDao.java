@@ -39,6 +39,22 @@ public class FlowReferenceDao {
                 flowId, referencedFlowIds);
     }
 
+    /** 当前发布版本切换后，把运行态调用方的引用指向新版本记录 */
+    public void retargetActiveReferences(long flowKey, long currentFlowId) {
+        jdbc.update(
+                "INSERT OR IGNORE INTO flow_flow_ref (flow_id, referenced_flow_id) "
+                        + "SELECT r.flow_id, ? FROM flow_flow_ref r "
+                        + "JOIN rule_flow f ON f.id=r.flow_id "
+                        + "WHERE r.referenced_flow_id IN "
+                        + "(SELECT id FROM rule_flow WHERE flow_key=? AND id<>?) AND f.status=1",
+                currentFlowId, flowKey, currentFlowId);
+        jdbc.update(
+                "DELETE FROM flow_flow_ref WHERE referenced_flow_id IN "
+                        + "(SELECT id FROM rule_flow WHERE flow_key=? AND id<>?) "
+                        + "AND flow_id IN (SELECT id FROM rule_flow WHERE status=1)",
+                flowKey, currentFlowId);
+    }
+
     /** 按命名空间统计每条原子规则被运行态规则流闭包直接引用的次数 */
     public Map<String, Integer> atomicRefCountsByActiveFlow(long namespaceId) {
         Map<String, Integer> counts = new HashMap<>();

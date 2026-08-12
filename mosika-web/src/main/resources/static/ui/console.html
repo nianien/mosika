@@ -57,6 +57,7 @@ tbody tr:hover{background:#f7fcfb}
 .pill.live{color:var(--green);background:var(--green-soft)}
 .pill.draft{color:#b5852a;background:#fbf1d9}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
+.pill.history{color:#60716d;background:#edf3f1}
 .num{font-variant-numeric:tabular-nums;color:#3f5f58}
 .time{color:#8aa39d;font-variant-numeric:tabular-nums}
 .actions{display:flex;gap:14px;align-items:center;justify-content:flex-end;white-space:nowrap}
@@ -136,8 +137,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       <div><h1>业务场景</h1><span class="sub" id="subCount">加载中…</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-status="">全部</button>
-        <button type="button" class="chip" data-status="1">已生效</button>
+        <button type="button" class="chip" data-status="1">当前发布</button>
         <button type="button" class="chip" data-status="0">草稿</button>
+        <button type="button" class="chip" data-status="3">历史版本</button>
         <button type="button" class="chip" data-status="2">已停用</button>
       </div>
     </div>
@@ -152,10 +154,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   <div class="scrim" id="scrim"></div>
   <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-    <div class="dw-head"><h2 id="drawerTitle">场景详情 <span class="pill live" id="dwStatusPill">已生效</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
+    <div class="dw-head"><h2 id="drawerTitle">场景详情 <span class="pill live" id="dwStatusPill">当前发布</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
     <div class="dw-body">
       <div class="field"><label>场景名称</label><input id="dwName" maxlength="60"></div>
-      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint">仅编辑名称与描述，不影响流程结构与状态；状态通过列表中的开关变更。</div></div>
+      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint" id="dwEditHint">草稿可修改名称与描述；已发布、历史和停用版本只读。</div></div>
       <div>
         <div class="sec-title">概览</div>
         <div class="metarow">
@@ -203,7 +205,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast"></div>
 
-<script src="/ui/api.js?v=20260810-1"></script>
+<script src="/ui/api.js?v=20260812-1"></script>
 <script src="/ui/ns.js?v=20260810-1"></script>
 <script>
 (() => {
@@ -232,16 +234,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function friendlyError(raw) {
     const m = String(raw || "");
     if (m.includes("rule kind does not match")) {
-      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断条件」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再生效。", detail: m };
+      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断条件」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再发布。", detail: m };
     }
     if (m.includes("unknown or disabled rule")) {
       return { msg: "引用了不存在或已停用的规则，请先到「业务规则」中启用相关规则后再重试。", detail: m };
     }
     if (m.includes("must use numeric") || m.includes("built-in reference")) {
-      return { msg: "存在不受支持的规则引用，请到编排画布检查引用后再生效。", detail: m };
+      return { msg: "存在不受支持的规则引用，请到编排画布检查引用后再发布。", detail: m };
     }
     if (m.includes("structural validation") || m.includes("compile failed") || m.includes("ruleTree")) {
-      return { msg: "场景结构校验未通过，请到编排画布修正后再生效。", detail: m };
+      return { msg: "场景结构校验未通过，请到编排画布修正后再发布。", detail: m };
     }
     if (m.includes("updated by others") || m.includes("version")) {
       return { msg: "该场景已被其他操作修改，请刷新页面后重试。", detail: "" };
@@ -304,8 +306,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   const STATUS_META = {
     0: { label: "草稿", cls: "draft" },
-    1: { label: "已生效", cls: "live" },
-    2: { label: "已停用", cls: "off" }
+    1: { label: "当前发布", cls: "live" },
+    2: { label: "已停用", cls: "off" },
+    3: { label: "历史版本", cls: "history" }
   };
 
   function renderRows() {
@@ -316,15 +319,17 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const active = f.status === 1;
       const pending = pendingFlowIds.has(f.flowId);
       const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
-      const ops = `<button class="open" data-open="${f.flowId}">编排</button>
-        <button class="btn link" data-detail="${f.flowId}">详情</button>
+      const actionable = f.status === 0 || f.status === 1;
+      const ops = `<button class="open" data-open="${f.flowId}" data-version="${f.version}">${f.status === 0 ? "编排" : "查看"}</button>
+        <button class="btn link" data-detail="${f.flowId}" data-version="${f.version}">详情</button>
         <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
-          aria-checked="${active}" aria-label="${esc(f.name)}的生效状态" data-status-toggle="${f.flowId}"${pending ? " disabled aria-busy=\"true\"" : ""}>
+          aria-checked="${active}" aria-label="${esc(f.name)}的发布状态" data-status-toggle="${f.flowId}" data-version="${f.version}"
+          ${!actionable || pending ? "disabled" : ""}${pending ? " aria-busy=\"true\"" : ""}>
           <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
           <span class="status-toggle-label">${meta.label}</span>
         </button>`;
       return `<tr>
-        <td><div class="name">${esc(f.name)}<span class="id">${esc(f.namespace)} / ${esc(f.flowId)}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
+        <td><div class="name">${esc(f.name)}<span class="id">${esc(f.namespace)} / ${esc(f.flowId)} / V${f.version}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
         <td class="num">${ruleIds.length}</td>
         <td class="time">${esc((f.updatedAt || "").slice(5, 16))}</td>
         <td><div class="actions">${ops}</div></td>
@@ -332,10 +337,14 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }).join("");
   }
 
-  function openCanvas(id) { location.href = Ns.link(`/flow/${id}`); }
+  function openCanvas(id, version) { location.href = Ns.link(`/flow/${id}?version=${version}`); }
 
-  function openDrawer(id) {
-    current = flows.find((f) => f.flowId === id);
+  function findFlowVersion(id, version) {
+    return flows.find((f) => f.flowId === id && f.version === Number(version));
+  }
+
+  function openDrawer(id, version) {
+    current = findFlowVersion(id, version);
     if (!current) return;
     drawerOpener = document.activeElement;
     $("#dwName").value = current.name || "";
@@ -348,6 +357,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     $("#dwRules").innerHTML = ruleIds.length
       ? ruleIds.map((rid) => `<div class="rtag">${esc(ruleNameById.get(String(rid)) || rid)}<span class="rid">#${esc(rid)}</span></div>`).join("")
       : `<span class="hint">未引用任何规则</span>`;
+    const editable = current.status === 0;
+    $("#dwName").readOnly = !editable;
+    $("#dwDesc").readOnly = !editable;
+    $("#dwSave").hidden = !editable;
+    $("#dwEditHint").textContent = editable
+      ? "修改只作用于当前草稿版本。"
+      : "该版本已锁定；可进入画布后基于此版本创建新草稿。";
     setDrawerStatus(current.status);
     document.querySelector(".topbar").inert = true;
     document.querySelector(".main").inert = true;
@@ -376,6 +392,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   async function saveDrawer(openAfter) {
     if (!current || drawerSaving) return;
+    if (current.status !== 0) {
+      const { flowId, version } = current;
+      closeDrawer(true);
+      if (openAfter) openCanvas(flowId, version);
+      return;
+    }
     const name = $("#dwName").value.trim();
     if (!name) { toast("场景名称不能为空"); return; }
     drawerSaving = true;
@@ -387,9 +409,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       });
       toast("已保存");
       const id = current.flowId;
+      const version = current.version;
       closeDrawer(true);
       await loadFlows();
-      if (openAfter) openCanvas(id);
+      if (openAfter) openCanvas(id, version);
     } catch (e) { showError(e.message, "保存失败"); }
     finally {
       drawerSaving = false;
@@ -397,17 +420,18 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }
   }
 
-  function openStatusDialog(id, button) {
-    const f = flows.find((x) => x.flowId === id); if (!f || pendingFlowIds.has(id)) return;
+  function openStatusDialog(id, version, button) {
+    const f = findFlowVersion(id, version);
+    if (!f || ![0, 1].includes(f.status) || pendingFlowIds.has(id)) return;
     const disabling = f.status === 1;
-    statusDialogTarget = { id, button };
-    $("#statusDlgTitle").textContent = disabling ? "确认停用场景" : "确认生效场景";
-    $("#statusDlgMessage").textContent = `${disabling ? "确定停用" : "确定生效"}「${f.name}」吗？`;
+    statusDialogTarget = { id, version: f.version, button };
+    $("#statusDlgTitle").textContent = disabling ? "确认停用场景" : "确认发布版本";
+    $("#statusDlgMessage").textContent = `${disabling ? "确定停用" : "确定发布"}「${f.name}」V${f.version} 吗？`;
     $("#statusDlgNote").textContent = disabling
       ? "停用后该场景立即退出运行态，但规则树和配置仍会保留。"
-      : "生效前会校验并编译当前规则树；成功后该场景立即进入运行态。";
+      : "发布前会校验并编译当前规则树；成功后该版本成为唯一的当前运行版本，其他草稿继续保留。";
     const confirm = $("#statusConfirm");
-    confirm.textContent = disabling ? "确认停用" : "确认生效";
+    confirm.textContent = disabling ? "确认停用" : "确认发布";
     confirm.className = disabling ? "btn danger" : "btn primary";
     const dialog = $("#statusDlg");
     if (!dialog.open) dialog.showModal();
@@ -424,11 +448,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const target = statusDialogTarget; if (!target) return;
     statusDialogTarget = null;
     $("#statusDlg").close();
-    toggleStatus(target.id, target.button);
+    toggleStatus(target.id, target.version, target.button);
   }
 
-  async function toggleStatus(id, button) {
-    const f = flows.find((x) => x.flowId === id); if (!f) return;
+  async function toggleStatus(id, version, button) {
+    const f = findFlowVersion(id, version); if (!f) return;
     if (pendingFlowIds.has(id)) return;
     const action = f.status === 1 ? "disable" : "publish";
     pendingFlowIds.add(id);
@@ -441,19 +465,19 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         await Api.disableFlow(id, f.version);
         toast("已停用");
       } else if (action === "publish") {
-        const full = await Api.getFlow(id);
+        const full = await Api.getFlow(id, f.version);
         await Api.publishFlow(id, {
           flowId: full.flowId, namespace: full.namespace,
           name: full.name, description: full.description,
           ruleTree: full.ruleTree, version: full.version
         });
-        toast("已生效");
+        toast(`V${f.version} 已发布`);
       }
       statusChanged = true;
       // 清除请求态后再重绘，避免新生成的开关继承旧请求的 pending 状态。
       pendingFlowIds.delete(id);
       await loadFlows();
-    } catch (e) { showError(e.message, action === "disable" ? "停用失败" : "生效失败"); }
+    } catch (e) { showError(e.message, action === "disable" ? "停用失败" : "发布失败"); }
     finally {
       pendingFlowIds.delete(id);
       if (button.isConnected) {
@@ -479,15 +503,15 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         })
       });
       $("#newDlg").close();
-      openCanvas(created.flowId);
+      openCanvas(created.flowId, created.version);
     } catch (e) { showError(e.message, "创建失败"); }
   }
 
   // events
   $("#rows").addEventListener("click", (e) => {
-    const o = e.target.closest("[data-open]"); if (o) return openCanvas(o.dataset.open);
-    const d = e.target.closest("[data-detail]"); if (d) return openDrawer(d.dataset.detail);
-    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(t.dataset.statusToggle, t);
+    const o = e.target.closest("[data-open]"); if (o) return openCanvas(o.dataset.open, o.dataset.version);
+    const d = e.target.closest("[data-detail]"); if (d) return openDrawer(d.dataset.detail, d.dataset.version);
+    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(t.dataset.statusToggle, t.dataset.version, t);
   });
   $("#filters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;

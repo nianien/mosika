@@ -23,6 +23,7 @@ public class DatabaseMigrationInitializer extends SqlDataSourceScriptDatabaseIni
     @Override
     public void afterPropertiesSet() throws Exception {
         migrateUdfDefinition();
+        migrateRuleFlow();
         super.afterPropertiesSet();
     }
 
@@ -40,5 +41,26 @@ public class DatabaseMigrationInitializer extends SqlDataSourceScriptDatabaseIni
             return;
         }
         new ResourceDatabasePopulator(new ClassPathResource("migration.sql")).execute(getDataSource());
+    }
+
+    private void migrateRuleFlow() {
+        Integer tableCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='rule_flow'",
+                Integer.class);
+        if (tableCount == null || tableCount == 0) {
+            return;
+        }
+        List<String> columns = jdbc.query(
+                "PRAGMA table_info(rule_flow)",
+                (rs, i) -> rs.getString("name"));
+        if (columns.contains("flow_key")) {
+            return;
+        }
+        jdbc.execute("ALTER TABLE rule_flow ADD COLUMN flow_key INTEGER");
+        jdbc.update("UPDATE rule_flow SET flow_key=id, version=1");
+        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_rule_flow_version "
+                + "ON rule_flow(flow_key, version)");
+        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_rule_flow_active "
+                + "ON rule_flow(flow_key) WHERE status=1");
     }
 }

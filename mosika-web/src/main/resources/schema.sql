@@ -60,20 +60,24 @@ CREATE INDEX IF NOT EXISTS idx_udf_definition_status ON udf_definition(status);
 
 CREATE TABLE IF NOT EXISTS rule_flow (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    flow_key     INTEGER NOT NULL,
     namespace_id INTEGER NOT NULL,
     name         TEXT    NOT NULL,
     description  TEXT    NOT NULL DEFAULT '',
     rule_tree    TEXT    NOT NULL,
-    -- 0=draft 草稿 / 1=published 已生效 / 2=disabled 已停用
+    -- 0=draft 草稿 / 1=published 当前发布 / 2=disabled 已停用 / 3=historical 历史版本
     status       INTEGER NOT NULL DEFAULT 0,
-    version      INTEGER NOT NULL DEFAULT 0,
+    version      INTEGER NOT NULL DEFAULT 1,
     created_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at   TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (flow_key, version),
     FOREIGN KEY (namespace_id) REFERENCES rule_namespace(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rule_flow_status ON rule_flow(status);
 CREATE INDEX IF NOT EXISTS idx_rule_flow_namespace ON rule_flow(namespace_id);
+CREATE INDEX IF NOT EXISTS idx_rule_flow_key ON rule_flow(flow_key);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rule_flow_active ON rule_flow(flow_key) WHERE status=1;
 
 CREATE TABLE IF NOT EXISTS flow_atomic_ref (
     flow_id INTEGER NOT NULL,

@@ -75,7 +75,7 @@ class ContentGenerationDemoDataTest {
         assertEquals(
                 "content.generation.extractClaims($)",
                 jdbc.queryForObject("SELECT expression FROM atomic_rule WHERE id=10118", String.class));
-        assertEquals(0, flowVersionSum());
+        assertEquals(7, flowVersionSum());
         assertTrue(flowDepth(20002) >= 11);
         assertTrue(flowDepth(20003) >= 10);
         assertTrue(flowDepth(20004) >= 10);
@@ -124,7 +124,7 @@ class ContentGenerationDemoDataTest {
         assertEquals(7, count("rule_flow"));
         assertEquals(115, count("flow_atomic_ref"));
         assertEquals(12, count("flow_flow_ref"));
-        assertEquals(0, flowVersionSum());
+        assertEquals(7, flowVersionSum());
     }
 
     private void importDemoData() {

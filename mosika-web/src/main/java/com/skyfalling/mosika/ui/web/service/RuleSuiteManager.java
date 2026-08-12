@@ -246,7 +246,7 @@ public class RuleSuiteManager {
 
     /** 执行一条已经生效的规则流 */
     public NodeResult evalFlow(String flowId, Object target, Map<String, Object> context) {
-        RuleFlowEntity flow = flowDao.findByFlowId(flowId);
+        RuleFlowEntity flow = flowDao.findActiveByFlowId(flowId);
         if (flow == null || flow.getStatus() == null || flow.getStatus() != RuleFlowService.PUBLISHED) {
             throw new BusinessException(404, "active flow not found: " + flowId);
         }

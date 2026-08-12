@@ -34,7 +34,10 @@
     root.MosikaApi = {
         // flows
         listFlows: (params) => request("GET", `/flows${qs(params)}`),
-        getFlow: (flowId) => request("GET", `/flows/${flowId}`),
+        getFlow: (flowId, version) => request("GET", `/flows/${flowId}${qs({ version })}`),
+        listFlowVersions: (flowId) => request("GET", `/flows/${flowId}/versions`),
+        createFlowVersion: (flowId, baseVersion) =>
+            request("POST", `/flows/${flowId}/versions${qs({ baseVersion })}`),
         createFlow: (flow) => request("POST", "/flows", flow),
         updateFlow: (flowId, flow) => request("PUT", `/flows/${flowId}`, flow),
         publishFlow: (flowId, flow) => request("POST", `/flows/${flowId}/publish`, flow),

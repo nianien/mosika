@@ -32,7 +32,7 @@
         R: { name: "动作规则", kind: "action", short: "R", help: "动作节点内部引用的原子规则。" },
         B: { name: "条件规则", kind: "condition", short: "B", help: "条件节点内部引用的可取反原子规则。" },
         A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，next 表示无条件后继。" },
-        PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/生效。" }
+        PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/发布。" }
     };
 
     // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
@@ -152,7 +152,11 @@
     let ruleAddArgs = [];
     // 后端接线：当前打开的 flow 元数据（null=独立演示，无法保存）。
     let flowMeta = null;
+    let flowVersions = [];
     let savingFlow = false;
+    let pendingFlowAction = null;
+    let switchingVersion = false;
+    let editorReadOnly = false;
     let dirty = false;
     let testPanelOpen = false;
     let testRunning = false;
@@ -532,7 +536,7 @@
         if (!rootRect.width || !rootRect.height) return;
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.id = "executionTrace";
-        svg.setAttribute("viewBox", `0 0 ${treeRoot.scrollWidth} ${treeRoot.scrollHeight}`);
+        svg.setAttribute("viewBox", `0 0 ${rootRect.width / scale} ${rootRect.height / scale}`);
         svg.setAttribute("aria-hidden", "true");
         const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
         const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
@@ -627,7 +631,9 @@
         treeRoot.innerHTML = renderBranch(tree);
         const stats = canvasStats(tree);
         $("#nodeCount").textContent = `${stats.flowNodes} 个流程节点${stats.modalRuleNodes ? ` · ${stats.modalRuleNodes} 个规则节点在弹窗` : ""}${stats.hiddenNodes ? ` · ${stats.hiddenNodes} 个流程已折叠` : ""}`;
+        updateFoldAllButton();
         updateInspector();
+        syncReadonlyControls();
         requestAnimationFrame(() => {
             drawExecutionTrace();
             if (!preserveView || fitMode) fitTree();
@@ -1013,6 +1019,7 @@
     }
 
     function beginFieldEdit(field) {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !inspectorEditableType(found.node.type)) return;
         inspectorEditingField = editKey(idOf(found.node), field);
@@ -1021,6 +1028,7 @@
     }
 
     function confirmFieldEdit() {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !inspectorEditingField) return;
         const node = found.node;
@@ -1480,6 +1488,7 @@
         $("#ruleDialogTitle").textContent = ruleDisplayName(judge);
         renderRuleTree();
         updateRuleEditor();
+        syncReadonlyControls();
     }
 
     let ruleDialogSnapshot = null;
@@ -1618,6 +1627,7 @@
     }
 
     async function deleteSelectedRule() {
+        if (editorReadOnly) return;
         const found = findRuleNode(ruleSelectedId);
         if (!canDeleteRule(found)) return;
         const descendants = countNodes(found.node) - 1;
@@ -1693,6 +1703,7 @@
     }
 
     function openInsertPanel() {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || found.node.type === "T") return;
         if (found.relation === "decision") {
@@ -1735,6 +1746,7 @@
     // 确认后才把真实节点挂到目标位置。决策分支固定为条件，直接插入判断并打开条件编辑，不经类型弹窗。
     let configTarget = null;
     function startAddConfig(relation) {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !availableRelations(found.node).includes(relation)) return;
         const parent = found.node;
@@ -1775,6 +1787,7 @@
     // 点击画布上已有的“待配置”占位（脚手架槽位）进入配置：replace 模式。
     // 决策槽固定为条件→直接开条件编辑弹窗；其余槽弹「配置节点」三选一。
     function openNodeConfig(ph) {
+        if (editorReadOnly) return;
         if (!ph || ph.type !== "PH") return;
         if (ph.slot === "decision") { configureAsCondition(ph); return; }
         configTarget = { mode: "replace", phId: idOf(ph) };
@@ -1819,6 +1832,7 @@
         return real;
     }
     function confirmNodeConfig() {
+        if (editorReadOnly) return;
         if (!configTarget) { closeNodeConfig(); return; }
         const type = $("#nodeConfigType").value;
         if (type === "A") {
@@ -1867,6 +1881,7 @@
 
     // 条件配置：把已有占位替换成条件节点（规则暂空=待配置条件），随即打开条件编辑弹窗
     function configureAsCondition(ph) {
+        if (editorReadOnly) return;
         const found = findNode(idOf(ph));
         if (!found || found.node.type !== "PH") return;
         const j = make.condition(null);
@@ -1886,6 +1901,7 @@
     }
 
     function insertNodeBefore(typeOverride = null) {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !found.parent) return;
         const { node: target, parent, relation } = found;
@@ -1920,6 +1936,7 @@
     }
 
     async function deleteSelected() {
+        if (editorReadOnly) return;
         const found = selectedId ? findNode(selectedId) : null;
         if (!found || !canDeleteFlowNode(found.node, found.parent, found.relation)) return;
         const descendants = countFlowNodes(found.node, found.relation !== "next") - 1;
@@ -1955,15 +1972,53 @@
         render({ preserveView: true });
     }
 
+    function updateFoldAllButton() {
+        let collapsibleCount = 0;
+        let collapsedCount = 0;
+        walk(tree, (node) => {
+            if (node.type === "C" || !executionEdges(node).length) return;
+            collapsibleCount++;
+            if (isCollapsed(node)) collapsedCount++;
+        });
+        const expand = collapsedCount > 0;
+        const button = $("#foldAllButton");
+        button.disabled = collapsibleCount === 0;
+        button.dataset.mode = expand ? "expand" : "collapse";
+        button.setAttribute("aria-label", expand ? `展开全部折叠节点，共 ${collapsedCount} 个` : "折叠全部节点");
+        button.querySelector("span").textContent = expand ? "展开全部" : "折叠全部";
+        button.querySelector(".fold-all-collapse-icon").toggleAttribute("hidden", expand);
+        button.querySelector(".fold-all-expand-icon").toggleAttribute("hidden", !expand);
+    }
+
+    function flowStatusKey(status) {
+        if (status === 1) return "published";
+        if (status === 2) return "disabled";
+        if (status === 3) return "historical";
+        return "draft";
+    }
+
+    function flowStatusLabel(status) {
+        if (status === 1) return "当前发布";
+        if (status === 2) return "已停用";
+        if (status === 3) return "历史版本";
+        return "草稿";
+    }
+
     function updateDocStatus() {
         const textEl = $("#docStatusText");
         const pill = $("#docStatus");
         if (!textEl || !pill) return;
-        textEl.textContent = dirty ? "有未保存修改" : docStatus === "formal" ? "已生效" : docStatus === "disabled" ? "已停用" : "草稿";
-        pill.classList.toggle("status-formal", !dirty && docStatus === "formal");
+        textEl.textContent = dirty ? "未保存"
+            : docStatus === "published" ? "当前发布"
+                : docStatus === "disabled" ? "已停用"
+                    : docStatus === "historical" ? "历史版本" : "已保存";
+        pill.classList.toggle("status-formal", !dirty && docStatus === "published");
+        pill.classList.toggle("status-disabled", !dirty && docStatus === "disabled");
+        pill.classList.toggle("status-historical", !dirty && docStatus === "historical");
     }
 
     function markDraft() {
+        if (editorReadOnly) return;
         if (executedPaths.size) {
             executedPaths.clear();
             treeRoot.querySelector("#executionTrace")?.remove();
@@ -1972,6 +2027,7 @@
         $("#testResult").hidden = true;
         dirty = true;
         updateDocStatus();
+        setSaveBusy(savingFlow);
     }
 
     function pulseStatus() {
@@ -1980,11 +2036,70 @@
     }
 
     function setSaveBusy(busy) {
-        const a = $("#saveDraftButton"), b = $("#promoteButton"), c = $("#testFlowButton");
-        const off = busy || flowLoadFailed;
-        if (a) a.disabled = off;
-        if (b) b.disabled = off;
-        if (c) c.disabled = off || !flowMeta;
+        const save = $("#saveDraftButton");
+        const publish = $("#publishFlowButton");
+        const createVersion = $("#createVersionButton");
+        const test = $("#testFlowButton");
+        const versionSelect = $("#flowVersionSelect");
+        const off = busy || switchingVersion || flowLoadFailed;
+        if (save) {
+            save.textContent = pendingFlowAction === "save" ? "保存中…" : "保存";
+            save.title = dirty ? "保存当前修改" : "当前没有未保存修改";
+            save.disabled = off || editorReadOnly || !dirty;
+        }
+        if (publish) {
+            publish.textContent = pendingFlowAction === "publish" ? "发布中…" : "发布";
+            publish.title = dirty ? "保存当前修改并发布" : "发布当前草稿";
+            publish.disabled = off || editorReadOnly;
+        }
+        if (createVersion) {
+            createVersion.textContent = pendingFlowAction === "create" ? "创建中…" : "基于此版本修改";
+            createVersion.disabled = off || !flowMeta || !editorReadOnly;
+        }
+        if (test) test.disabled = off || !flowMeta;
+        if (versionSelect) versionSelect.disabled = off || !flowMeta;
+    }
+
+    function syncReadonlyControls() {
+        document.body.classList.toggle("editor-readonly", editorReadOnly);
+        const draftActions = $("#flowDraftActions");
+        const createVersion = $("#createVersionButton");
+        if (draftActions) draftActions.hidden = editorReadOnly;
+        if (createVersion) createVersion.hidden = !flowMeta || !editorReadOnly;
+
+        if (editorReadOnly) {
+            document.querySelectorAll("#inspectorForm input, #inspectorForm select, #inspectorForm textarea, #inspectorForm button")
+                .forEach((control) => { control.disabled = true; });
+        }
+        const viewRule = $("#editNodeButton");
+        if (viewRule) viewRule.disabled = false;
+
+        if (editorReadOnly) {
+            document.querySelectorAll("#ruleDialog input, #ruleDialog select, #ruleDialog textarea, #ruleDialog button")
+                .forEach((control) => { control.disabled = true; });
+        }
+        const closeRule = $("#ruleDialogCloseButton");
+        const cancelRule = $("#ruleDialogCancelButton");
+        if (closeRule) {
+            closeRule.disabled = false;
+            closeRule.textContent = editorReadOnly ? "关闭" : "保存";
+        }
+        if (cancelRule) {
+            cancelRule.disabled = false;
+            cancelRule.hidden = editorReadOnly;
+        }
+        setSaveBusy(savingFlow);
+    }
+
+    function applyEditorMode() {
+        const nextReadOnly = Boolean(flowMeta && flowMeta.status !== 0);
+        if (editorReadOnly && !nextReadOnly) {
+            document.querySelectorAll("#inspectorForm input, #inspectorForm select, #inspectorForm textarea, #inspectorForm button, "
+                + "#ruleDialog input, #ruleDialog select, #ruleDialog textarea, #ruleDialog button")
+                .forEach((control) => { control.disabled = false; });
+        }
+        editorReadOnly = nextReadOnly;
+        syncReadonlyControls();
     }
 
     function parseDataPathSegments(path) {
@@ -2076,6 +2191,29 @@
         }
     }
 
+    function setTestInputTab(kind, focus = true) {
+        const targetActive = kind !== "context";
+        [
+            ["target", $("#testTargetTab"), $("#testTargetPanel"), $("#testTargetInput")],
+            ["context", $("#testContextTab"), $("#testContextPanel"), $("#testContextInput")]
+        ].forEach(([tabKind, tab, panel, input]) => {
+            const active = tabKind === (targetActive ? "target" : "context");
+            tab.classList.toggle("is-active", active);
+            tab.setAttribute("aria-selected", String(active));
+            tab.tabIndex = active ? 0 : -1;
+            panel.hidden = !active;
+            if (active && focus) requestAnimationFrame(() => input.focus());
+        });
+    }
+
+    function setTestInputError(input, invalid) {
+        const kind = input.id === "testContextInput" ? "context" : "target";
+        const tab = kind === "context" ? $("#testContextTab") : $("#testTargetTab");
+        input.setAttribute("aria-invalid", String(invalid));
+        tab.classList.toggle("is-error", invalid);
+        if (invalid) setTestInputTab(kind, false);
+    }
+
     function setTestPanelOpen(open) {
         testPanelOpen = open;
         if (open) {
@@ -2083,7 +2221,7 @@
             setInspectorCollapsed(false);
         }
         updateInspector();
-        if (open) requestAnimationFrame(() => $("#testTargetInput").focus());
+        if (open) setTestInputTab("target");
     }
 
     function formatJson(value) {
@@ -2096,11 +2234,14 @@
         try {
             value = JSON.parse(input.value.trim() || "{}");
         } catch (error) {
+            setTestInputError(input, true);
             throw new Error(`${label} JSON 格式错误：${error.message}`);
         }
         if (objectOnly && (!value || typeof value !== "object" || Array.isArray(value))) {
+            setTestInputError(input, true);
             throw new Error(`${label} 必须是 JSON 对象`);
         }
+        setTestInputError(input, false);
         return value;
     }
 
@@ -2165,11 +2306,11 @@
         }
     }
 
-    // 存在待配置占位时拦截保存/生效（占位无后端表示，无法序列化）。返回 true 表示已拦截。
+    // 存在待配置占位时拦截保存/发布（占位无后端表示，无法序列化）。返回 true 表示已拦截。
     function placeholderGate() {
         const n = countPlaceholders();
         if (n > 0) {
-            openConfirm(`还有 ${n} 个待配置节点，请先完成配置再保存/生效。`, { title: "存在待配置节点", confirmLabel: "知道了" });
+            openConfirm(`还有 ${n} 个待配置节点，请先完成配置再保存/发布。`, { title: "存在待配置节点", confirmLabel: "知道了" });
             return true;
         }
         return false;
@@ -2184,19 +2325,20 @@
         return true;
     }
 
-    // 保存到后端：过滤瞬时态后 serialize(tree) → 草稿走 PUT /api/flows/{id}，生效走 POST /publish；
-    // 不再由前端传 status（后端按端点决定草稿/生效，PUT 不能发布）。
+    // 保存到后端：过滤瞬时态后 serialize(tree) → 草稿走 PUT /api/flows/{id}，发布走 POST /publish。
     async function saveToBackend(makeFormal) {
-        if (savingFlow) return true;
+        if (savingFlow || editorReadOnly) return false;
         if (placeholderGate() || requiredParamGate()) return false;
         materializeParamDefaults(tree);
         if (!flowMeta || !window.MosikaApi) {
-            docStatus = makeFormal ? "formal" : "draft";
+            docStatus = makeFormal ? "published" : "draft";
             dirty = false;
             updateDocStatus(); pulseStatus();
             return true;
         }
-        savingFlow = true; setSaveBusy(true);
+        savingFlow = true;
+        pendingFlowAction = makeFormal ? "publish" : "save";
+        setSaveBusy(true);
         try {
             const payload = {
                 flowId: flowMeta.flowId, namespace: flowMeta.namespace,
@@ -2206,19 +2348,30 @@
             const updated = makeFormal
                 ? await window.MosikaApi.publishFlow(flowMeta.flowId, payload)
                 : await window.MosikaApi.updateFlow(flowMeta.flowId, payload);
-            if (updated) { flowMeta.version = updated.version; flowMeta.name = updated.name; flowMeta.description = updated.description; }
-            docStatus = makeFormal ? "formal" : "draft";
+            if (updated) {
+                flowMeta.version = updated.version;
+                flowMeta.name = updated.name;
+                flowMeta.description = updated.description;
+                flowMeta.status = updated.status;
+            }
+            docStatus = flowStatusKey(flowMeta.status);
             dirty = false;
+            applyEditorMode();
+            try {
+                await refreshFlowVersions(flowMeta.version);
+            } catch (error) {
+                console.error("刷新版本列表失败", error);
+            }
             updateDocStatus(); pulseStatus();
-            // 保存/生效成功后自动返回场景列表（dirty 已清空，不再触发离开提醒）。
-            setTimeout(() => { location.href = window.MosikaNs ? window.MosikaNs.link("/") : "/"; }, 300);
             return true;
         } catch (e) {
-            openConfirm(`${makeFormal ? "生效" : "保存"}失败：${e.message}`,
-                { title: makeFormal ? "生效失败" : "保存失败", confirmLabel: "知道了" });
+            openConfirm(`${makeFormal ? "发布" : "保存"}失败：${e.message}`,
+                { title: makeFormal ? "发布失败" : "保存失败", confirmLabel: "知道了" });
             return false;
         } finally {
-            savingFlow = false; setSaveBusy(false);
+            savingFlow = false;
+            pendingFlowAction = null;
+            setSaveBusy(false);
         }
     }
 
@@ -2245,7 +2398,7 @@
     }
 
     function openValidateDialog(problems) {
-        $("#validateSummary").textContent = `发现 ${problems.length} 处结构问题，修正后才能生效：`;
+        $("#validateSummary").textContent = `发现 ${problems.length} 处结构问题，修正后才能发布：`;
         $("#validateList").innerHTML = problems.map((problem) => `
             <li>
                 <button type="button" class="validate-item" data-locate="${escapeText(problem.id)}">
@@ -2257,10 +2410,26 @@
         if (!dialog.open) dialog.showModal();
     }
 
-    function promoteToFormal() {
+    async function promoteToFormal() {
+        if (editorReadOnly) return;
         if (placeholderGate()) return;
         const problems = collectViolations();
-        if (problems.length === 0) { saveToBackend(true); return; }
+        if (problems.length === 0) {
+            const version = flowMeta?.version;
+            const saveAndPublish = dirty;
+            const confirmed = await openConfirm(
+                saveAndPublish
+                    ? (version
+                        ? `当前有未保存修改，确定保存并发布 V${version} 吗？发布后该版本不可再修改。`
+                        : "当前有未保存修改，确定保存并发布吗？")
+                    : (version ? `确定发布 V${version} 吗？发布后该版本不可再修改。` : "确定发布当前版本吗？"),
+                {
+                    title: saveAndPublish ? "保存并发布" : "发布版本",
+                    confirmLabel: saveAndPublish ? "保存并发布" : "发布"
+                });
+            if (confirmed) saveToBackend(true);
+            return;
+        }
         openValidateDialog(problems);
     }
 
@@ -2357,6 +2526,12 @@
     function contextItemsFor(found) {
         const node = found.node;
         const items = [];
+        if (editorReadOnly) {
+            if (node.type === "C") {
+                items.push({ label: "查看规则", icon: "rule", kind: "normal", onClick: () => openRuleDialog(idOf(node)) });
+            }
+            return items;
+        }
         if (node.type === "PH") {
             items.push({ label: node.slot === "decision" ? "配置条件" : "配置此节点", icon: "config", kind: "hot", onClick: () => openNodeConfig(node) });
         } else {
@@ -2500,12 +2675,14 @@
     });
     zoomInput.addEventListener("blur", applyZoomInput);
     $("#fitButton").addEventListener("click", fitTree);
-    $("#collapseAllButton").addEventListener("click", () => {
-        walk(tree, (node) => { if (node.type !== "C" && executionEdges(node).length) setCollapsed(node, true); });
-        render({ preserveView: true });
-    });
-    $("#expandAllButton").addEventListener("click", () => {
-        collapsedIds.clear();
+    $("#foldAllButton").addEventListener("click", (event) => {
+        if (event.currentTarget.dataset.mode === "expand") {
+            collapsedIds.clear();
+        } else {
+            walk(tree, (node) => {
+                if (node.type !== "C" && executionEdges(node).length) setCollapsed(node, true);
+            });
+        }
         render({ preserveView: true });
     });
     function setInspectorCollapsed(collapsed) {
@@ -2517,9 +2694,25 @@
     $("#inspectorExpand").addEventListener("click", () => setInspectorCollapsed(false));
     $("#testFlowButton").addEventListener("click", () => setTestPanelOpen(!testPanelOpen));
     $("#testPanelClose").addEventListener("click", () => setTestPanelOpen(false));
+    document.querySelector(".test-json-tabs").addEventListener("click", (event) => {
+        const tab = event.target.closest("[data-test-input-tab]");
+        if (tab) setTestInputTab(tab.dataset.testInputTab);
+    });
+    document.querySelector(".test-json-tabs").addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        event.preventDefault();
+        setTestInputTab(event.target.dataset.testInputTab === "target" ? "context" : "target");
+    });
+    ["testTargetInput", "testContextInput"].forEach((id) => {
+        $(`#${id}`).addEventListener("input", (event) => setTestInputError(event.target, false));
+    });
     $("#runTestButton").addEventListener("click", runFlowTest);
     $("#saveDraftButton").addEventListener("click", saveDraft);
-    $("#promoteButton").addEventListener("click", promoteToFormal);
+    $("#publishFlowButton").addEventListener("click", promoteToFormal);
+    $("#createVersionButton").addEventListener("click", createDraftFromCurrentVersion);
+    $("#flowVersionSelect").addEventListener("change", (event) => {
+        loadFlowVersion(Number(event.target.value));
+    });
     $("#validateCloseButton").addEventListener("click", () => $("#validateDialog").close());
     $("#validateDismissButton").addEventListener("click", () => $("#validateDialog").close());
     $("#validateList").addEventListener("click", (event) => {
@@ -2547,6 +2740,7 @@
     $("#nodeDetailFields").addEventListener("click", inspectorFieldClick);
     $("#nodeDetailFields").addEventListener("keydown", inspectorFieldKeydown);
     const onFlowArgInput = (event) => {
+        if (editorReadOnly) return;
         if (!event.target.classList.contains("arg-control")) return;
         const node = selectedId ? findNode(selectedId)?.node : null;
         if (!node) return;
@@ -2561,6 +2755,7 @@
 
     // 模板参数录入：就地写回选中规则节点的 args，不重渲染以保留输入焦点。
     const onRuleArgInput = (event) => {
+        if (editorReadOnly) return;
         if (!event.target.classList.contains("arg-control")) return;
         const node = currentEditingNode();
         if (!node) return;
@@ -2571,6 +2766,11 @@
     $("#ruleEditorParamsField").addEventListener("input", onRuleArgInput);
     $("#ruleEditorParamsField").addEventListener("change", onRuleArgInput);
     $("#ruleDialogCloseButton").addEventListener("click", () => {
+        if (editorReadOnly) {
+            ruleDialogCommitted = true;
+            ruleDialog.close();
+            return;
+        }
         // 「填了才能保存」：规则子树内任一原子规则的必填模板参数未填写则拦截保存，并定位到该节点。
         const judge = currentRuleJudge();
         const missing = missingRequiredInRule(judge ? conditionRule(judge) : null);
@@ -2698,7 +2898,7 @@
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !$("#inspectorAddPanel").hidden) closeAddPanel();
         const editing = event.target.matches("input, select, textarea");
-        if (!editing && ruleDialog.open && (event.key === "Delete" || event.key === "Backspace")) deleteSelectedRule();
+        if (!editorReadOnly && !editing && ruleDialog.open && (event.key === "Delete" || event.key === "Backspace")) deleteSelectedRule();
         if (!editing && event.key === "0") fitTree();
     });
 
@@ -2862,6 +3062,7 @@
     createSiblingReorder({
         container: treeRoot,
         key: "flow",
+        canStart: () => !editorReadOnly,
         axis: "x",
         branchAttr: "data-branch-id",
         shellIdKey: "nodeId",
@@ -2885,6 +3086,7 @@
     createSiblingReorder({
         container: ruleTreeRoot,
         key: "rule",
+        canStart: () => !editorReadOnly,
         axis: "y",
         branchAttr: "data-rule-branch-id",
         shellIdKey: "ruleNodeId",
@@ -2910,13 +3112,111 @@
     window.__mosikaEditor = {
         getTreeJson() { return T.serialize(tree); },
         loadTreeJson(json, opts) { loadTree(json, opts || {}); },
-        setDocStatus(status) { docStatus = status === "formal" ? "formal" : "draft"; updateDocStatus(); },
+        setDocStatus(status) {
+            docStatus = status === "formal" ? "published" : status;
+            updateDocStatus();
+        },
         markDraft
     };
 
     function showLoadError(message) {
         $("#loadErrorText").textContent = message;
         $("#loadErrorBanner").hidden = false;
+    }
+
+    function renderFlowVersions(selectedVersion = flowMeta?.version) {
+        const picker = $("#flowVersionPicker");
+        const select = $("#flowVersionSelect");
+        if (!picker || !select) return;
+        picker.hidden = !flowMeta;
+        select.innerHTML = flowVersions.map((flow) =>
+            `<option value="${flow.version}" ${flow.version === selectedVersion ? "selected" : ""}>V${flow.version} · ${flowStatusLabel(flow.status)}</option>`
+        ).join("");
+    }
+
+    async function refreshFlowVersions(selectedVersion = flowMeta?.version) {
+        if (!flowMeta || !window.MosikaApi) return;
+        flowVersions = await window.MosikaApi.listFlowVersions(flowMeta.flowId) || [];
+        renderFlowVersions(selectedVersion);
+    }
+
+    function updateVersionUrl(version) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("version", String(version));
+        window.history.replaceState(null, "", url);
+    }
+
+    function applyLoadedFlow(flow) {
+        flowMeta = {
+            flowId: flow.flowId,
+            namespace: flow.namespace,
+            name: flow.name,
+            description: flow.description,
+            version: flow.version,
+            status: flow.status
+        };
+        applyEditorMode();
+        const titleEl = document.querySelector(".canvas-titlebar strong");
+        if (titleEl) titleEl.textContent = flow.name || "流程画布";
+        const crumbEl = document.getElementById("flowCrumbName");
+        if (crumbEl) crumbEl.textContent = flow.name || "规则树编辑器";
+        document.title = `${flow.name || "场景"} · Mosika`;
+        loadTree(flow.ruleTree);
+        docStatus = flowStatusKey(flow.status);
+        dirty = false;
+        renderFlowVersions(flow.version);
+        updateVersionUrl(flow.version);
+        updateDocStatus();
+        applyEditorMode();
+        setSaveBusy(savingFlow);
+    }
+
+    async function loadFlowVersion(version) {
+        if (!flowMeta || !Number.isInteger(version) || version <= 0 || version === flowMeta.version) return;
+        const previousVersion = flowMeta.version;
+        if (dirty && !window.confirm("当前草稿有未保存修改，确定切换版本吗？")) {
+            renderFlowVersions(previousVersion);
+            return;
+        }
+        switchingVersion = true;
+        setSaveBusy(false);
+        try {
+            const flow = await window.MosikaApi.getFlow(flowMeta.flowId, version);
+            if (!flow) throw new Error("场景版本不存在");
+            applyLoadedFlow(flow);
+        } catch (error) {
+            renderFlowVersions(previousVersion);
+            openConfirm(`切换版本失败：${error.message}`, { title: "切换失败", confirmLabel: "知道了" });
+        } finally {
+            switchingVersion = false;
+            setSaveBusy(false);
+        }
+    }
+
+    async function createDraftFromCurrentVersion() {
+        if (!flowMeta || savingFlow || switchingVersion) return;
+        if (dirty) {
+            openConfirm("请先保存当前草稿，再基于该版本创建新版本。",
+                { title: "存在未保存修改", confirmLabel: "知道了" });
+            return;
+        }
+        savingFlow = true;
+        pendingFlowAction = "create";
+        setSaveBusy(true);
+        try {
+            const draft = await window.MosikaApi.createFlowVersion(flowMeta.flowId, flowMeta.version);
+            if (!draft) throw new Error("创建草稿版本失败");
+            applyLoadedFlow(draft);
+            await refreshFlowVersions(draft.version);
+            pulseStatus();
+        } catch (error) {
+            openConfirm(`创建草稿版本失败：${error.message}`,
+                { title: "创建失败", confirmLabel: "知道了" });
+        } finally {
+            savingFlow = false;
+            pendingFlowAction = null;
+            setSaveBusy(false);
+        }
     }
 
     $("#loadErrorRetry").addEventListener("click", () => window.location.reload());
@@ -2928,16 +3228,18 @@
         // 无 flowId = 独立演示，保留内置示例与演示规则定义，不触碰后端。
         if (!flowId) return;
         try {
-            const flow = await window.MosikaApi.getFlow(flowId);
+            const requestedVersionText = new URLSearchParams(window.location.search).get("version");
+            const requestedVersion = /^[1-9]\d*$/.test(requestedVersionText || "")
+                ? Number(requestedVersionText) : undefined;
+            const flow = await window.MosikaApi.getFlow(flowId, requestedVersion);
             if (!flow) throw new Error("场景不存在");
-            flowMeta = {
-                flowId: flow.flowId, namespace: flow.namespace,
-                name: flow.name, description: flow.description, version: flow.version
-            };
-            const [atomics, flows] = await Promise.all([
+            flowMeta = { flowId: flow.flowId, namespace: flow.namespace };
+            const [atomics, flows, versions] = await Promise.all([
                 window.MosikaApi.listRuleReferences(flow.namespace),
-                window.MosikaApi.listFlowReferences(flow.namespace)
+                window.MosikaApi.listFlowReferences(flow.namespace),
+                window.MosikaApi.listFlowVersions(flow.flowId)
             ]);
+            flowVersions = versions || [];
             applyRuleDefinitions(atomics, flows.filter((candidate) => candidate.flowId !== flow.flowId));
             $("#loadErrorBanner").hidden = true;
             if (window.MosikaNs) {
@@ -2951,19 +3253,10 @@
                 const backEl = document.getElementById("backToFlows");
                 if (backEl) backEl.setAttribute("href", window.MosikaNs.link("/"));
             }
-            const titleEl = document.querySelector(".canvas-titlebar strong");
-            if (titleEl) titleEl.textContent = flow.name || "流程画布";
-            const crumbEl = document.getElementById("flowCrumbName");
-            if (crumbEl) crumbEl.textContent = flow.name || "规则树编辑器";
-            document.title = `${flow.name || "场景"} · Mosika`;
-            loadTree(flow.ruleTree);
-            docStatus = flow.status === 1 ? "formal" : flow.status === 2 ? "disabled" : "draft";
-            dirty = false;
-            updateDocStatus();
-            setSaveBusy(false);
+            applyLoadedFlow(flow);
         } catch (e) {
             console.error("加载场景失败", e);
-            // 只读错误态：禁用保存/生效，避免把空白画布当成真实流程覆盖后端。
+            // 只读错误态：禁用保存/发布，避免把空白画布当成真实流程覆盖后端。
             flowLoadFailed = true;
             setSaveBusy(false);
             showLoadError(`场景加载失败：${e.message}`);

@@ -39,8 +39,14 @@ public class RuleFlowService {
     /** 草稿状态 */
     public static final int DRAFT = 0;
 
-    /** 已生效状态 */
+    /** 当前发布状态 */
     public static final int PUBLISHED = 1;
+
+    /** 已停用状态 */
+    public static final int DISABLED = 2;
+
+    /** 历史版本状态 */
+    public static final int HISTORICAL = 3;
 
     /** 条件位置允许的内置引用 */
     private static final Set<String> CONDITION_BUILTINS = Set.of(
@@ -73,52 +79,69 @@ public class RuleFlowService {
         request.setNamespace(namespace.getCode());
         request.setRuleTree(RuleTreeCompiler.canonicalizeLenient(request.getRuleTree()));
         request.setStatus(DRAFT);
-        request.setId(flowDao.insert(request));
-        referenceDao.replaceForFlow(request.getId(), Set.of(), Set.of());
-        return flowDao.findByFlowId(request.getFlowId());
+        request.setVersion(1L);
+        long id = flowDao.insertInitial(request);
+        referenceDao.replaceForFlow(id, Set.of(), Set.of());
+        return flowDao.findById(id);
     }
 
-    /** 保存草稿并从运行态移除原生效版本 */
+    /** 基于指定版本创建新的草稿版本 */
+    @Transactional
+    public RuleFlowEntity createVersion(String flowId, long baseVersion) {
+        RuleFlowEntity base = requireFlowVersion(flowId, baseVersion);
+        RuleFlowEntity draft = RuleFlowEntity.builder()
+                .flowKey(base.getFlowKey())
+                .namespaceId(base.getNamespaceId())
+                .namespace(base.getNamespace())
+                .name(base.getName())
+                .description(base.getDescription())
+                .ruleTree(base.getRuleTree())
+                .status(DRAFT)
+                .build();
+        long id = flowDao.insertVersion(base.getFlowKey(), draft);
+        referenceDao.replaceForFlow(id, Set.of(), Set.of());
+        return flowDao.findById(id);
+    }
+
+    /** 保存指定草稿版本，业务版本号保持不变 */
     @Transactional
     public RuleFlowEntity saveDraft(String flowId, RuleFlowEntity request) {
-        RuleFlowEntity existing = requireFlow(flowId);
-        boolean loadedByRuntime = referenceDao.runtimeFlowIds().contains(existing.getId());
-        requireVersion(request, existing, "update");
+        requireVersion(request, "update");
+        RuleFlowEntity existing = requireFlowVersion(flowId, request.getVersion());
+        requireDraft(existing);
         basicCheck(request);
         assertNamespaceUnchanged(request.getNamespace(), existing.getNamespace());
         copyIdentity(request, existing);
-        request.setStatus(DRAFT);
         request.setRuleTree(RuleTreeCompiler.canonicalizeLenient(request.getRuleTree()));
-        if (flowDao.update(flowId, request) == 0) {
-            throw conflict(request.getVersion());
+        if (flowDao.updateDraft(flowId, request) == 0) {
+            throw immutableVersion(existing);
         }
         referenceDao.replaceForFlow(existing.getId(), Set.of(), Set.of());
-        if (loadedByRuntime) {
-            suiteManager.refreshAfterCommit();
-        }
-        return flowDao.findByFlowId(flowId);
+        return flowDao.findByVersion(flowId, request.getVersion());
     }
 
-    /** 仅更新规则流名称和描述 */
+    /** 仅更新指定草稿版本的名称和描述 */
     @Transactional
     public RuleFlowEntity updateMeta(String flowId, RuleFlowEntity request) {
-        RuleFlowEntity existing = requireFlow(flowId);
-        requireVersion(request, existing, "update");
+        requireVersion(request, "update");
+        RuleFlowEntity existing = requireFlowVersion(flowId, request.getVersion());
+        requireDraft(existing);
         if (request.getName() == null || request.getName().isBlank()) {
             throw new IllegalArgumentException("flow name is required");
         }
         assertNamespaceUnchanged(request.getNamespace(), existing.getNamespace());
         if (flowDao.updateMeta(flowId, request.getName(), request.getDescription(), request.getVersion()) == 0) {
-            throw conflict(request.getVersion());
+            throw immutableVersion(existing);
         }
-        return flowDao.findByFlowId(flowId);
+        return flowDao.findByVersion(flowId, request.getVersion());
     }
 
-    /** 全量校验并发布规则流 */
+    /** 全量校验并发布指定草稿版本 */
     @Transactional
     public RuleFlowEntity publish(String flowId, RuleFlowEntity request) {
-        RuleFlowEntity existing = requireFlow(flowId);
-        requireVersion(request, existing, "publish");
+        requireVersion(request, "publish");
+        RuleFlowEntity existing = requireFlowVersion(flowId, request.getVersion());
+        requireDraft(existing);
         basicCheck(request);
         assertNamespaceUnchanged(request.getNamespace(), existing.getNamespace());
         CompileResult compiled = RuleTreeCompiler.compile(request.getRuleTree());
@@ -126,30 +149,42 @@ public class RuleFlowService {
         copyIdentity(request, existing);
         request.setStatus(PUBLISHED);
         request.setRuleTree(compiled.getCanonicalJson());
-        if (flowDao.update(flowId, request) == 0) {
-            throw conflict(request.getVersion());
+        flowDao.historizeActive(existing.getFlowKey());
+        if (flowDao.publishDraft(flowId, request) == 0) {
+            throw immutableVersion(existing);
         }
         referenceDao.replaceForFlow(existing.getId(),
                 references.ruleDatabaseIds(), references.flowDatabaseIds());
+        referenceDao.retargetActiveReferences(existing.getFlowKey(), existing.getId());
         suiteManager.refreshAfterCommit();
-        return flowDao.findByFlowId(flowId);
+        return flowDao.findByVersion(flowId, request.getVersion());
     }
 
-    /** 停用规则流 */
+    /** 停用指定的当前发布版本 */
     @Transactional
-    public void disable(String flowId, long expectedVersion) {
-        RuleFlowEntity existing = requireFlow(flowId);
-        if (flowDao.disable(flowId, expectedVersion) == 0) {
-            throw new BusinessException(409, "flow updated by others, please retry");
+    public void disable(String flowId, long version) {
+        RuleFlowEntity existing = requireFlowVersion(flowId, version);
+        if (existing.getStatus() == null || existing.getStatus() != PUBLISHED) {
+            throw new BusinessException(409, "only the current published version can be disabled");
         }
-        if (existing.getStatus() != null && existing.getStatus() == PUBLISHED) {
-            suiteManager.refreshAfterCommit();
+        if (flowDao.disable(flowId, version) == 0) {
+            throw new BusinessException(409, "flow version is no longer current");
         }
+        suiteManager.refreshAfterCommit();
     }
 
-    /** 按 flowId 查询规则流 */
-    public RuleFlowEntity findByFlowId(String flowId) {
-        return flowDao.findByFlowId(flowId);
+    /** 按 flowId 查询默认编辑版本或指定业务版本 */
+    public RuleFlowEntity findByFlowId(String flowId, Long version) {
+        return version == null ? flowDao.findByFlowId(flowId) : flowDao.findByVersion(flowId, version);
+    }
+
+    /** 查询业务场景的全部版本 */
+    public List<RuleFlowEntity> versions(String flowId) {
+        RuleFlowEntity flow = flowDao.findByFlowId(flowId);
+        if (flow == null) {
+            throw new BusinessException(404, "flow not found: " + flowId);
+        }
+        return flowDao.listVersions(flowId);
     }
 
     /** 分页查询规则流 */
@@ -288,6 +323,15 @@ public class RuleFlowService {
         return flow;
     }
 
+    /** 查询必须存在的指定业务版本 */
+    private RuleFlowEntity requireFlowVersion(String flowId, long version) {
+        RuleFlowEntity flow = flowDao.findByVersion(flowId, version);
+        if (flow == null) {
+            throw new BusinessException(404, "flow version not found: " + flowId + " V" + version);
+        }
+        return flow;
+    }
+
     /** 查询必须存在且启用的命名空间 */
     private RuleNamespaceEntity requireNamespace(String code) {
         String normalized = AtomicRuleService.normalizeNamespace(code);
@@ -311,22 +355,30 @@ public class RuleFlowService {
     /** 拷贝不可变身份和命名空间字段 */
     private static void copyIdentity(RuleFlowEntity request, RuleFlowEntity existing) {
         request.setId(existing.getId());
+        request.setFlowKey(existing.getFlowKey());
         request.setNamespaceId(existing.getNamespaceId());
         request.setNamespace(existing.getNamespace());
     }
 
     /** 校验请求版本 */
-    private static void requireVersion(RuleFlowEntity request, RuleFlowEntity existing, String operation) {
+    private static void requireVersion(RuleFlowEntity request, String operation) {
         if (request.getVersion() == null) {
-            throw new IllegalArgumentException(
-                    "version is required for " + operation + " (expected " + existing.getVersion() + ")");
+            throw new IllegalArgumentException("version is required for " + operation);
         }
     }
 
-    /** 创建乐观锁冲突异常 */
-    private static BusinessException conflict(long version) {
+    /** 已发布、停用和历史版本都不可修改 */
+    private static void requireDraft(RuleFlowEntity flow) {
+        if (flow.getStatus() == null || flow.getStatus() != DRAFT) {
+            throw immutableVersion(flow);
+        }
+    }
+
+    /** 创建不可修改版本异常 */
+    private static BusinessException immutableVersion(RuleFlowEntity flow) {
         return new BusinessException(409,
-                "flow updated by others, please retry (expected version=" + version + ")");
+                "published flow versions are immutable; create a new draft from "
+                        + flow.getFlowId() + " V" + flow.getVersion());
     }
 
     /** 规则流创建后不允许改变命名空间 */

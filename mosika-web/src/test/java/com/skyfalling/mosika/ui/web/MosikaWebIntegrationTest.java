@@ -106,7 +106,7 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn());
         String flowId = created.path("flowId").asText();
-        salesFlow.put("version", 0);
+        salesFlow.put("version", 1);
 
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -117,7 +117,7 @@ class MosikaWebIntegrationTest {
         String childFlowId = createFlow("default-child", EMPTY_TREE);
         mvc.perform(post("/api/flows/{flowId}/publish", childFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("default-child", EMPTY_TREE, 0))))
+                        .content(json(flowBody("default-child", EMPTY_TREE, 1))))
                 .andExpect(status().isOk());
         Map<String, Object> salesCaller = flowBody(
                 "sales-caller", compositeReferenceTree(childFlowId), null);
@@ -127,7 +127,7 @@ class MosikaWebIntegrationTest {
                         .content(json(salesCaller)))
                 .andExpect(status().isOk())
                 .andReturn()).path("flowId").asText();
-        salesCaller.put("version", 0);
+        salesCaller.put("version", 1);
         mvc.perform(post("/api/flows/{flowId}/publish", callerFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(salesCaller)))
@@ -378,7 +378,7 @@ class MosikaWebIntegrationTest {
                         .content(json(salesFlow)))
                 .andExpect(status().isOk())
                 .andReturn()).path("flowId").asText();
-        salesFlow.put("version", 0);
+        salesFlow.put("version", 1);
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(salesFlow)))
@@ -404,7 +404,9 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("cannot be disabled")));
 
-        long flowDatabaseId = RuleIds.parseFlowId(flowId);
+        long flowKey = RuleIds.parseFlowId(flowId);
+        long flowDatabaseId = jdbc.queryForObject(
+                "SELECT id FROM rule_flow WHERE flow_key=?", Long.class, flowKey);
         jdbc.update("DELETE FROM flow_atomic_ref WHERE flow_id=?", flowDatabaseId);
         jdbc.update("DELETE FROM flow_flow_ref WHERE flow_id=?", flowDatabaseId);
         jdbc.update("DELETE FROM rule_flow WHERE id=?", flowDatabaseId);
@@ -415,10 +417,10 @@ class MosikaWebIntegrationTest {
 
         jdbc.update("""
                 INSERT INTO rule_flow
-                    (id, namespace_id, name, description, rule_tree, status, version)
+                    (flow_key, namespace_id, name, description, rule_tree, status, version)
                 VALUES (?, (SELECT id FROM rule_namespace WHERE code='sales'),
-                        'disabled-flow', 'disabled-flow', ?, 1, 0)
-                """, flowDatabaseId, EMPTY_TREE);
+                        'disabled-flow', 'disabled-flow', ?, 1, 1)
+                """, flowKey, EMPTY_TREE);
         mvc.perform(post("/api/eval/flow/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -467,12 +469,13 @@ class MosikaWebIntegrationTest {
     }
 
     @Test
-    void flowLifecycleValidatesDecisionAndRemovesDraftFromRuntime() throws Exception {
+    void flowLifecycleKeepsMultipleDraftsAndPublishesOneVersion() throws Exception {
         JsonNode created = data(mvc.perform(post("/api/flows")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", EMPTY_TREE, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(0))
+                .andExpect(jsonPath("$.data.version").value(1))
                 .andExpect(jsonPath("$.data.id").doesNotExist())
                 .andExpect(jsonPath("$.data.namespaceId").doesNotExist())
                 .andReturn());
@@ -481,34 +484,60 @@ class MosikaWebIntegrationTest {
 
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("flow", INVALID_DECISION_TREE, 0))))
+                        .content(json(flowBody("flow", INVALID_DECISION_TREE, 1))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("flow", EMPTY_TREE, 0))))
+                        .content(json(flowBody("flow", EMPTY_TREE, 1))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(1))
                 .andExpect(jsonPath("$.data.version").value(1));
 
         mvc.perform(put("/api/flows/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("flow", EMPTY_TREE, 0))))
+                        .content(json(flowBody("flow", EMPTY_TREE, 1))))
                 .andExpect(status().isConflict());
 
-        mvc.perform(put("/api/flows/{flowId}", flowId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("flow", EMPTY_TREE, 1))))
+        mvc.perform(post("/api/flows/{flowId}/versions", flowId).param("baseVersion", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(0))
                 .andExpect(jsonPath("$.data.version").value(2));
 
+        mvc.perform(post("/api/flows/{flowId}/versions", flowId).param("baseVersion", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(0))
+                .andExpect(jsonPath("$.data.version").value(3));
+
+        mvc.perform(put("/api/flows/{flowId}", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("flow-v2", EMPTY_TREE, 2))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(0))
+                .andExpect(jsonPath("$.data.version").value(2));
+
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("flow-v2", EMPTY_TREE, 2))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1))
+                .andExpect(jsonPath("$.data.version").value(2));
+
+        mvc.perform(get("/api/flows/{flowId}/versions", flowId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].version").value(3))
+                .andExpect(jsonPath("$.data[0].status").value(0))
+                .andExpect(jsonPath("$.data[1].version").value(2))
+                .andExpect(jsonPath("$.data[1].status").value(1))
+                .andExpect(jsonPath("$.data[2].version").value(1))
+                .andExpect(jsonPath("$.data[2].status").value(3));
+
         mvc.perform(post("/api/eval/flow/{flowId}", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(404));
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -517,7 +546,7 @@ class MosikaWebIntegrationTest {
 
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("optional-actions", OPTIONAL_ACTION_DECISION_TREE, 0))))
+                        .content(json(flowBody("optional-actions", OPTIONAL_ACTION_DECISION_TREE, 1))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value(1))
                 .andExpect(jsonPath("$.data.version").value(1));
@@ -576,14 +605,14 @@ class MosikaWebIntegrationTest {
         String childFlowId = createFlow("child", childTree);
         mvc.perform(post("/api/flows/{flowId}/publish", childFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("child", childTree, 0))))
+                        .content(json(flowBody("child", childTree, 1))))
                 .andExpect(status().isOk());
 
         String callerTree = compositeReferenceTree(childFlowId);
         String callerFlowId = createFlow("caller", callerTree);
         mvc.perform(post("/api/flows/{flowId}/publish", callerFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("caller", callerTree, 0))))
+                        .content(json(flowBody("caller", callerTree, 1))))
                 .andExpect(status().isOk());
 
         var result = suiteManager.evalFlow(callerFlowId, new Object(), Map.of());
@@ -620,7 +649,7 @@ class MosikaWebIntegrationTest {
         String flowId = createFlow("flow", tree);
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("flow", tree, 0))))
+                        .content(json(flowBody("flow", tree, 1))))
                 .andExpect(status().isOk());
 
         mvc.perform(delete("/api/rules/{ruleId}", ruleId).param("version", "0"))
@@ -650,10 +679,10 @@ class MosikaWebIntegrationTest {
                 """, sharedId);
         jdbc.update("""
                 INSERT INTO rule_flow
-                    (id, namespace_id, name, description, rule_tree, status, version)
-                VALUES (?, (SELECT id FROM rule_namespace WHERE code='default'),
-                        'same-id-flow', 'same-id-flow', ?, 1, 0)
-                """, sharedId, judgeTree("true"));
+                    (id, flow_key, namespace_id, name, description, rule_tree, status, version)
+                VALUES (?, ?, (SELECT id FROM rule_namespace WHERE code='default'),
+                        'same-id-flow', 'same-id-flow', ?, 1, 1)
+                """, sharedId, sharedId, judgeTree("true"));
 
         suiteManager.refresh();
 
@@ -733,21 +762,21 @@ class MosikaWebIntegrationTest {
         String unknownFlowId = createFlow("unknown", judgeTree("bogus"));
         mvc.perform(post("/api/flows/{flowId}/publish", unknownFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("unknown", judgeTree("bogus"), 0))))
+                        .content(json(flowBody("unknown", judgeTree("bogus"), 1))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
         String embeddedDslFlowId = createFlow("embedded-dsl", judgeTree("true&&false"));
         mvc.perform(post("/api/flows/{flowId}/publish", embeddedDslFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("embedded-dsl", judgeTree("true&&false"), 0))))
+                        .content(json(flowBody("embedded-dsl", judgeTree("true&&false"), 1))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
         String invalidBuiltinFlowId = createFlow("invalid-builtin", actionTree("true"));
         mvc.perform(post("/api/flows/{flowId}/publish", invalidBuiltinFlowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("invalid-builtin", actionTree("true"), 0))))
+                        .content(json(flowBody("invalid-builtin", actionTree("true"), 1))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
 
@@ -755,7 +784,7 @@ class MosikaWebIntegrationTest {
             String flowId = createFlow("invalid", invalidTree);
             mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(json(flowBody("invalid", invalidTree, 0))))
+                            .content(json(flowBody("invalid", invalidTree, 1))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400));
         }
@@ -769,19 +798,19 @@ class MosikaWebIntegrationTest {
         String wrongJudge = createFlow("wrong-judge", judgeTree(actionRule));
         mvc.perform(post("/api/flows/{flowId}/publish", wrongJudge)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("wrong-judge", judgeTree(actionRule), 0))))
+                        .content(json(flowBody("wrong-judge", judgeTree(actionRule), 1))))
                 .andExpect(status().isBadRequest());
 
         String wrongAction = createFlow("wrong-action", actionTree(conditionRule));
         mvc.perform(post("/api/flows/{flowId}/publish", wrongAction)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("wrong-action", actionTree(conditionRule), 0))))
+                        .content(json(flowBody("wrong-action", actionTree(conditionRule), 1))))
                 .andExpect(status().isBadRequest());
 
         String valid = createFlow("valid", actionTree(actionRule));
         mvc.perform(post("/api/flows/{flowId}/publish", valid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("valid", actionTree(actionRule), 0))))
+                        .content(json(flowBody("valid", actionTree(actionRule), 1))))
                 .andExpect(status().isOk());
     }
 
@@ -806,10 +835,11 @@ class MosikaWebIntegrationTest {
         String flowId = createFlow("broken-later", EMPTY_TREE);
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(flowBody("broken-later", EMPTY_TREE, 0))))
+                        .content(json(flowBody("broken-later", EMPTY_TREE, 1))))
                 .andExpect(status().isOk());
         RuleSuite published = suiteManager.getSuite("default");
-        jdbc.update("UPDATE rule_flow SET rule_tree='not-json' WHERE id=?", RuleIds.parseFlowId(flowId));
+        jdbc.update("UPDATE rule_flow SET rule_tree='not-json' WHERE flow_key=? AND status=1",
+                RuleIds.parseFlowId(flowId));
 
         mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)

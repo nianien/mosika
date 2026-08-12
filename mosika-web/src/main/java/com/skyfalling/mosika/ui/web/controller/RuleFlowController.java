@@ -39,6 +39,13 @@ public class RuleFlowController {
         return ApiResponse.ok(service.create(request));
     }
 
+    /** 基于指定版本创建新的草稿版本 */
+    @PostMapping("/{flowId}/versions")
+    public ApiResponse<RuleFlowEntity> createVersion(@PathVariable String flowId,
+                                                     @RequestParam long baseVersion) {
+        return ApiResponse.ok(service.createVersion(flowId, baseVersion));
+    }
+
     /** 保存规则流草稿 */
     @PutMapping("/{flowId}")
     public ApiResponse<RuleFlowEntity> update(@PathVariable String flowId,
@@ -67,14 +74,23 @@ public class RuleFlowController {
         return ApiResponse.ok();
     }
 
-    /** 按 flowId 查询规则流 */
+    /** 按 flowId 查询默认编辑版本或指定业务版本 */
     @GetMapping("/{flowId}")
-    public ApiResponse<RuleFlowEntity> get(@PathVariable String flowId) {
-        RuleFlowEntity entity = service.findByFlowId(flowId);
+    public ApiResponse<RuleFlowEntity> get(@PathVariable String flowId,
+                                           @RequestParam(required = false) Long version) {
+        RuleFlowEntity entity = service.findByFlowId(flowId, version);
         if (entity == null) {
-            throw new BusinessException(404, "flow not found: " + flowId);
+            throw new BusinessException(404,
+                    version == null ? "flow not found: " + flowId
+                            : "flow version not found: " + flowId + " V" + version);
         }
         return ApiResponse.ok(entity);
+    }
+
+    /** 查询业务场景的全部版本 */
+    @GetMapping("/{flowId}/versions")
+    public ApiResponse<List<RuleFlowEntity>> versions(@PathVariable String flowId) {
+        return ApiResponse.ok(service.versions(flowId));
     }
 
     /** 分页查询规则流 */

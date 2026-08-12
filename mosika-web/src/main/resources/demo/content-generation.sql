@@ -119,86 +119,86 @@ UPDATE atomic_rule SET expression='content.generation.bindCitations($)' WHERE id
 -- ============================================================
 
 -- 20001 内容生成任务智能路由：有序识别快讯、营销文案和深度文章。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20001, (SELECT id FROM rule_namespace WHERE code='default'), '内容生成任务智能路由', '根据内容类型与时效要求，把创作任务路由到快讯、营销文案或深度文章生成流程',
+    (20001, 20001, (SELECT id FROM rule_namespace WHERE code='default'), '内容生成任务智能路由', '根据内容类型与时效要求，把创作任务路由到快讯、营销文案或深度文章生成流程',
      '{"type":"T","name":"","next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"命中快讯时效窗口","expr":"r10011","negative":false},"next":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20003"}}},{"type":"C","name":"","rule":{"type":"B","name":"命中营销文案模式","expr":"r10013","negative":false},"next":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20004"}}},{"type":"C","name":"","rule":{"type":"B","name":"命中深度文章模式","expr":"r10012","negative":false},"next":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20002"}}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10116"}}}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20002 标准深度文章生成：证据链、上下文、模型、候选生成、SEO、渠道适配和质量门禁串联。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20002, (SELECT id FROM rule_namespace WHERE code='default'), '标准深度文章生成', '以深层递归树表达准入、证据决策、生成子树、SEO 和发布风险决策的完整内容生产链路',
+    (20002, 20002, (SELECT id FROM rule_namespace WHERE code='default'), '标准深度文章生成', '以深层递归树表达准入、证据决策、生成子树、SEO 和发布风险决策的完整内容生产链路',
      '{"type":"T","name":"","next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"深度文章生产准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"业务准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"内容模式与请求","expr":"&&","negative":false,"rules":[{"type":"B","name":"命中深度文章模式","expr":"r10012","negative":false},{"type":"B","name":"创作请求完整","expr":"r10001","negative":false}]},{"type":"L","name":"主题与渠道","expr":"&&","negative":false,"rules":[{"type":"B","name":"主题相关性达标","expr":"r10004","negative":false},{"type":"B","name":"发布渠道受支持","expr":"r10015","negative":false}]}]},{"type":"L","name":"运行资源准入","expr":"&&","negative":false,"rules":[{"type":"B","name":"生成配置就绪","expr":"r10016","negative":false},{"type":"B","name":"生成预算充足","expr":"r10017","negative":false}]}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20006"}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"证据链完整","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材时效达标","expr":"r10018","negative":false},{"type":"B","name":"证据覆盖达标","expr":"r10019","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10120"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10121"}},{"type":"P","name":"","branches":[{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10102"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10103"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10122"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10123"}}]},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10135"}}]},{"type":"C","name":"","rule":{"type":"B","name":"需要搜索优化","expr":"r10023","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10124"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"命中监管敏感主题","expr":"r10021","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10130"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"B","name":"命中高影响发布","expr":"r10022","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10131"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20007"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20005"}}]}}]}},{"type":"C","name":"","rule":{"type":"L","name":"具备素材补全基础","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材数量达标","expr":"r10002","negative":false},{"type":"B","name":"可信素材占比达标","expr":"r10003","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10129"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20003 突发快讯生成：证据链完成后并行生成正文与标题摘要。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20003, (SELECT id FROM rule_namespace WHERE code='default'), '突发快讯生成', '以深层递归树表达时效准入、证据决策、双路并行生成和分级发布风险处理',
+    (20003, 20003, (SELECT id FROM rule_namespace WHERE code='default'), '突发快讯生成', '以深层递归树表达时效准入、证据决策、双路并行生成和分级发布风险处理',
      '{"type":"T","name":"","next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"突发快讯生产准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"业务准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"时效与请求","expr":"&&","negative":false,"rules":[{"type":"B","name":"命中快讯时效窗口","expr":"r10011","negative":false},{"type":"B","name":"创作请求完整","expr":"r10001","negative":false}]},{"type":"L","name":"信源与渠道","expr":"&&","negative":false,"rules":[{"type":"B","name":"快讯双源确认","expr":"r10014","negative":false},{"type":"B","name":"发布渠道受支持","expr":"r10015","negative":false}]}]},{"type":"L","name":"运行资源准入","expr":"&&","negative":false,"rules":[{"type":"B","name":"生成配置就绪","expr":"r10016","negative":false},{"type":"B","name":"生成预算充足","expr":"r10017","negative":false}]}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20006"}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"快讯证据链完整","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材时效达标","expr":"r10018","negative":false},{"type":"B","name":"证据覆盖达标","expr":"r10019","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"P","name":"","branches":[{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10120"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10121"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10110"}}]},{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10135"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}]},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"命中监管敏感主题","expr":"r10021","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10130"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"B","name":"命中高影响发布","expr":"r10022","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10131"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20007"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20005"}}]}}]}},{"type":"C","name":"","rule":{"type":"L","name":"具备素材补全基础","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材数量达标","expr":"r10002","negative":false},{"type":"B","name":"可信素材占比达标","expr":"r10003","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10129"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20004 营销文案生成：活动准入、品牌知识、候选优选、渠道适配和高影响审核完整串联。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20004, (SELECT id FROM rule_namespace WHERE code='default'), '营销文案生成', '以深层递归树表达活动与品牌准入、证据分流、双路准备、候选优选和高影响审核',
+    (20004, 20004, (SELECT id FROM rule_namespace WHERE code='default'), '营销文案生成', '以深层递归树表达活动与品牌准入、证据分流、双路准备、候选优选和高影响审核',
      '{"type":"T","name":"","next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"营销文案生产准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"业务准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"内容与活动","expr":"&&","negative":false,"rules":[{"type":"B","name":"命中营销文案模式","expr":"r10013","negative":false},{"type":"B","name":"营销活动有效","expr":"r10024","negative":false}]},{"type":"L","name":"品牌与版权","expr":"&&","negative":false,"rules":[{"type":"B","name":"品牌语调已配置","expr":"r10009","negative":false},{"type":"B","name":"版权风险可接受","expr":"r10005","negative":false}]}]},{"type":"L","name":"运行准入","expr":"&&","negative":false,"rules":[{"type":"L","name":"请求与渠道","expr":"&&","negative":false,"rules":[{"type":"B","name":"创作请求完整","expr":"r10001","negative":false},{"type":"B","name":"发布渠道受支持","expr":"r10015","negative":false}]},{"type":"L","name":"配置与预算","expr":"&&","negative":false,"rules":[{"type":"B","name":"生成配置就绪","expr":"r10016","negative":false},{"type":"B","name":"生成预算充足","expr":"r10017","negative":false}]}]}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20006"}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"营销证据链完整","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材时效达标","expr":"r10018","negative":false},{"type":"B","name":"证据覆盖达标","expr":"r10019","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"P","name":"","branches":[{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10136"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10111"}}]},{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10120"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10121"}}]}]},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10102"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10122"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10123"}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"命中高影响发布","expr":"r10022","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10131"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20007"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"f20005"}}]}}]}},{"type":"C","name":"","rule":{"type":"L","name":"具备素材补全基础","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材数量达标","expr":"r10002","negative":false},{"type":"B","name":"可信素材占比达标","expr":"r10003","negative":false}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10129"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20005 发布前质量门禁：监管、高影响、自动发布、普通复核和驳回有序决策。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20005, (SELECT id FROM rule_namespace WHERE code='default'), '发布前质量门禁', '以深层递归树表达并行检测、分级审核、嵌套自动发布资格和发布后审计',
+    (20005, 20005, (SELECT id FROM rule_namespace WHERE code='default'), '发布前质量门禁', '以深层递归树表达并行检测、分级审核、嵌套自动发布资格和发布后审计',
      '{"type":"T","name":"","next":{"type":"S","name":"","branches":[{"type":"P","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10104"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10105"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10106"}}]},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"命中监管敏感主题","expr":"r10021","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10130"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"B","name":"命中高影响发布","expr":"r10022","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10131"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"L","name":"自动发布门禁","expr":"&&","negative":false,"rules":[{"type":"L","name":"内容可信","expr":"&&","negative":false,"rules":[{"type":"L","name":"事实与证据","expr":"&&","negative":false,"rules":[{"type":"B","name":"事实置信度达标","expr":"r10007","negative":false},{"type":"B","name":"证据覆盖达标","expr":"r10019","negative":false}]},{"type":"L","name":"版权与敏感","expr":"&&","negative":false,"rules":[{"type":"B","name":"版权风险可接受","expr":"r10005","negative":false},{"type":"B","name":"敏感风险可接受","expr":"r10006","negative":false}]}]},{"type":"L","name":"发布资格","expr":"&&","negative":false,"rules":[{"type":"L","name":"质量与原创","expr":"&&","negative":false,"rules":[{"type":"B","name":"内容质量达标","expr":"r10008","negative":false},{"type":"B","name":"原创性达标","expr":"r10020","negative":false}]},{"type":"L","name":"自动发布策略","expr":"&&","negative":false,"rules":[{"type":"B","name":"允许自动发布","expr":"r10025","negative":false},{"type":"B","name":"无需人工复核","expr":"r10010","negative":true}]}]}]},"next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"发布渠道受支持","expr":"r10015","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10108"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10134"}}}},{"type":"C","name":"","rule":{"type":"L","name":"普通人工复核门禁","expr":"||","negative":false,"rules":[{"type":"B","name":"需要人工复核","expr":"r10010","negative":false},{"type":"L","name":"可信度不足","expr":"||","negative":false,"rules":[{"type":"B","name":"证据覆盖不足","expr":"r10019","negative":true},{"type":"B","name":"原创性不足","expr":"r10020","negative":true}]}]},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10107"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}]}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20006 素材证据链构建：清洗、检索、主张提取、引用绑定和证据质量分流。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20006, (SELECT id FROM rule_namespace WHERE code='default'), '素材证据链构建', '完成素材清洗与检索、核心主张提取、引用绑定，并将证据充分、待补全和不可生成任务分流',
+    (20006, 20006, (SELECT id FROM rule_namespace WHERE code='default'), '素材证据链构建', '完成素材清洗与检索、核心主张提取、引用绑定，并将证据充分、待补全和不可生成任务分流',
      '{"type":"T","name":"","next":{"type":"S","name":"","branches":[{"type":"P","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10101"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10117"}}]},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10118"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10119"}},{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"L","name":"证据链完整","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材时效达标","expr":"r10018","negative":false},{"type":"B","name":"证据覆盖达标","expr":"r10019","negative":false}]},"next":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}},{"type":"C","name":"","rule":{"type":"L","name":"具备素材补全基础","expr":"&&","negative":false,"rules":[{"type":"B","name":"素材数量达标","expr":"r10002","negative":false},{"type":"B","name":"可信素材占比达标","expr":"r10003","negative":false}]},"next":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10129"}}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10109"}}}]}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
 -- 20007 多渠道内容适配：按渠道执行专属转换，并统一记录生成审计。
-INSERT INTO rule_flow (id, namespace_id, name, description, rule_tree, status, version)
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
 VALUES
-    (20007, (SELECT id FROM rule_namespace WHERE code='default'), '多渠道内容适配', '按微信、客户端和 Web 三类渠道执行不同内容投影，并记录可追溯的生成审计',
+    (20007, 20007, (SELECT id FROM rule_namespace WHERE code='default'), '多渠道内容适配', '按微信、客户端和 Web 三类渠道执行不同内容投影，并记录可追溯的生成审计',
      '{"type":"T","name":"","next":{"type":"D","name":"","branches":[{"type":"C","name":"","rule":{"type":"B","name":"目标渠道为微信","expr":"r10026","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10125"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"B","name":"目标渠道为客户端","expr":"r10027","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10126"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}},{"type":"C","name":"","rule":{"type":"B","name":"目标渠道为网站","expr":"r10028","negative":false},"next":{"type":"S","name":"","branches":[{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10127"}},{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10128"}}]}}],"defaultBranch":{"type":"A","name":"","rule":{"type":"R","name":"","expr":"r10134"}}}}',
-     1, 0)
+     1, 1)
 ON CONFLICT(id) DO UPDATE SET
     name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
-    status=excluded.status, version=rule_flow.version + 1, updated_at=datetime('now','localtime')
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
