@@ -56,14 +56,15 @@ public class MosikaWebApplication {
         String base = "http://" + displayHost + ":" + port + contextPath;
         log.info("\n----------------------------------------------------------\n" +
                         "  Mosika 规则编排已启动，可访问：\n" +
-                        "  规则流控制台   : {}/\n" +
+                        "  产品首页       : {}/\n" +
+                        "  规则流控制台   : {}/scenes\n" +
                         "  原子规则库     : {}/rules\n" +
                         "  JavaScript UDF : {}/udfs\n" +
                         "  规则画布       : {}/flow/{{id}}\n" +
                         "  API 基址       : {}/api\n" +
                         "  监听地址       : {}\n" +
                         "----------------------------------------------------------",
-                base, base, base, base, base, address);
+                base, base, base, base, base, base, address);
     }
 
     /**

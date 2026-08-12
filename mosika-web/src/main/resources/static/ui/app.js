@@ -22,17 +22,17 @@
     const { childEdges, childNodes, executionEdges, make } = T;
 
     const TYPES = {
-        T: { name: "根节点", kind: "root", short: "开始", help: "规则树入口，仅承担根节点定位。" },
-        S: { name: "串行节点", kind: "structure", short: "串", help: "子节点按顺序执行，顺序由树中从左到右的位置表达。" },
-        P: { name: "并行节点", kind: "structure", short: "并", help: "多个子节点并发执行；结构节点本身不承载业务结果。" },
-        D: { name: "分支节点", kind: "structure", short: "分", help: "按顺序检查各条件，多选一并在首个命中后停止，最后可设置默认分支。" },
-        C: { name: "条件节点", kind: "structure", short: "条件", help: "引用一棵可递归嵌套的布尔规则树，命中后执行其后续流程。" },
-        L: { name: "逻辑", kind: "structure", short: "与", help: "使用“与”或“或”组合两个及以上纯规则子节点。" },
-        H: { name: "命中数", kind: "structure", short: "H", help: "表达 some(min,max,...)；例如至少命中 2 项。" },
-        R: { name: "动作规则", kind: "action", short: "R", help: "动作节点内部引用的原子规则。" },
-        B: { name: "条件规则", kind: "condition", short: "B", help: "条件节点内部引用的可取反原子规则。" },
-        A: { name: "动作节点", kind: "action", short: "动作", help: "引用一条后台执行动作或命名复合规则，next 表示无条件后继。" },
-        PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "待配置的占位节点，点击选择其类型与引用规则；存在占位时不能保存/发布。" }
+        T: { name: "根节点", kind: "root", short: "开始", help: "规则树入口" },
+        S: { name: "串行节点", kind: "structure", short: "串", help: "子节点顺序执行" },
+        P: { name: "并行节点", kind: "structure", short: "并", help: "子节点并行执行" },
+        D: { name: "分支节点", kind: "structure", short: "分", help: "首个命中分支生效" },
+        C: { name: "条件节点", kind: "structure", short: "条件", help: "按条件决定后续流程" },
+        L: { name: "逻辑", kind: "structure", short: "与", help: "组合多个判断条件" },
+        H: { name: "命中数", kind: "structure", short: "H", help: "按命中数量判定" },
+        R: { name: "动作规则", kind: "action", short: "R", help: "执行动作规则" },
+        B: { name: "条件规则", kind: "condition", short: "B", help: "执行判断规则" },
+        A: { name: "动作节点", kind: "action", short: "动作", help: "执行指定动作" },
+        PH: { name: "待配置", kind: "placeholder", short: "待配置", help: "等待配置" }
     };
 
     // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
@@ -983,7 +983,7 @@
         // 占位节点：提示 + “配置此节点”按钮（点节点本身也会弹「配置节点」弹窗）。
         if (node.type === "PH") {
             const isDecision = node.slot === "decision";
-            $("#nodeDetailFields").innerHTML = `<div class="detail-field"><span class="detail-value">${isDecision ? "决策分支（固定为条件），点击配置条件。" : "尚未配置，点击选择节点类型并完成配置。"}</span></div>`;
+            $("#nodeDetailFields").innerHTML = `<div class="detail-field"><span class="detail-value">${isDecision ? "待配置条件" : "待配置节点"}</span></div>`;
             $("#flowNodeActions").innerHTML = `<button class="flow-operation wide add-op" type="button" data-config-ph>配置此节点</button>`;
             $("#editNodeButton").hidden = true;
             $("#inspectorViewActions").hidden = false;
@@ -1267,10 +1267,7 @@
         const panel = $("#ruleEditorPanel");
         if (!found) {
             const hasRule = Boolean(currentRuleJudge() && conditionRule(currentRuleJudge()));
-            $("#ruleEditorEmptyTitle").textContent = hasRule ? "选择一个规则节点" : "尚未配置条件";
-            $("#ruleEditorEmptyHint").textContent = hasRule
-                ? "选择左侧节点后在这里查看规则信息。"
-                : "请从左侧空状态配置第一条规则。";
+            $("#ruleEditorEmptyTitle").textContent = hasRule ? "未选择规则" : "暂无条件";
             empty.hidden = false;
             panel.hidden = true;
             return;
@@ -1804,10 +1801,10 @@
             note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无执行动作，请先在「业务规则」中新建执行动作。";
         } else if (type === "C") {
             ruleField.hidden = true;
-            note.textContent = "确认后打开条件编辑，配置该条件（可原子 / 与或 / 命中）。";
+            note.textContent = "";
         } else {
             ruleField.hidden = true;
-            note.textContent = "确认后生成对应结构，其分支再在画布上逐个配置。";
+            note.textContent = "";
         }
         note.hidden = !note.textContent.trim();
     }

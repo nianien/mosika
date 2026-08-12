@@ -71,7 +71,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   <div class="topbar">
     <div class="brandwrap">
       <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
-      <a class="back-link" id="backLink" href="/">返回业务场景</a>
+      <a class="back-link" id="backLink" href="/scenes">返回业务场景</a>
     </div>
     <div class="top-right"><button class="btn primary" id="newBtn">＋ 新建命名空间</button></div>
   </div>
@@ -79,7 +79,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
     <div class="page-head">
       <div>
         <h1>命名空间</h1>
-        <p id="summary">运行态的隔离边界：规则、业务场景与自定义函数都归属于其中一个，彼此不可跨界引用，同名函数调用路径互不影响。请先选择一个再进行其他操作。</p>
+        <p id="summary">加载中…</p>
       </div>
     </div>
     <section class="panel">
@@ -100,17 +100,17 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
 </div>
 
 <dialog id="createDlg">
-  <div class="dlg-head"><div class="dlg-title">新建命名空间</div><div class="dlg-sub">命名空间创建后标识不可修改，其下的规则、场景与函数与其他命名空间完全隔离。</div></div>
+  <div class="dlg-head"><div class="dlg-title">新建命名空间</div></div>
   <div class="dlg-body">
-    <div class="field"><label>标识<span class="req">*</span></label><input id="cCode" placeholder="如 sales" autocomplete="off"><div class="hint">字母开头，可含字母、数字、下划线、点与连字符，最长 64 个字符；作为接口参数与链接参数使用，创建后不可修改。</div></div>
+    <div class="field"><label>标识<span class="req">*</span></label><input id="cCode" placeholder="如 sales" autocomplete="off"><div class="hint">字母开头，最长 64 个字符；支持字母、数字、下划线、句点和连字符。创建后不可修改。</div></div>
     <div class="field"><label>名称<span class="req">*</span></label><input id="cName" placeholder="如 销售规则域" autocomplete="off"></div>
-    <div class="field"><label>描述</label><input id="cDesc" placeholder="简要说明该命名空间的业务边界" autocomplete="off"></div>
+    <div class="field"><label>描述</label><input id="cDesc" placeholder="业务边界" autocomplete="off"></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="cCancel">取消</button><button class="btn primary" id="cSave">创建</button></div>
 </dialog>
 
 <dialog id="editDlg">
-  <div class="dlg-head"><div class="dlg-title">编辑命名空间</div><div class="dlg-sub">标识作为引用键不可修改，仅可调整展示名称与描述。</div></div>
+  <div class="dlg-head"><div class="dlg-title">编辑命名空间</div></div>
   <div class="dlg-body">
     <div class="field"><label>标识</label><input id="eCode" disabled></div>
     <div class="field"><label>名称<span class="req">*</span></label><input id="eName" autocomplete="off"></div>
@@ -146,7 +146,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
 
   function enter(code) {
     try { localStorage.setItem(STORE_KEY, code); } catch (_) { /* 隐私模式下仅靠 URL 传递 */ }
-    location.href = `/?ns=${encodeURIComponent(code)}`;
+    location.href = `/scenes?ns=${encodeURIComponent(code)}`;
   }
 
   function usageOf(n) {
@@ -157,7 +157,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   function renderRows() {
     const body = $("#rows");
     if (!items.length) {
-      body.innerHTML = '<tr><td colspan="5"><div class="empty">暂无命名空间，点右上角「新建命名空间」添加。</div></td></tr>';
+      body.innerHTML = '<tr><td colspan="5"><div class="empty">暂无命名空间</div></td></tr>';
       return;
     }
     body.innerHTML = items.map(n => {
@@ -183,6 +183,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   async function load() {
     try {
       items = (await Api.listNamespaces()) || [];
+      $("#summary").textContent = `共 ${items.length} 个命名空间`;
     } catch (e) {
       $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
       return;

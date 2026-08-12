@@ -14,12 +14,14 @@
 <main class="app-shell">
     <header class="topbar">
         <div class="brand">
-            <span class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></span>
-            <div>
+            <a class="brand-home" href="/" aria-label="返回 Mosika 首页">
+                <span class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></span>
                 <b class="brand-name">Mosika</b>
+            </a>
+            <div class="brand-crumbs">
                 <span id="flowCrumbNsWrap" hidden><span class="crumb-sep">/</span><span id="flowCrumbNs" class="crumb-ns"></span></span>
                 <span class="crumb-sep">/</span>
-                <a class="back-link" id="backToFlows" href="/" title="返回业务场景列表">业务场景</a>
+                <a class="back-link" id="backToFlows" href="/scenes" title="返回业务场景列表">业务场景</a>
                 <span class="crumb-sep">/</span>
                 <strong id="flowCrumbName">规则树编辑器</strong>
             </div>
@@ -87,10 +89,7 @@
             <button class="inspector-collapse" id="inspectorCollapse" type="button" aria-label="收起属性栏" title="收起属性栏">»</button>
             <section class="test-panel" id="testPanel" hidden>
                 <div class="test-panel-heading">
-                    <div>
-                        <strong>测试规则流</strong>
-                        <span>执行当前画布内容</span>
-                    </div>
+                    <div><strong>测试规则流</strong></div>
                     <button class="icon-button" id="testPanelClose" type="button" aria-label="关闭测试面板">×</button>
                 </div>
                 <div class="test-json-tabs" role="tablist" aria-label="测试输入类型">
@@ -142,8 +141,7 @@
             </section>
             <div class="inspector-empty" id="inspectorEmpty">
                 <span>↖</span>
-                <strong>选择一个节点</strong>
-                <p>选择节点后查看结构摘要和可用操作。</p>
+                <strong>未选择节点</strong>
             </div>
             <section class="inspector-panel" id="inspectorForm" hidden>
                 <div class="inspector-heading rule-editor-heading" id="inspectorHeading"></div>
@@ -195,10 +193,7 @@
 <dialog id="nodeConfigDialog">
     <form method="dialog" class="node-config-form">
         <div class="dialog-heading">
-            <div>
-                <span>选择节点类型并完成配置</span>
-                <h2>配置节点</h2>
-            </div>
+            <div><h2>配置节点</h2></div>
             <button class="icon-button" id="nodeConfigCloseButton" aria-label="关闭" type="button">×</button>
         </div>
         <label class="detail-field" id="nodeConfigTypeField">
@@ -240,10 +235,7 @@
 <dialog id="ruleDialog" class="rule-dialog">
     <div class="rule-dialog-shell">
         <header class="rule-dialog-header">
-            <div>
-                <span>条件配置</span>
-                <h2 id="ruleDialogTitle">判断条件</h2>
-            </div>
+            <div><h2 id="ruleDialogTitle">判断条件</h2></div>
             <div class="rule-dialog-header-actions">
                 <button id="ruleDialogCancelButton" type="button">取消</button>
                 <button class="primary" id="ruleDialogCloseButton" type="button">保存</button>
@@ -262,8 +254,7 @@
             <aside class="rule-editor">
                 <div class="rule-editor-empty" id="ruleEditorEmpty">
                     <span>◇</span>
-                    <strong id="ruleEditorEmptyTitle">尚未配置条件</strong>
-                    <p id="ruleEditorEmptyHint">规则子树只在当前弹窗内递归，不会进入流程画布。</p>
+                    <strong id="ruleEditorEmptyTitle">暂无条件</strong>
                 </div>
                 <div class="rule-editor-panel" id="ruleEditorPanel" hidden>
                     <div class="inspector-heading rule-editor-heading" id="ruleEditorHeading"></div>

@@ -45,17 +45,19 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
         // 正式干净路由，forward 到静态页并保留浏览器地址，页面静态资源使用 /ui/ 绝对引用
-        //   /            规则流列表
+        //   /            产品首页
         //   /namespaces  命名空间选择门禁与管理页
+        //   /scenes      规则流列表
         //   /rules       原子规则库
         //   /udfs        JavaScript UDF 注册中心
         //   /flow/{id}   规则画布（id 在路径中，由前端 app.js 解析）
         //   /flow        缺 id 时回列表
         registry.addViewController("/").setViewName("forward:/ui/console.html");
+        registry.addViewController("/scenes").setViewName("forward:/ui/scenes.html");
         registry.addViewController("/namespaces").setViewName("forward:/ui/namespaces.html");
         registry.addViewController("/rules").setViewName("forward:/ui/rules.html");
         registry.addViewController("/udfs").setViewName("forward:/ui/udfs.html");
         registry.addViewController("/flow/{flowId:f[1-9]\\d*}").setViewName("forward:/ui/index.html");
-        registry.addRedirectViewController("/flow", "/");
+        registry.addRedirectViewController("/flow", "/scenes");
     }
 }

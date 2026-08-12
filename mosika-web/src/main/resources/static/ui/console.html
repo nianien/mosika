@@ -3,552 +3,432 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>业务场景 · Mosika</title>
-    <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
+<title>Mosika · 模型驱动的可视化规则流语言</title>
+<meta name="description" content="Mosika 让规则图成为可编译、可执行、可追踪的业务语言。">
+<link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
+<link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
 <style>
 :root{
-  color:#123038;background:#edf4f3;
-  --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
-  --cyan:#0891b2;--cyan-soft:#e3fafd;
-  --green:#1f7a43;--green-soft:#dcf9e4;
-  --lemon:#8a6d0e;--lemon-soft:#fdf6d5;
-  --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
+  color:#173630;
+  background:#f6f9f8;
+  --ink:#173630;
+  --muted:#647b76;
+  --line:#d7e4e1;
+  --teal:#0f9d8a;
+  --teal-dark:#08796c;
+  --cyan:#0e7490;
+  --amber:#b77912;
+  --surface:#fff;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
-[hidden]{display:none!important}
-.app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr);position:relative}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
-.brandwrap{display:flex;align-items:center}
-.brand{display:flex;align-items:center;gap:11px}
-.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
-.brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
-.tabs{display:flex;gap:6px;margin-left:26px}
-.tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
-.tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
-.top-right{display:flex;align-items:center;gap:12px}
-.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
-.search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
-.btn:hover{border-color:#a9d3cc;background:#f5faf9}
-.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
-.btn.primary:hover{background:var(--teal-d)}
-.btn.danger{color:#fff;border-color:#cf5552;background:#cf5552;font-weight:600}
-.btn.danger:hover{border-color:#b94340;background:#b94340}
-.btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;height:auto;cursor:pointer}
-.main{overflow:auto;padding:22px 26px}
-.page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.page-head>div:first-child{display:flex;align-items:baseline}
-.page-head h1{font-size:var(--fs-page)}.page-head .sub{color:#6f8b86;font-size:var(--fs-base);margin-left:10px;font-weight:400}
-.filters{display:flex;gap:8px}
-.chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:var(--fs-meta);display:flex;align-items:center;cursor:pointer;white-space:nowrap}
-.chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
-.panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:var(--fs-base)}
-thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
-tbody td{padding:15px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:#f7fcfb}
-.name{font-weight:600;font-size:var(--fs-strong)}
-.name .id{color:#9fb4af;font-weight:400;font-size:var(--fs-caption);margin-left:7px}
-.rowdesc{color:#71887f;font-size:var(--fs-minor);margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pill{font-size:var(--fs-label);font-weight:600;padding:3px 9px;border-radius:11px;white-space:nowrap}
-.pill.live{color:var(--green);background:var(--green-soft)}
-.pill.draft{color:#b5852a;background:#fbf1d9}
-.pill.off{color:var(--grey);background:var(--grey-soft)}
-.pill.history{color:#60716d;background:#edf3f1}
-.num{font-variant-numeric:tabular-nums;color:#3f5f58}
-.time{color:#8aa39d;font-variant-numeric:tabular-nums}
-.actions{display:flex;gap:14px;align-items:center;justify-content:flex-end;white-space:nowrap}
-.actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 16px;font-weight:600;font-size:var(--fs-meta);cursor:pointer}
-.actions .open:hover{background:#cdeee7;border-color:#7fccc0}
-.status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
-.status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
-.status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
-.status-toggle.is-on{color:var(--teal-d);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--teal)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
-.status-toggle.is-draft{color:#a67823}.status-toggle.is-draft .status-toggle-track{background:#e4c77c}
-.status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
-.status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
-.status-toggle:disabled{cursor:wait;opacity:.58}.status-toggle.is-pending .status-toggle-track{animation:switchPulse .8s ease-in-out infinite alternate}
-.status-toggle-label{font-size:var(--fs-meta);line-height:1}
-@keyframes switchPulse{to{opacity:.5}}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
-.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:var(--fs-meta)}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer;font-size:var(--fs-meta)}.pager button:disabled{opacity:.45;cursor:not-allowed}
-/* drawer */
-.scrim{position:absolute;inset:58px 0 0 0;background:rgba(18,48,56,.28);display:none}
-.scrim.show{display:block}
-.drawer{position:absolute;top:0;right:0;bottom:0;width:460px;max-width:92vw;background:#fff;box-shadow:-14px 0 40px rgba(18,48,56,.18);display:none;flex-direction:column;border-left:1px solid var(--border);z-index:6}
-.drawer.show{display:flex}
-.dw-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #eef4f2}
-.dw-head h2{font-size:var(--fs-title);display:flex;align-items:center;gap:10px}
-.x{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#6f8b86;cursor:pointer;font-size:15px}/* × 字形，不纳入文字刻度 */
-.dw-body{padding:20px 22px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:18px}
-.field label{display:block;font-size:var(--fs-meta);color:#5c766f;margin-bottom:7px;font-weight:600}
-.field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038;background:#fff;font-family:inherit}
-.field input:focus,.field textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
-.field textarea{min-height:80px;resize:vertical;line-height:1.55}
-.hint{font-size:var(--fs-caption);color:#93a89f;margin-top:6px}
-.metarow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.metabox{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#f8fcfb}
-.metabox .k{font-size:var(--fs-caption);color:#6f8b86}.metabox .v{font-size:var(--fs-title);font-weight:700;color:#234;margin-top:3px}
-.sec-title{font-size:var(--fs-minor);color:#6f8b86;font-weight:600;letter-spacing:.3px;margin-bottom:10px}
-.rules{display:flex;flex-wrap:wrap;gap:7px}
-.rtag{background:#f4faf9;border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:var(--fs-minor);color:#3f5f58;display:flex;gap:6px;align-items:center}
-.rtag .rid{color:#a7c0ba;font-size:var(--fs-note)}
-.statusseg{display:flex;gap:8px}
-.seg{flex:1;text-align:center;padding:8px 0;border:1px solid var(--border);border-radius:9px;font-size:var(--fs-meta);color:#5c766f;cursor:pointer;background:#fff}
-.seg.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
-.dw-foot{display:flex;align-items:center;gap:10px;padding:16px 22px;border-top:1px solid #eef4f2}
-.dw-foot .grow{flex:1}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
-.toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(420px,92vw)}
-dialog::backdrop{background:rgba(18,48,56,.3)}
-#newDlg{width:min(720px,94vw)}
-#newDlg .dlg-body{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch}
-#newDlg .dlg-body>.field{display:flex;flex-direction:column;height:100%}
-#newDlg .dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
-#newDlg .dlg-body>.field.span-2{grid-column:1/-1}
-@media(max-width:900px){#newDlg .dlg-body{grid-template-columns:1fr}#newDlg .dlg-body>.field.span-2{grid-column:1}}
-.dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
-.dlg-body{padding:12px 24px;display:flex;flex-direction:column;gap:14px}
-.dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
-.confirm-message{font-size:var(--fs-base);color:#23443d;line-height:1.6}
-.confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:var(--fs-minor);line-height:1.55}
-@media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.drawer{width:100%;max-width:100vw}.pager{justify-content:space-between}}
+html{scroll-behavior:smooth}
+body{min-width:320px;color:var(--ink);background:#f6f9f8}
+a{color:inherit}
+.page{min-height:100vh;overflow:hidden}
+.site-header{
+  height:64px;padding:0 max(24px,calc((100vw - 1180px)/2));
+  display:flex;align-items:center;gap:30px;
+  position:relative;z-index:20;
+  border-bottom:1px solid rgba(215,228,225,.9);background:rgba(255,255,255,.96);
+}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;white-space:nowrap}
+.brand img{width:34px;height:34px}
+.brand strong{font-size:17px}
+.site-nav{display:flex;align-items:center;gap:26px;margin-left:auto}
+.site-nav a{color:#5c746f;font-size:13px;text-decoration:none}
+.site-nav a:hover{color:var(--teal-dark)}
+.header-action,.primary-action,.secondary-action{
+  min-height:40px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  text-decoration:none;font-size:14px;font-weight:680;
+}
+.header-action{
+  min-height:36px;padding:0 16px;color:#fff;background:var(--teal);border:1px solid var(--teal);
+}
+.header-action:hover,.primary-action:hover{background:var(--teal-dark);border-color:var(--teal-dark)}
+.hero{
+  min-height:620px;position:relative;isolation:isolate;
+  border-bottom:1px solid var(--line);background:#f6f9f8;
+}
+.hero-mark{
+  width:420px;height:420px;position:absolute;right:max(24px,calc((100vw - 1180px)/2));top:72px;
+  opacity:.07;z-index:-1;pointer-events:none;
+}
+.hero-mark img{width:100%;height:100%}
+.hero-expression{
+  position:absolute;right:max(30px,calc((100vw - 1120px)/2));bottom:58px;
+  color:#8ba49e;font-family:var(--ff-mono);font-size:12px;letter-spacing:0;
+}
+.hero-inner{
+  width:min(1180px,calc(100% - 48px));min-height:620px;margin:0 auto;
+  display:flex;align-items:center;
+}
+.hero-copy{max-width:810px;padding:72px 0 86px}
+.eyebrow{
+  display:flex;align-items:center;gap:10px;margin-bottom:22px;
+  color:var(--teal-dark);font-size:12px;font-weight:760;
+}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--teal)}
+.hero h1{font-size:68px;line-height:1;font-weight:790;color:#102f29}
+.hero h2{max-width:790px;margin-top:20px;font-size:42px;line-height:1.2;font-weight:720}
+.hero-lead{max-width:650px;margin-top:21px;color:var(--muted);font-size:16px;line-height:1.8}
+.hero-actions{display:flex;gap:11px;margin-top:31px}
+.primary-action{padding:0 20px;color:#fff;background:var(--teal);border:1px solid var(--teal)}
+.secondary-action{padding:0 20px;color:#31564f;background:#fff;border:1px solid #bfd8d3}
+.secondary-action:hover{border-color:#8ec6bc;background:#f1f8f6}
+.hero-points{
+  display:flex;align-items:center;gap:30px;margin-top:43px;
+  color:#536f68;font-size:12px;
+}
+.hero-points span{display:flex;align-items:center;gap:8px}
+.hero-points i{width:5px;height:5px;border-radius:50%;background:var(--teal)}
+.section{padding:92px 24px}
+.section-inner{width:min(1120px,100%);margin:0 auto}
+.section-head{max-width:680px}
+.section-kicker{color:var(--teal-dark);font-size:12px;font-weight:760}
+.section h2{margin-top:12px;font-size:36px;line-height:1.28}
+.section-intro{margin-top:15px;color:var(--muted);font-size:15px;line-height:1.8}
+.capabilities{background:#fff}
+.capability-head{
+  display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:72px;align-items:end;
+}
+.model-path{padding-left:24px;border-left:2px solid #a8d7cf}
+.model-path-label{
+  color:#6f8882;font-size:11px;font-weight:720;
+}
+.model-path-chain{
+  margin-top:13px;display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid #b9d3ce;border-bottom:1px solid #b9d3ce;
+}
+.model-path-chain span{
+  min-width:0;padding:11px 7px;position:relative;
+  color:#146f64;font-family:var(--ff-mono);font-size:11px;text-align:center;
+  white-space:nowrap;
+}
+.model-path-chain span + span{border-left:1px solid var(--line)}
+.model-path-chain span + span::before{
+  content:"→";position:absolute;left:-7px;top:50%;transform:translateY(-50%);
+  padding:0 2px;color:#79938d;background:#fff;
+}
+.model-path p{margin-top:10px;color:#718781;font-size:12px;line-height:1.6}
+.capability-grid{
+  margin-top:40px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  border-top:1px solid var(--line);border-left:1px solid var(--line);
+}
+.capability-item{
+  --accent:var(--teal);
+  min-height:264px;padding:26px 28px 24px;position:relative;
+  display:flex;flex-direction:column;
+  border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:#f8fbfa;
+}
+.capability-item::before{
+  content:"";height:3px;position:absolute;left:-1px;right:-1px;top:-1px;background:var(--accent);
+}
+.capability-item:nth-child(2){--accent:#1595b0;background:#f7fbfc}
+.capability-item:nth-child(3){--accent:#c49419;background:#fffdf7}
+.capability-item:nth-child(4){--accent:#c7632d;background:#fffaf7}
+.capability-meta{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.capability-index{
+  color:var(--accent);font-family:var(--ff-mono);font-size:12px;font-weight:760;
+}
+.capability-domain{
+  color:#829892;font-family:var(--ff-mono);font-size:10px;
+}
+.capability-item h3{margin-top:18px;font-size:21px;font-weight:730}
+.capability-summary{
+  min-height:48px;margin-top:9px;color:#5f7771;font-size:13px;line-height:1.75;
+}
+.capability-facts{
+  display:grid;grid-template-columns:1fr 1fr;margin-top:20px;
+  border-top:1px solid #d8e4e1;border-bottom:1px solid #d8e4e1;
+}
+.capability-fact{min-width:0;padding:12px 14px 12px 0}
+.capability-fact + .capability-fact{padding-left:14px;border-left:1px solid #d8e4e1}
+.capability-fact dt{color:#849992;font-size:10px}
+.capability-fact dd{
+  margin-top:5px;color:#284a43;font-size:12px;font-weight:660;line-height:1.45;
+}
+.capability-code{
+  margin-top:auto;padding-top:16px;color:var(--accent);
+  font-family:var(--ff-mono);font-size:11px;line-height:1.5;
+}
+.difference{color:#fff;background:#173630}
+.difference .section-kicker{color:#6bd8c6}
+.difference h2{max-width:740px;color:#fff}
+.difference .section-intro{max-width:680px;color:#b9cdc9}
+.difference-list{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:58px;
+  border-top:1px solid rgba(255,255,255,.25);
+}
+.difference-item{min-height:190px;padding:30px 34px 0 0}
+.difference-item + .difference-item{
+  padding-left:34px;border-left:1px solid rgba(255,255,255,.18);
+}
+.difference-item span{
+  display:block;color:#6bd8c6;font-family:var(--ff-mono);font-size:11px;
+}
+.difference-item h3{margin-top:28px;font-size:19px;color:#fff}
+.difference-item p{margin-top:10px;color:#b9cdc9;font-size:13px;line-height:1.75}
+.difference-item code{
+  display:block;margin-top:22px;color:#fff;font-family:var(--ff-mono);
+  font-size:12px;line-height:1.65;white-space:normal;
+}
+.workflow{background:#f3f7f6}
+.workflow-layout{display:grid;grid-template-columns:.78fr 1.22fr;gap:86px;align-items:start}
+.workflow-list{border-top:1px solid #aac9c3}
+.workflow-step{
+  min-height:92px;padding:22px 0;display:grid;
+  grid-template-columns:52px 96px 1fr;align-items:center;gap:18px;
+  border-bottom:1px solid #d2e1de;
+}
+.workflow-step span{color:#7d9690;font-family:var(--ff-mono);font-size:11px}
+.workflow-step b{font-size:15px}
+.workflow-step p{color:#667e78;font-size:13px;line-height:1.65}
+.closing{padding:78px 24px;background:#fff;border-top:1px solid var(--line)}
+.closing-inner{
+  width:min(1120px,100%);margin:0 auto;display:flex;align-items:center;
+  justify-content:space-between;gap:48px;
+}
+.closing h2{font-size:31px;line-height:1.3}
+.closing p{max-width:610px;margin-top:10px;color:#687f7a;font-size:14px;line-height:1.75}
+.site-footer{
+  min-height:72px;padding:18px max(24px,calc((100vw - 1120px)/2));
+  display:flex;align-items:center;justify-content:space-between;gap:24px;
+  color:#78918b;background:#102b27;font-size:11px;
+}
+.footer-links{display:flex;gap:20px}.footer-links a{text-decoration:none}
+.footer-links a:hover{color:#fff}
+a:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+@media(max-width:900px){
+  .site-header{padding:0 20px}.site-nav{gap:18px}
+  .hero-inner{width:calc(100% - 40px)}
+  .hero-mark{right:-70px;width:360px;height:360px}
+  .hero-expression{right:28px}
+  .hero h1{font-size:60px}.hero h2{font-size:36px}
+  .capability-head{grid-template-columns:1fr;gap:30px}
+  .model-path{max-width:620px}
+  .workflow-layout{gap:48px}
+}
+@media(max-width:700px){
+  .site-header{height:58px;padding:0 16px}
+  .brand img{width:32px;height:32px}.site-nav{display:none}
+  .header-action{margin-left:auto;min-height:34px;padding:0 12px;font-size:12px}
+  .hero{min-height:650px}
+  .hero-inner{width:calc(100% - 32px);min-height:650px;align-items:flex-start}
+  .hero-mark{width:260px;height:260px;right:-62px;top:82px}
+  .hero-expression{display:none}
+  .hero-copy{padding:66px 0 54px}
+  .eyebrow{font-size:11px}
+  .hero h1{font-size:52px}.hero h2{font-size:32px}
+  .hero-lead{font-size:14px;line-height:1.75}
+  .hero-actions{display:grid;grid-template-columns:1fr 1fr}
+  .primary-action,.secondary-action{padding:0 10px;font-size:13px}
+  .hero-points{align-items:flex-start;flex-direction:column;gap:12px;margin-top:34px}
+  .section{padding:64px 18px}.section h2{font-size:29px}
+  .model-path{padding-left:16px}
+  .model-path-chain{grid-template-columns:1fr 1fr}
+  .model-path-chain span:nth-child(3){border-left:0;border-top:1px solid var(--line)}
+  .model-path-chain span:nth-child(4){border-top:1px solid var(--line)}
+  .model-path-chain span:nth-child(3)::before{content:"";padding:0}
+  .capability-grid{grid-template-columns:1fr;margin-top:30px}
+  .capability-item{min-height:0;padding:24px 22px}
+  .capability-summary{min-height:0}
+  .capability-code{margin-top:16px}
+  .difference-list{grid-template-columns:1fr;margin-top:42px}
+  .difference-item,.difference-item + .difference-item{
+    min-height:0;padding:25px 0;border-left:0;border-bottom:1px solid rgba(255,255,255,.18);
+  }
+  .difference-item h3{margin-top:15px}
+  .workflow-layout{grid-template-columns:1fr;gap:38px}
+  .workflow-step{grid-template-columns:36px 76px 1fr;gap:10px}
+  .closing{padding:60px 18px}
+  .closing-inner{align-items:flex-start;flex-direction:column;gap:28px}
+  .closing h2{font-size:27px}.closing .primary-action{width:100%}
+  .site-footer{align-items:flex-start;flex-direction:column;padding:20px 18px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
-<div class="app-shell">
-  <div class="topbar">
-    <div class="brandwrap">
-      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
-      <div id="nsSlot"></div>
-      <div class="tabs"><a class="tab on" href="/">业务场景</a><a class="tab" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
-    </div>
-    <div class="top-right">
-      <div class="search">🔍 <input id="searchInput" placeholder="搜索场景名称 / 描述"></div>
-      <button class="btn primary" id="newFlowBtn">＋ 新建场景</button>
-    </div>
-  </div>
-  <div class="main">
-    <div class="page-head">
-      <div><h1>业务场景</h1><span class="sub" id="subCount">加载中…</span></div>
-      <div class="filters" id="filters">
-        <button type="button" class="chip on" data-status="">全部</button>
-        <button type="button" class="chip" data-status="1">当前发布</button>
-        <button type="button" class="chip" data-status="0">草稿</button>
-        <button type="button" class="chip" data-status="3">历史版本</button>
-        <button type="button" class="chip" data-status="2">已停用</button>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="table-scroll"><table>
-        <thead><tr><th style="width:46%">场景 / 描述</th><th>引用规则</th><th>更新时间</th><th style="width:320px;text-align:right">操作</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="4"><div class="loading">加载中…</div></td></tr></tbody>
-      </table></div>
-      <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
-    </div>
-  </div>
+<div class="page">
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Mosika 首页">
+      <img src="/ui/logo.svg" alt="">
+      <strong>Mosika</strong>
+    </a>
+    <nav class="site-nav" aria-label="产品导航">
+      <a href="#capabilities">核心设计</a>
+      <a href="#difference">规则语言</a>
+      <a href="#workflow">运行链路</a>
+    </nav>
+    <a class="header-action" href="/scenes">进入控制台&nbsp;→</a>
+  </header>
 
-  <div class="scrim" id="scrim"></div>
-  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-    <div class="dw-head"><h2 id="drawerTitle">场景详情 <span class="pill live" id="dwStatusPill">当前发布</span></h2><button class="x" id="dwClose" aria-label="关闭">✕</button></div>
-    <div class="dw-body">
-      <div class="field"><label>场景名称</label><input id="dwName" maxlength="60"></div>
-      <div class="field"><label>场景描述</label><textarea id="dwDesc" maxlength="500"></textarea><div class="hint" id="dwEditHint">草稿可修改名称与描述；已发布、历史和停用版本只读。</div></div>
-      <div>
-        <div class="sec-title">概览</div>
-        <div class="metarow">
-          <div class="metabox"><div class="k">引用规则</div><div class="v" id="dwRuleCount">0</div></div>
-          <div class="metabox"><div class="k">流程节点</div><div class="v" id="dwNodeCount">0</div></div>
-          <div class="metabox"><div class="k">版本</div><div class="v" id="dwVersion">v0</div></div>
-          <div class="metabox"><div class="k">最近更新</div><div class="v" id="dwUpdated" style="font-size:var(--fs-base);padding-top:4px">-</div></div>
+  <main>
+    <section class="hero">
+      <div class="hero-mark" aria-hidden="true"><img src="/ui/logo.svg" alt=""></div>
+      <div class="hero-expression" aria-hidden="true">policy → (validate ⇒ enrich) → decision</div>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <div class="eyebrow">模型驱动的可视化规则流语言</div>
+          <h1>Mosika</h1>
+          <h2>让规则图成为业务语言</h2>
+          <p class="hero-lead">图就是语法，树形作用域就是语义。同一份规则模型贯穿创作、持久化、编译、执行与追踪。</p>
+          <div class="hero-actions">
+            <a class="primary-action" href="/scenes">进入控制台&nbsp;→</a>
+            <a class="secondary-action" href="#capabilities">查看核心能力</a>
+          </div>
+          <div class="hero-points" aria-label="产品特点">
+            <span><i></i>规则生成与策略编排分离</span>
+            <span><i></i>一条规则，多组参数</span>
+            <span><i></i>Java 与 JavaScript 扩展</span>
+          </div>
         </div>
       </div>
-      <div>
-        <div class="sec-title">引用的规则</div>
-        <div class="rules" id="dwRules"></div>
+    </section>
+
+    <section class="section capabilities" id="capabilities">
+      <div class="section-inner">
+        <div class="capability-head">
+          <div class="section-head">
+            <div class="section-kicker">核心设计</div>
+            <h2>不是流程图外壳，而是可执行规则模型</h2>
+            <p class="section-intro">同一模型贯穿编辑、持久化、编译和执行，稳定业务事实与可变产品策略分别演进。</p>
+          </div>
+          <div class="model-path" aria-label="统一语义链路">
+            <div class="model-path-label">统一语义链路</div>
+            <div class="model-path-chain" aria-hidden="true">
+              <span>UI AST</span>
+              <span>RuleNode</span>
+              <span>RuleSuite</span>
+              <span>EvalResult</span>
+            </div>
+            <p>创作、发布与追踪共享同一套规则语义。</p>
+          </div>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-item">
+            <div class="capability-meta">
+              <span class="capability-index">01</span>
+              <span class="capability-domain">MODEL SOURCE</span>
+            </div>
+            <h3>图即源代码</h3>
+            <p class="capability-summary">UI AST 及其 JSON 是编辑与持久化的唯一事实源，运行时只接受单向编译结果。</p>
+            <dl class="capability-facts">
+              <div class="capability-fact"><dt>事实来源</dt><dd>UI AST / JSON</dd></div>
+              <div class="capability-fact"><dt>编译边界</dt><dd>仅生成执行树</dd></div>
+            </dl>
+            <code class="capability-code">UI AST → RuleNode</code>
+          </article>
+          <article class="capability-item">
+            <div class="capability-meta">
+              <span class="capability-index">02</span>
+              <span class="capability-domain">LIFECYCLE</span>
+            </div>
+            <h3>生成与编排解耦</h3>
+            <p class="capability-summary">规则生产沉淀稳定的业务定义，产品编排只通过规则标识组合策略。</p>
+            <dl class="capability-facts">
+              <div class="capability-fact"><dt>稳定资产</dt><dd>RuleDefinition</dd></div>
+              <div class="capability-fact"><dt>变化边界</dt><dd>ruleId 编排</dd></div>
+            </dl>
+            <code class="capability-code">Domain Fact → RuleDefinition → Flow</code>
+          </article>
+          <article class="capability-item">
+            <div class="capability-meta">
+              <span class="capability-index">03</span>
+              <span class="capability-domain">PARAMETERIZATION</span>
+            </div>
+            <h3>一条规则，多组参数</h3>
+            <p class="capability-summary">同一个 ruleId 可在不同节点绑定独立参数，阈值、等级和地域差异无需复制定义。</p>
+            <dl class="capability-facts">
+              <div class="capability-fact"><dt>编译复用</dt><dd>JavaScript Source</dd></div>
+              <div class="capability-fact"><dt>运行绑定</dt><dd>$args</dd></div>
+            </dl>
+            <code class="capability-code">ruleId("""{...}""")</code>
+          </article>
+          <article class="capability-item">
+            <div class="capability-meta">
+              <span class="capability-index">04</span>
+              <span class="capability-domain">COMPOSITION</span>
+            </div>
+            <h3>作用域显式可组合</h3>
+            <p class="capability-summary">串行、并行、判断和决策递归成树，执行关系不从坐标或连线方向推断。</p>
+            <dl class="capability-facts">
+              <div class="capability-fact"><dt>语义载体</dt><dd>节点类型 + 父子关系</dd></div>
+              <div class="capability-fact"><dt>推断依赖</dt><dd>无坐标 / 无隐式汇合</dd></div>
+            </dl>
+            <code class="capability-code">S(P(...), D(...))</code>
+          </article>
+        </div>
       </div>
+    </section>
+
+    <section class="section difference" id="difference">
+      <div class="section-inner">
+        <div class="section-head">
+          <div class="section-kicker">规则语言</div>
+          <h2>结构负责组合，表达式负责计算</h2>
+          <p class="section-intro">有限、稳定的结构语言与灵活的业务表达式各司其职，复杂规则仍然清晰可解释。</p>
+        </div>
+        <div class="difference-list">
+          <article class="difference-item">
+            <span>STRUCTURE DSL</span>
+            <h3>可组合结构</h3>
+            <p>逻辑、命中数、条件、串行与并行共享同一递归执行模型。</p>
+            <code>&amp;&amp; &nbsp; || &nbsp; ? : &nbsp; -&gt; &nbsp; =&gt; &nbsp; some(...)</code>
+          </article>
+          <article class="difference-item">
+            <span>RUNTIME DATA</span>
+            <h3>三类数据边界</h3>
+            <p>业务输入、共享上下文和节点参数职责分明，组合时互不污染。</p>
+            <code>$ input &nbsp; / &nbsp; $$ context &nbsp; / &nbsp; $args</code>
+          </article>
+          <article class="difference-item">
+            <span>DOMAIN EXTENSION</span>
+            <h3>领域函数扩展</h3>
+            <p>Java 与 JavaScript UDF 通过命名空间注入，规则直接复用领域能力。</p>
+            <code>content.delivery.publish($)</code>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section workflow" id="workflow">
+      <div class="section-inner workflow-layout">
+        <div class="section-head">
+          <div class="section-kicker">运行链路</div>
+          <h2>一份模型，贯穿每个阶段</h2>
+          <p class="section-intro">编辑器与运行时不再分别解释流程，测试结果和执行路径都回到同一棵规则树。</p>
+        </div>
+        <div class="workflow-list">
+          <div class="workflow-step"><span>01</span><b>创作</b><p>画布生成可持久化 UI AST</p></div>
+          <div class="workflow-step"><span>02</span><b>编译</b><p>单向生成递归执行树</p></div>
+          <div class="workflow-step"><span>03</span><b>验证</b><p>构造完整候选 RuleSuite</p></div>
+          <div class="workflow-step"><span>04</span><b>执行</b><p>按树形作用域确定运行</p></div>
+          <div class="workflow-step"><span>05</span><b>追踪</b><p>返回真实命中路径与结果</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing">
+      <div class="closing-inner">
+        <div>
+          <h2>把领域知识沉淀为可复用的规则能力</h2>
+          <p>用原子规则表达业务事实，用规则流组织持续演进的产品策略。</p>
+        </div>
+        <a class="primary-action" href="/scenes">进入规则控制台&nbsp;→</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Mosika · 模型驱动的可视化规则流语言</span>
+    <div class="footer-links">
+      <a href="/scenes">业务场景</a>
+      <a href="/rules">业务规则</a>
+      <a href="/udfs">自定义函数</a>
     </div>
-    <div class="dw-foot"><button class="btn" id="dwCancel">取消</button><span class="grow"></span><button class="btn" id="dwSave">保存</button><button class="btn primary" id="dwOpen">编排 →</button></div>
-  </aside>
+  </footer>
 </div>
-
-<dialog id="newDlg">
-  <div class="dlg-head">新建场景</div>
-  <div class="dlg-body">
-    <div class="field"><label>场景名称 *</label><input id="newName" placeholder="如：准入场景"></div>
-    <div class="field span-2"><label>场景描述</label><textarea id="newDesc" placeholder="一句话说明这个场景做什么"></textarea></div>
-  </div>
-  <div class="dlg-foot"><button class="btn" id="newCancel">取消</button><button class="btn primary" id="newCreate">创建并编排</button></div>
-</dialog>
-
-<dialog id="statusDlg" aria-labelledby="statusDlgTitle" aria-describedby="statusDlgMessage statusDlgNote">
-  <div class="dlg-head" id="statusDlgTitle">确认变更状态</div>
-  <div class="dlg-body">
-    <p class="confirm-message" id="statusDlgMessage"></p>
-    <p class="confirm-note" id="statusDlgNote"></p>
-  </div>
-  <div class="dlg-foot"><button class="btn" id="statusCancel">取消</button><button class="btn primary" id="statusConfirm">确认</button></div>
-</dialog>
-
-<dialog id="errDlg" aria-labelledby="errDlgTitle" aria-describedby="errDlgMessage">
-  <div class="dlg-head" id="errDlgTitle">操作未完成</div>
-  <div class="dlg-body">
-    <p class="confirm-message" id="errDlgMessage"></p>
-    <p class="confirm-note" id="errDlgDetail" hidden></p>
-  </div>
-  <div class="dlg-foot"><button class="btn primary" id="errDlgClose">知道了</button></div>
-</dialog>
-
-<div class="toast" id="toast"></div>
-
-<script src="/ui/api.js?v=20260812-1"></script>
-<script src="/ui/ns.js?v=20260810-1"></script>
-<script>
-(() => {
-  "use strict";
-  const Api = window.MosikaApi;
-  const Ns = window.MosikaNs;
-  const $ = (s) => document.querySelector(s);
-  let statusFilter = "";
-  let keyword = "";
-  let pageNumber = 1;
-  const pageSize = 20;
-  let total = 0;
-  let loadSequence = 0;
-  let flows = [];
-  let ruleNameById = new Map();
-  let current = null; // drawer 当前 flow
-  let drawerOpener = null;
-  let drawerSaving = false;
-  let statusDialogTarget = null;
-  const pendingFlowIds = new Set();
-
-  const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
-  const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
-
-  // 把后端英文技术错误映射为可读中文；返回 {msg, detail}。detail 为原始信息（仅在有助于排查时展示）。
-  function friendlyError(raw) {
-    const m = String(raw || "");
-    if (m.includes("rule kind does not match")) {
-      return { msg: "规则类型与节点位置不匹配：条件位置只能引用「判断条件」、动作位置只能引用「执行动作」。请到编排画布检查并调整后再发布。", detail: m };
-    }
-    if (m.includes("unknown or disabled rule")) {
-      return { msg: "引用了不存在或已停用的规则，请先到「业务规则」中启用相关规则后再重试。", detail: m };
-    }
-    if (m.includes("must use numeric") || m.includes("built-in reference")) {
-      return { msg: "存在不受支持的规则引用，请到编排画布检查引用后再发布。", detail: m };
-    }
-    if (m.includes("structural validation") || m.includes("compile failed") || m.includes("ruleTree")) {
-      return { msg: "场景结构校验未通过，请到编排画布修正后再发布。", detail: m };
-    }
-    if (m.includes("updated by others") || m.includes("version")) {
-      return { msg: "该场景已被其他操作修改，请刷新页面后重试。", detail: "" };
-    }
-    return { msg: m || "操作未完成，请稍后重试。", detail: "" };
-  }
-
-  function showError(raw, title) {
-    const { msg, detail } = friendlyError(raw);
-    $("#errDlgTitle").textContent = title || "操作未完成";
-    $("#errDlgMessage").textContent = msg;
-    const d = $("#errDlgDetail");
-    if (detail && detail !== msg) { d.textContent = detail; d.hidden = false; } else { d.hidden = true; }
-    const dlg = $("#errDlg");
-    if (!dlg.open) dlg.showModal();
-  }
-
-  async function loadReferenceNames() {
-    ruleNameById = new Map();
-    try {
-      const groups = await Promise.all([
-        Api.listRuleReferences(Ns.code()), Api.listFlowReferences(Ns.code())
-      ]);
-      groups.flat().forEach((item) => {
-        const id = item.ruleId || item.flowId;
-        if (id) ruleNameById.set(String(id), item.name || item.description || String(id));
-      });
-    } catch (_) { /* 引用名称不是列表主链路 */ }
-  }
-
-  async function loadFlows() {
-    const sequence = ++loadSequence;
-    $("#rows").innerHTML = `<tr><td colspan="4"><div class="loading">加载中…</div></td></tr>`;
-    try {
-      const page = await Api.listFlows({ status: statusFilter, keyword, pageNumber, pageSize, namespace: Ns.code() });
-      if (sequence !== loadSequence) return;
-      flows = page.items || [];
-      total = page.total || 0;
-      if (!flows.length && total > 0 && pageNumber > 1) {
-        pageNumber -= 1;
-        return loadFlows();
-      }
-      $("#subCount").textContent = `将业务规则编排为可执行流程 · 共 ${page.total} 个`;
-      renderRows();
-      renderPager();
-    } catch (e) {
-      if (sequence !== loadSequence) return;
-      $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
-      $("#pager").hidden = true;
-    }
-  }
-
-  function renderPager() {
-    const pages = Math.max(1, Math.ceil(total / pageSize));
-    $("#pager").hidden = total <= pageSize;
-    $("#pageSummary").textContent = `第 ${pageNumber} / ${pages} 页 · 共 ${total} 条`;
-    $("#prevPage").disabled = pageNumber <= 1;
-    $("#nextPage").disabled = pageNumber >= pages;
-  }
-
-  const STATUS_META = {
-    0: { label: "草稿", cls: "draft" },
-    1: { label: "当前发布", cls: "live" },
-    2: { label: "已停用", cls: "off" },
-    3: { label: "历史版本", cls: "history" }
-  };
-
-  function renderRows() {
-    if (!flows.length) { $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">暂无业务场景，点右上角「新建场景」添加。</div></td></tr>`; return; }
-    $("#rows").innerHTML = flows.map((f) => {
-      const ruleIds = f.referencedRuleIds || [];
-      const meta = STATUS_META[f.status] || STATUS_META[0];
-      const active = f.status === 1;
-      const pending = pendingFlowIds.has(f.flowId);
-      const toggleClass = active ? "is-on" : (f.status === 0 ? "is-draft" : "is-off");
-      const actionable = f.status === 0 || f.status === 1;
-      const ops = `<button class="open" data-open="${f.flowId}" data-version="${f.version}">${f.status === 0 ? "编排" : "查看"}</button>
-        <button class="btn link" data-detail="${f.flowId}" data-version="${f.version}">详情</button>
-        <button type="button" class="status-toggle ${toggleClass}${pending ? " is-pending" : ""}" role="switch"
-          aria-checked="${active}" aria-label="${esc(f.name)}的发布状态" data-status-toggle="${f.flowId}" data-version="${f.version}"
-          ${!actionable || pending ? "disabled" : ""}${pending ? " aria-busy=\"true\"" : ""}>
-          <span class="status-toggle-track" aria-hidden="true"><span class="status-toggle-thumb"></span></span>
-          <span class="status-toggle-label">${meta.label}</span>
-        </button>`;
-      return `<tr>
-        <td><div class="name">${esc(f.name)}<span class="id">${esc(f.namespace)} / ${esc(f.flowId)} / V${f.version}</span></div><div class="rowdesc">${esc(f.description || "—")}</div></td>
-        <td class="num">${ruleIds.length}</td>
-        <td class="time">${esc((f.updatedAt || "").slice(5, 16))}</td>
-        <td><div class="actions">${ops}</div></td>
-      </tr>`;
-    }).join("");
-  }
-
-  function openCanvas(id, version) { location.href = Ns.link(`/flow/${id}?version=${version}`); }
-
-  function findFlowVersion(id, version) {
-    return flows.find((f) => f.flowId === id && f.version === Number(version));
-  }
-
-  function openDrawer(id, version) {
-    current = findFlowVersion(id, version);
-    if (!current) return;
-    drawerOpener = document.activeElement;
-    $("#dwName").value = current.name || "";
-    $("#dwDesc").value = current.description || "";
-    $("#dwVersion").textContent = "v" + current.version;
-    $("#dwUpdated").textContent = (current.updatedAt || "").slice(0, 16);
-    const ruleIds = current.referencedRuleIds || [];
-    $("#dwRuleCount").textContent = ruleIds.length;
-    $("#dwNodeCount").textContent = current.nodeCount ?? 0;
-    $("#dwRules").innerHTML = ruleIds.length
-      ? ruleIds.map((rid) => `<div class="rtag">${esc(ruleNameById.get(String(rid)) || rid)}<span class="rid">#${esc(rid)}</span></div>`).join("")
-      : `<span class="hint">未引用任何规则</span>`;
-    const editable = current.status === 0;
-    $("#dwName").readOnly = !editable;
-    $("#dwDesc").readOnly = !editable;
-    $("#dwSave").hidden = !editable;
-    $("#dwEditHint").textContent = editable
-      ? "修改只作用于当前草稿版本。"
-      : "该版本已锁定；可进入画布后基于此版本创建新草稿。";
-    setDrawerStatus(current.status);
-    document.querySelector(".topbar").inert = true;
-    document.querySelector(".main").inert = true;
-    $("#scrim").classList.add("show"); $("#drawer").classList.add("show");
-    requestAnimationFrame(() => $("#dwClose").focus());
-  }
-  function drawerDirty() {
-    return Boolean(current && (
-      $("#dwName").value.trim() !== (current.name || "").trim()
-      || $("#dwDesc").value.trim() !== (current.description || "").trim()));
-  }
-  function closeDrawer(force = false) {
-    if (!force && drawerDirty() && !window.confirm("详情中有未保存修改，确定关闭吗？")) return false;
-    $("#scrim").classList.remove("show"); $("#drawer").classList.remove("show");
-    document.querySelector(".topbar").inert = false;
-    document.querySelector(".main").inert = false;
-    current = null;
-    if (drawerOpener && drawerOpener.isConnected) drawerOpener.focus();
-    drawerOpener = null;
-    return true;
-  }
-  function setDrawerStatus(v) {
-    const meta = STATUS_META[v] || STATUS_META[0];
-    const pill = $("#dwStatusPill"); pill.textContent = meta.label; pill.className = "pill " + meta.cls;
-  }
-
-  async function saveDrawer(openAfter) {
-    if (!current || drawerSaving) return;
-    if (current.status !== 0) {
-      const { flowId, version } = current;
-      closeDrawer(true);
-      if (openAfter) openCanvas(flowId, version);
-      return;
-    }
-    const name = $("#dwName").value.trim();
-    if (!name) { toast("场景名称不能为空"); return; }
-    drawerSaving = true;
-    $("#dwSave").disabled = true; $("#dwOpen").disabled = true;
-    try {
-      await Api.updateFlowMeta(current.flowId, {
-        flowId: current.flowId, namespace: current.namespace,
-        name, description: $("#dwDesc").value.trim(), version: current.version
-      });
-      toast("已保存");
-      const id = current.flowId;
-      const version = current.version;
-      closeDrawer(true);
-      await loadFlows();
-      if (openAfter) openCanvas(id, version);
-    } catch (e) { showError(e.message, "保存失败"); }
-    finally {
-      drawerSaving = false;
-      $("#dwSave").disabled = false; $("#dwOpen").disabled = false;
-    }
-  }
-
-  function openStatusDialog(id, version, button) {
-    const f = findFlowVersion(id, version);
-    if (!f || ![0, 1].includes(f.status) || pendingFlowIds.has(id)) return;
-    const disabling = f.status === 1;
-    statusDialogTarget = { id, version: f.version, button };
-    $("#statusDlgTitle").textContent = disabling ? "确认停用场景" : "确认发布版本";
-    $("#statusDlgMessage").textContent = `${disabling ? "确定停用" : "确定发布"}「${f.name}」V${f.version} 吗？`;
-    $("#statusDlgNote").textContent = disabling
-      ? "停用后该场景立即退出运行态，但规则树和配置仍会保留。"
-      : "发布前会校验并编译当前规则树；成功后该版本成为唯一的当前运行版本，其他草稿继续保留。";
-    const confirm = $("#statusConfirm");
-    confirm.textContent = disabling ? "确认停用" : "确认发布";
-    confirm.className = disabling ? "btn danger" : "btn primary";
-    const dialog = $("#statusDlg");
-    if (!dialog.open) dialog.showModal();
-  }
-
-  function closeStatusDialog() {
-    const target = statusDialogTarget;
-    statusDialogTarget = null;
-    $("#statusDlg").close();
-    if (target?.button.isConnected) requestAnimationFrame(() => target.button.focus());
-  }
-
-  function confirmStatusChange() {
-    const target = statusDialogTarget; if (!target) return;
-    statusDialogTarget = null;
-    $("#statusDlg").close();
-    toggleStatus(target.id, target.version, target.button);
-  }
-
-  async function toggleStatus(id, version, button) {
-    const f = findFlowVersion(id, version); if (!f) return;
-    if (pendingFlowIds.has(id)) return;
-    const action = f.status === 1 ? "disable" : "publish";
-    pendingFlowIds.add(id);
-    button.disabled = true;
-    button.classList.add("is-pending");
-    button.setAttribute("aria-busy", "true");
-    let statusChanged = false;
-    try {
-      if (action === "disable") {
-        await Api.disableFlow(id, f.version);
-        toast("已停用");
-      } else if (action === "publish") {
-        const full = await Api.getFlow(id, f.version);
-        await Api.publishFlow(id, {
-          flowId: full.flowId, namespace: full.namespace,
-          name: full.name, description: full.description,
-          ruleTree: full.ruleTree, version: full.version
-        });
-        toast(`V${f.version} 已发布`);
-      }
-      statusChanged = true;
-      // 清除请求态后再重绘，避免新生成的开关继承旧请求的 pending 状态。
-      pendingFlowIds.delete(id);
-      await loadFlows();
-    } catch (e) { showError(e.message, action === "disable" ? "停用失败" : "发布失败"); }
-    finally {
-      pendingFlowIds.delete(id);
-      if (button.isConnected) {
-        button.disabled = false;
-        button.classList.remove("is-pending");
-        button.removeAttribute("aria-busy");
-      } else if (!statusChanged) {
-        // 请求期间若筛选/搜索触发过重绘，失败后还原新生成的开关。
-        renderRows();
-      }
-    }
-  }
-
-  async function createFlow() {
-    const name = $("#newName").value.trim();
-    if (!name) { toast("请填写场景名称"); return; }
-    try {
-      const created = await Api.createFlow({
-        name, namespace: Ns.code(), description: $("#newDesc").value.trim(),
-        ruleTree: JSON.stringify({
-          type: "T", name: "",
-          next: { type: "A", name: "", rule: { type: "R", name: "", expr: "∅" } }
-        })
-      });
-      $("#newDlg").close();
-      openCanvas(created.flowId, created.version);
-    } catch (e) { showError(e.message, "创建失败"); }
-  }
-
-  // events
-  $("#rows").addEventListener("click", (e) => {
-    const o = e.target.closest("[data-open]"); if (o) return openCanvas(o.dataset.open, o.dataset.version);
-    const d = e.target.closest("[data-detail]"); if (d) return openDrawer(d.dataset.detail, d.dataset.version);
-    const t = e.target.closest("[data-status-toggle]"); if (t) return openStatusDialog(t.dataset.statusToggle, t.dataset.version, t);
-  });
-  $("#filters").addEventListener("click", (e) => {
-    const chip = e.target.closest(".chip"); if (!chip) return;
-    document.querySelectorAll("#filters .chip").forEach((c) => c.classList.remove("on"));
-    chip.classList.add("on"); statusFilter = chip.dataset.status; pageNumber = 1; loadFlows();
-  });
-  let searchTimer;
-  $("#searchInput").addEventListener("input", (e) => { keyword = e.target.value.trim(); pageNumber = 1; clearTimeout(searchTimer); searchTimer = setTimeout(loadFlows, 250); });
-  $("#prevPage").addEventListener("click", () => { if (pageNumber > 1) { pageNumber -= 1; loadFlows(); } });
-  $("#nextPage").addEventListener("click", () => { if (pageNumber * pageSize < total) { pageNumber += 1; loadFlows(); } });
-  $("#dwClose").addEventListener("click", () => closeDrawer());
-  $("#dwCancel").addEventListener("click", () => closeDrawer());
-  $("#scrim").addEventListener("click", () => closeDrawer());
-  $("#dwSave").addEventListener("click", () => saveDrawer(false));
-  $("#dwOpen").addEventListener("click", () => saveDrawer(true));
-  $("#newFlowBtn").addEventListener("click", () => { $("#newName").value = ""; $("#newDesc").value = ""; $("#newDlg").showModal(); requestAnimationFrame(() => $("#newName").focus()); });
-  $("#newCancel").addEventListener("click", () => $("#newDlg").close());
-  $("#newCreate").addEventListener("click", createFlow);
-  $("#statusCancel").addEventListener("click", closeStatusDialog);
-  $("#statusConfirm").addEventListener("click", confirmStatusChange);
-  $("#errDlgClose").addEventListener("click", () => $("#errDlg").close());
-  $("#statusDlg").addEventListener("cancel", () => {
-    const target = statusDialogTarget;
-    statusDialogTarget = null;
-    if (target?.button.isConnected) requestAnimationFrame(() => target.button.focus());
-  });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && current) closeDrawer(); });
-
-  (async () => {
-    const ctx = await Ns.boot();
-    if (!ctx) return;
-    Ns.mountSelector($("#nsSlot"));
-    Ns.applyTabs();
-    await loadFlows();
-    await loadReferenceNames();
-  })();
-})();
-</script>
 </body>
 </html>

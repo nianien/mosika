@@ -33,7 +33,9 @@
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
 .brandwrap{display:flex;align-items:center}
 .brand{display:flex;align-items:center;gap:11px}
+.brand-home{color:inherit;text-decoration:none;border-radius:10px}
 .brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
+.brand-home .brand-mark{transition:transform .16s ease,box-shadow .16s ease}.brand-home:hover{color:var(--teal-d)}.brand-home:hover .brand-mark{transform:translateY(-1px);box-shadow:0 7px 16px rgba(15,157,138,.4)}.brand-home:focus-visible{outline:2px solid var(--teal);outline-offset:4px}
 .brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
 .tabs{display:flex;gap:6px;margin-left:26px}
 .tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
@@ -295,9 +297,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <div class="brand"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><div><b>Mosika</b></div></div>
+      <a class="brand brand-home" href="/" aria-label="返回 Mosika 首页"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><b>Mosika</b></a>
       <div id="nsSlot"></div>
-      <div class="tabs"><a class="tab" href="/">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
+      <div class="tabs"><a class="tab" href="/scenes">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
     </div>
     <div class="top-right">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
@@ -306,7 +308,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   </div>
   <div class="main">
     <div class="page-head">
-      <div><h1>业务规则</h1><span class="sub" id="subCount">供业务场景复用的判断条件与执行动作</span></div>
+      <div><h1>业务规则</h1><span class="sub" id="subCount">加载中…</span></div>
       <div class="filters" id="filters">
         <button type="button" class="chip on" data-f="">全部</button>
         <button type="button" class="chip" data-f="condition">判断条件</button>
@@ -330,7 +332,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dlg-fixed">
     <div class="rule-info">
       <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="一句话说明" title="支持表达式插值：${$.字段} 取入参，${$$.字段} 取上下文，运行时替换为实际值"></div>
+      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="规则用途" title="支持表达式插值：${$.字段} 取入参，${$$.字段} 取上下文，运行时替换为实际值"></div>
       <div class="field field-kind">
         <label>类型</label>
         <div class="radiobar" role="radiogroup" aria-label="规则类型">
@@ -373,7 +375,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
       <div class="field field-params">
         <div class="field-bar">
-          <label>参数<span class="field-sub">$args.xxx 自动提取，参数名不可改；其余手动补全</span></label>
+          <label>参数<span class="field-sub">$args 参数自动提取</span></label>
           <div class="field-tools">
             <button type="button" class="mini-btn" id="reExtractBtn">重新提取</button>
             <button type="button" class="mini-btn dashed" id="addParamBtn">＋ 手动添加</button>
@@ -542,7 +544,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     if (head) head.hidden = paramState.length === 0;
     editor.innerHTML = paramState.length
       ? paramState.map(paramCardHtml).join("")
-      : `<div class="params-empty">表达式里还没有引用 $args，该规则将作为无参规则调用。</div>`;
+      : `<div class="params-empty">暂无参数</div>`;
     renderTestArgs();
   }
 
@@ -601,7 +603,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         pageNumber -= 1;
         return loadRules();
       }
-      $("#subCount").textContent = `供业务场景复用的判断条件与执行动作 · 共 ${page.total} 条`;
+      $("#subCount").textContent = `共 ${page.total} 条规则`;
       renderRows();
       renderPager();
     } catch (e) {
@@ -620,7 +622,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   }
 
   function renderRows() {
-    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务规则，点右上角「新建规则」添加。</div></td></tr>`; return; }
+    if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务规则</div></td></tr>`; return; }
     $("#rows").innerHTML = rules.map((r) => {
       const live = r.status === 1;
       const dim = live ? "" : ' style="opacity:.62"';
@@ -787,7 +789,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const prev = readTestArgsRaw();
     const items = paramState.filter((p) => !p.stale && String(p.name || "").trim());
     if (!items.length) {
-      box.innerHTML = `<div class="targs-empty">该规则无参数，直接运行即可。</div>`;
+      box.innerHTML = `<div class="targs-empty">无参数</div>`;
       refreshArgsCount();
       return;
     }
