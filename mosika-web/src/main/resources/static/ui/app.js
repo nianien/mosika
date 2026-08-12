@@ -53,6 +53,7 @@
             ruleId: String(r.ruleId),
             desc: r.name || r.description || String(r.ruleId),
             kind: r.kind === "action" ? "action" : "condition",
+            expression: r.expression || "",
             // 模板参数定义，供画布在引用该规则的节点上渲染 $args 录入表单；缺省为无参
             params: Array.isArray(r.params) ? r.params : []
         });
@@ -153,6 +154,9 @@
     let flowMeta = null;
     let savingFlow = false;
     let dirty = false;
+    let testPanelOpen = false;
+    let testRunning = false;
+    const executedPaths = new Set();
 
     const FLOW_TYPES = T.FLOW_TYPES;
     // 各真实递归边允许的可创建节点类型。
@@ -314,6 +318,8 @@
         const semantic = T.deserialize(root);
         if (!bypassLimits) assertTreeWithinLimits(semantic, "导入的树");
         tree = semantic;
+        executedPaths.clear();
+        $("#testResult").hidden = true;
         collapsedIds.clear();
         selectedId = null;
         ruleSelectedId = null;
@@ -441,7 +447,16 @@
     }
 
     // ---- 主画布渲染 ----
-    function renderBranch(node, parent = null, relation = null, siblingCount = 1) {
+    function flowChildPath(parentPath, edge) {
+        if (edge.relation === "next" || edge.relation === "matched") return `${parentPath}.next`;
+        if (edge.relation === "branch" || edge.relation === "decision") {
+            return `${parentPath}.branches[${edge.index}]`;
+        }
+        if (edge.relation === "default") return `${parentPath}.defaultBranch`;
+        return parentPath;
+    }
+
+    function renderBranch(node, parent = null, relation = null, siblingCount = 1, path = "$") {
         const type = TYPES[node.type] || TYPES.A;
         const reorderable = Boolean(parent && ["branch", "decision"].includes(relation)
             && siblingCount >= 2);
@@ -457,7 +472,8 @@
         }, new Map());
         const children = visibleEdges.length
             ? `<div class="tree-children">${visibleEdges.map((edge) => renderBranch(
-                edge.node, node, edge.relation, relationCounts.get(edge.relation))).join("")}</div>` : "";
+                edge.node, node, edge.relation, relationCounts.get(edge.relation),
+                flowChildPath(path, edge))).join("")}</div>` : "";
         const hiddenCount = executionChildren.length;
         const collapsedBadge = collapsed ? `<span class="collapsed-count" title="${hiddenCount} 个分支">${hiddenCount}</span>` : "";
         // 待配置节点（占位 PH，或未选引用规则的 动作/条件/判断）统一以红虚线“待配置”呈现。
@@ -483,7 +499,7 @@
         const negateBadge = jNegated ? `<span class="negate-badge" title="取反">非</span>` : "";
         const id = idOf(node);
         const nodeShell = `
-            <div class="node-shell${collapsible ? " has-fold-toggle" : ""}"${reorderable ? ' data-reorderable="1"' : ""} data-node-id="${id}" tabindex="0" role="treeitem" aria-selected="${selectedId === id}" aria-expanded="${!collapsed}">
+            <div class="node-shell${collapsible ? " has-fold-toggle" : ""}${executedPaths.has(path) ? " trace-node" : ""}"${reorderable ? ' data-reorderable="1"' : ""} data-node-id="${id}" data-flow-path="${escapeText(path)}" tabindex="0" role="treeitem" aria-selected="${selectedId === id}" aria-expanded="${!collapsed}">
                     <div class="node-card ${cardKind}${jNegated ? " is-negated" : ""}" title="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
@@ -493,10 +509,118 @@
                     ${collapsedBadge}
                 </div>`;
         return `
-            <div class="tree-branch" data-branch-id="${id}">
+            <div class="tree-branch" data-branch-id="${id}" data-flow-path="${escapeText(path)}">
                 ${nodeShell}
                 ${children}
             </div>`;
+    }
+
+    function flowPathMap() {
+        const paths = new Map();
+        const visit = (node, path) => {
+            paths.set(path, node);
+            executionEdges(node).forEach((edge) => visit(edge.node, flowChildPath(path, edge)));
+        };
+        visit(tree, "$");
+        return paths;
+    }
+
+    function drawExecutionTrace() {
+        treeRoot.querySelector("#executionTrace")?.remove();
+        if (executedPaths.size < 2) return;
+        const rootRect = treeRoot.getBoundingClientRect();
+        if (!rootRect.width || !rootRect.height) return;
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.id = "executionTrace";
+        svg.setAttribute("viewBox", `0 0 ${treeRoot.scrollWidth} ${treeRoot.scrollHeight}`);
+        svg.setAttribute("aria-hidden", "true");
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        gradient.id = "executionTraceGradient";
+        gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+        gradient.setAttribute("x1", "0");
+        gradient.setAttribute("y1", "0");
+        gradient.setAttribute("x2", "120");
+        gradient.setAttribute("y2", "120");
+        gradient.setAttribute("spreadMethod", "repeat");
+        [
+            ["0%", "#ef4444"],
+            ["10%", "#f97316"],
+            ["20%", "#facc15"],
+            ["30%", "#84cc16"],
+            ["40%", "#22c55e"],
+            ["50%", "#06b6d4"],
+            ["60%", "#2563eb"],
+            ["70%", "#06b6d4"],
+            ["80%", "#22c55e"],
+            ["90%", "#facc15"],
+            ["100%", "#ef4444"]
+        ].forEach(([offset, color]) => {
+            const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+            stop.setAttribute("offset", offset);
+            stop.setAttribute("stop-color", color);
+            gradient.appendChild(stop);
+        });
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            const animation = document.createElementNS("http://www.w3.org/2000/svg", "animateTransform");
+            animation.setAttribute("attributeName", "gradientTransform");
+            animation.setAttribute("type", "translate");
+            animation.setAttribute("from", "-120 -120");
+            animation.setAttribute("to", "0 0");
+            animation.setAttribute("dur", "2.4s");
+            animation.setAttribute("repeatCount", "indefinite");
+            gradient.appendChild(animation);
+        }
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
+        const localRect = (element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+                left: (rect.left - rootRect.left) / scale,
+                top: (rect.top - rootRect.top) / scale,
+                width: rect.width / scale,
+                height: rect.height / scale
+            };
+        };
+        const paths = flowPathMap();
+        const connectorOffset = 0.75;
+        paths.forEach((node, parentPath) => {
+            if (!executedPaths.has(parentPath)) return;
+            const parent = treeRoot.querySelector(`.node-shell[data-flow-path="${CSS.escape(parentPath)}"]`);
+            if (!parent) return;
+            executionEdges(node).forEach((edge) => {
+                const childPath = flowChildPath(parentPath, edge);
+                if (!executedPaths.has(childPath)) return;
+                const child = treeRoot.querySelector(`.node-shell[data-flow-path="${CSS.escape(childPath)}"]`);
+                if (!child) return;
+                const from = localRect(parent.querySelector(".node-card") || parent);
+                const to = localRect(child.querySelector(".node-card") || child);
+                const startX = from.left + from.width / 2 + connectorOffset;
+                const startY = from.top + from.height;
+                const endY = to.top;
+                const childBranch = child.closest(".tree-branch");
+                const siblingBranches = Array.from(childBranch.parentElement.children)
+                    .filter((element) => element.classList.contains("tree-branch"));
+                const isFirstBranch = siblingBranches.length > 1 && childBranch === siblingBranches[0];
+                const isLastBranch = siblingBranches.length > 1 && childBranch === siblingBranches[siblingBranches.length - 1];
+                const endX = to.left + to.width / 2 + (isLastBranch ? -connectorOffset : connectorOffset);
+                const turnY = localRect(childBranch).top + connectorOffset;
+                const isOuterBranch = isFirstBranch || isLastBranch;
+                const cornerRadius = isOuterBranch
+                    ? Math.min(8 - connectorOffset, Math.abs(endX - startX), endY - turnY)
+                    : 0;
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                if (cornerRadius > 0) {
+                    const approachX = endX + Math.sign(startX - endX) * cornerRadius;
+                    line.setAttribute("d", `M ${startX} ${startY} V ${turnY} H ${approachX} Q ${endX} ${turnY} ${endX} ${turnY + cornerRadius} V ${endY}`);
+                } else {
+                    line.setAttribute("d", `M ${startX} ${startY} V ${turnY} H ${endX} V ${endY}`);
+                }
+                line.setAttribute("stroke", "url(#executionTraceGradient)");
+                svg.appendChild(line);
+            });
+        });
+        treeRoot.appendChild(svg);
     }
 
     function render({ preserveView = true } = {}) {
@@ -505,6 +629,7 @@
         $("#nodeCount").textContent = `${stats.flowNodes} 个流程节点${stats.modalRuleNodes ? ` · ${stats.modalRuleNodes} 个规则节点在弹窗` : ""}${stats.hiddenNodes ? ` · ${stats.hiddenNodes} 个流程已折叠` : ""}`;
         updateInspector();
         requestAnimationFrame(() => {
+            drawExecutionTrace();
             if (!preserveView || fitMode) fitTree();
             else applyTransform();
         });
@@ -836,6 +961,14 @@
         const found = selectedId ? findNode(selectedId) : null;
         const empty = $("#inspectorEmpty");
         const form = $("#inspectorForm");
+        const testPanel = $("#testPanel");
+        if (testPanelOpen) {
+            testPanel.hidden = false;
+            empty.hidden = true;
+            form.hidden = true;
+            return;
+        }
+        testPanel.hidden = true;
         if (!found) { empty.hidden = false; form.hidden = true; return; }
         const { node } = found;
         empty.hidden = true;
@@ -1831,6 +1964,12 @@
     }
 
     function markDraft() {
+        if (executedPaths.size) {
+            executedPaths.clear();
+            treeRoot.querySelector("#executionTrace")?.remove();
+            treeRoot.querySelectorAll(".trace-node").forEach((node) => node.classList.remove("trace-node"));
+        }
+        $("#testResult").hidden = true;
         dirty = true;
         updateDocStatus();
     }
@@ -1841,10 +1980,189 @@
     }
 
     function setSaveBusy(busy) {
-        const a = $("#saveDraftButton"), b = $("#promoteButton");
+        const a = $("#saveDraftButton"), b = $("#promoteButton"), c = $("#testFlowButton");
         const off = busy || flowLoadFailed;
         if (a) a.disabled = off;
         if (b) b.disabled = off;
+        if (c) c.disabled = off || !flowMeta;
+    }
+
+    function parseDataPathSegments(path) {
+        const segments = [];
+        const pattern = /\.([A-Za-z_$][\w$]*)|\[(\d+)\]|\["((?:\\.|[^"\\])*)"\]|\['((?:\\.|[^'\\])*)'\]/g;
+        for (const match of path.matchAll(pattern)) {
+            if (match[1] != null) segments.push(match[1]);
+            else if (match[2] != null) segments.push(Number(match[2]));
+            else if (match[3] != null) segments.push(JSON.parse(`"${match[3]}"`));
+            else segments.push(match[4].replace(/\\(['\\])/g, "$1"));
+        }
+        return segments;
+    }
+
+    function collectTestDataPaths(root) {
+        const paths = { target: [], context: [] };
+        const seen = { target: new Set(), context: new Set() };
+        const collect = (source) => {
+            if (typeof source !== "string" || !source) return;
+            const pattern = /(\$\$|\$)((?:\.[A-Za-z_$][\w$]*|\[(?:\d+|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\])+)/g;
+            for (const match of source.matchAll(pattern)) {
+                const tail = source.slice((match.index || 0) + match[0].length);
+                if (/^\s*\(/.test(tail)) continue;
+                const segments = parseDataPathSegments(match[2]);
+                if (!segments.length) continue;
+                const bucket = match[1] === "$$" ? "context" : "target";
+                const key = JSON.stringify(segments);
+                if (seen[bucket].has(key)) continue;
+                seen[bucket].add(key);
+                paths[bucket].push(segments);
+            }
+        };
+        walk(root, (node) => {
+            if (!["R", "B"].includes(node.type)) return;
+            collect(node.expr);
+            const definition = node.type === "R"
+                ? actionDefinitionById(node.expr)
+                : ruleDefinitionById(node.expr);
+            collect(definition?.expression);
+            collect(node.args);
+        });
+        return paths;
+    }
+
+    function buildTestJsonSkeleton(paths) {
+        const root = {};
+        paths.forEach((segments) => {
+            if (segments.some((segment) => ["__proto__", "prototype", "constructor"].includes(segment))) {
+                return;
+            }
+            let current = root;
+            segments.forEach((segment, index) => {
+                const last = index === segments.length - 1;
+                if (last) {
+                    if (current[segment] === undefined) current[segment] = null;
+                    return;
+                }
+                const nextContainer = typeof segments[index + 1] === "number" ? [] : {};
+                const existing = current[segment];
+                if (!existing || typeof existing !== "object"
+                    || Array.isArray(existing) !== Array.isArray(nextContainer)) {
+                    current[segment] = nextContainer;
+                }
+                current = current[segment];
+            });
+        });
+        return root;
+    }
+
+    function isEmptyJsonObject(input) {
+        try {
+            const value = JSON.parse(input.value.trim() || "{}");
+            return value && typeof value === "object" && !Array.isArray(value)
+                && Object.keys(value).length === 0;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function populateTestInputsFromTree() {
+        const paths = collectTestDataPaths(tree);
+        const targetInput = $("#testTargetInput");
+        const contextInput = $("#testContextInput");
+        if (isEmptyJsonObject(targetInput) && paths.target.length) {
+            targetInput.value = formatJson(buildTestJsonSkeleton(paths.target));
+        }
+        if (isEmptyJsonObject(contextInput) && paths.context.length) {
+            contextInput.value = formatJson(buildTestJsonSkeleton(paths.context));
+        }
+    }
+
+    function setTestPanelOpen(open) {
+        testPanelOpen = open;
+        if (open) {
+            populateTestInputsFromTree();
+            setInspectorCollapsed(false);
+        }
+        updateInspector();
+        if (open) requestAnimationFrame(() => $("#testTargetInput").focus());
+    }
+
+    function formatJson(value) {
+        const json = JSON.stringify(value, null, 2);
+        return json === undefined ? String(value) : json;
+    }
+
+    function parseTestJson(input, label, objectOnly = false) {
+        let value;
+        try {
+            value = JSON.parse(input.value.trim() || "{}");
+        } catch (error) {
+            throw new Error(`${label} JSON 格式错误：${error.message}`);
+        }
+        if (objectOnly && (!value || typeof value !== "object" || Array.isArray(value))) {
+            throw new Error(`${label} 必须是 JSON 对象`);
+        }
+        return value;
+    }
+
+    function setTestBusy(busy) {
+        testRunning = busy;
+        const button = $("#runTestButton");
+        button.disabled = busy;
+        button.querySelector("span").textContent = busy ? "执行中…" : "执行测试";
+    }
+
+    function showTestFailure(message) {
+        executedPaths.clear();
+        render({ preserveView: true });
+        $("#testResult").hidden = false;
+        $("#testResult").classList.add("is-error");
+        $("#testResultStatus").textContent = "执行失败";
+        $("#testResultValue").textContent = message;
+        $("#testContextValue").textContent = "未返回";
+        $("#testPathList").innerHTML = "";
+    }
+
+    async function runFlowTest() {
+        if (testRunning || !flowMeta || !window.MosikaApi) return;
+        if (placeholderGate() || requiredParamGate()) return;
+        materializeParamDefaults(tree);
+        let target;
+        let context;
+        try {
+            target = parseTestJson($("#testTargetInput"), "$ 输入数据");
+            context = parseTestJson($("#testContextInput"), "$$ 上下文", true);
+        } catch (error) {
+            showTestFailure(error.message);
+            return;
+        }
+        setTestBusy(true);
+        try {
+            const response = await window.MosikaApi.tryFlow({
+                namespace: flowMeta.namespace,
+                ruleTree: JSON.stringify(T.serialize(tree)),
+                target,
+                context
+            });
+            executedPaths.clear();
+            (response.executedPaths || []).forEach((path) => executedPaths.add(path));
+            collapsedIds.clear();
+            render({ preserveView: true });
+
+            $("#testResult").hidden = false;
+            $("#testResult").classList.remove("is-error");
+            $("#testResultStatus").textContent = "执行完成";
+            $("#testResultValue").textContent = formatJson(response.result?.result);
+            $("#testContextValue").textContent = formatJson(response.context || {});
+            const paths = flowPathMap();
+            $("#testPathList").innerHTML = (response.executedPaths || []).map((path) => {
+                const node = paths.get(path);
+                return `<li><span>${escapeText(node ? flowNodeDisplayName(node) : path)}</span><code>${escapeText(path)}</code></li>`;
+            }).join("");
+        } catch (error) {
+            showTestFailure(error.message);
+        } finally {
+            setTestBusy(false);
+        }
     }
 
     // 存在待配置占位时拦截保存/生效（占位无后端表示，无法序列化）。返回 true 表示已拦截。
@@ -2197,6 +2515,9 @@
     }
     $("#inspectorCollapse").addEventListener("click", () => setInspectorCollapsed(true));
     $("#inspectorExpand").addEventListener("click", () => setInspectorCollapsed(false));
+    $("#testFlowButton").addEventListener("click", () => setTestPanelOpen(!testPanelOpen));
+    $("#testPanelClose").addEventListener("click", () => setTestPanelOpen(false));
+    $("#runTestButton").addEventListener("click", runFlowTest);
     $("#saveDraftButton").addEventListener("click", saveDraft);
     $("#promoteButton").addEventListener("click", promoteToFormal);
     $("#validateCloseButton").addEventListener("click", () => $("#validateDialog").close());
@@ -2639,6 +2960,7 @@
             docStatus = flow.status === 1 ? "formal" : flow.status === 2 ? "disabled" : "draft";
             dirty = false;
             updateDocStatus();
+            setSaveBusy(false);
         } catch (e) {
             console.error("加载场景失败", e);
             // 只读错误态：禁用保存/生效，避免把空白画布当成真实流程覆盖后端。

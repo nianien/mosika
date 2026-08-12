@@ -48,6 +48,22 @@ public class EvalController {
         private Map<String, Object> args;
     }
 
+    @Data
+    @EqualsAndHashCode(callSuper = false)
+    public static class TryFlowRequest extends EvalRequest {
+        private String namespace;
+        private String ruleTree;
+    }
+
+    @PostMapping("/flow/try")
+    public ApiResponse<RuleSuiteManager.FlowTryResult> tryFlow(@RequestBody TryFlowRequest req) {
+        if (req.getNamespace() == null || req.getNamespace().isBlank()) {
+            throw new IllegalArgumentException("namespace is required");
+        }
+        return ApiResponse.ok(suiteManager.tryFlow(
+                req.getNamespace(), req.getRuleTree(), req.getTarget(), req.getContext()));
+    }
+
     /** 执行一条规则流：POST /api/eval/flow/{flowId} */
     @PostMapping("/flow/{flowId}")
     public ApiResponse<NodeResult> evalFlow(@PathVariable String flowId,

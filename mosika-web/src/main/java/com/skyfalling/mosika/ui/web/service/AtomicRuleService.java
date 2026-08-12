@@ -121,6 +121,7 @@ public class AtomicRuleService {
             reference.put("description", rule.getDescription());
             reference.put("kind", rule.getKind());
             reference.put("namespace", rule.getNamespace());
+            reference.put("expression", rule.getExpression());
             reference.put("params", parseParams(rule.getParams()));
             return reference;
         }).toList();

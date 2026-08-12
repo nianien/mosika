@@ -61,7 +61,8 @@
         updateUdf: (id, udf) => request("PUT", `/udfs/${id}`, udf),
         enableUdf: (id, version) => request("POST", `/udfs/${id}/enable${qs({ version })}`),
         disableUdf: (id, version) => request("DELETE", `/udfs/${id}${qs({ version })}`),
-        // eval：试运行编辑中的原子规则，body 含 namespace/expression/args/target/context
-        tryRule: (body) => request("POST", "/eval/try", body)
+        // eval
+        tryRule: (body) => request("POST", "/eval/try", body),
+        tryFlow: (body) => request("POST", "/eval/flow/try", body)
     };
 })(window);

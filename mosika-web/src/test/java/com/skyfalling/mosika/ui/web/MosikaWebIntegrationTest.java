@@ -167,6 +167,22 @@ class MosikaWebIntegrationTest {
     }
 
     @Test
+    void activeRuleReferencesIncludeExpressionForTestInputExtraction() throws Exception {
+        String expression = "$.customer.name == $$.tenant.name";
+        String ruleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(ruleBody("test-inputs", expression))))
+                .andExpect(status().isOk())
+                .andReturn()).path("ruleId").asText();
+
+        mvc.perform(get("/api/rules/references")
+                        .param("namespace", "default"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].ruleId").value(ruleId))
+                .andExpect(jsonPath("$.data[0].expression").value(expression));
+    }
+
+    @Test
     void userCanRegisterUpdateDisableAndEnableParameterizedUdf() throws Exception {
         Map<String, Object> create = udfBody("content.generation", "bindCitations",
                 "(target, prefix) => ({stage: prefix, citedClaimCount: target.citedClaimCount})");
@@ -510,6 +526,48 @@ class MosikaWebIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void flowTryExecutesUnsavedTreeAndReturnsVisualPaths() throws Exception {
+        Map<String, Object> action = ruleBody(
+                "remember-preview",
+                "$$.setProperty('visited', $.value)");
+        action.put("kind", "action");
+        String actionRuleId = data(mvc.perform(post("/api/rules")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(action)))
+                .andExpect(status().isOk())
+                .andReturn()).path("ruleId").asText();
+        RuleSuite active = suiteManager.getSuite("default");
+        String tree = """
+                {"type":"T","next":{"type":"D","branches":[
+                  {"type":"C","rule":{"type":"B","expr":"false"},
+                   "next":{"type":"A","rule":{"type":"R","expr":"∅"}}},
+                  {"type":"C","rule":{"type":"B","expr":"true"},
+                   "next":{"type":"A","rule":{"type":"R","expr":"%s"}}}
+                ],"defaultBranch":{"type":"A","rule":{"type":"R","expr":"∅"}}}}
+                """.formatted(actionRuleId);
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("namespace", "default");
+        request.put("ruleTree", tree);
+        request.put("target", Map.of("value", "done"));
+        request.put("context", Map.of());
+
+        mvc.perform(post("/api/eval/flow/try")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.context.visited").value("done"))
+                .andExpect(jsonPath("$.data.executedPaths[0]").value("$"))
+                .andExpect(jsonPath("$.data.executedPaths[1]").value("$.next"))
+                .andExpect(jsonPath("$.data.executedPaths[2]").value("$.next.branches[0]"))
+                .andExpect(jsonPath("$.data.executedPaths[3]").value("$.next.branches[1]"))
+                .andExpect(jsonPath("$.data.executedPaths[4]").value("$.next.branches[1].next"))
+                .andExpect(jsonPath("$.data.executedPaths.length()").value(5));
+
+        assertSame(active, suiteManager.getSuite("default"));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM rule_flow", Integer.class));
     }
 
     @Test

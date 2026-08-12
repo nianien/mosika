@@ -140,6 +140,14 @@ public class RuleSuite {
         return eval(nodeBuilder.build(ruleExpr), data, context);
     }
 
+    public NodeResult evalWithDetails(String ruleExpr, Object data, Map<String, Object> context) {
+        RuleVisitor ruleContext = new RuleVisitor(ruleEngine, data);
+        ruleContext.putAll(context);
+        NodeResult result = doEval(nodeBuilder.build(ruleExpr), ruleContext, true);
+        context.putAll(ruleContext);
+        return result;
+    }
+
     /**
      * 执行已经构建的规则节点
      *

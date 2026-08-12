@@ -5,8 +5,15 @@ import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.node.ExprNode;
 import com.skyfalling.mosika.eval.node.RuleNode;
 import com.skyfalling.mosika.eval.result.NodeResult;
+import com.skyfalling.mosika.eval.result.RuleResult;
 import com.skyfalling.mosika.suite.RuleSuite;
 import com.skyfalling.mosika.ui.tree.node.TreeNode;
+import com.skyfalling.mosika.ui.tree.node.define.UINode;
+import com.skyfalling.mosika.ui.tree.node.flow.ANode;
+import com.skyfalling.mosika.ui.tree.node.flow.CNode;
+import com.skyfalling.mosika.ui.tree.node.flow.DNode;
+import com.skyfalling.mosika.ui.tree.node.flow.PNode;
+import com.skyfalling.mosika.ui.tree.node.flow.SNode;
 import com.skyfalling.mosika.ui.web.common.BusinessException;
 import com.skyfalling.mosika.ui.web.config.DatabaseMigrationInitializer;
 import com.skyfalling.mosika.ui.web.dao.AtomicRuleDao;
@@ -18,6 +25,7 @@ import com.skyfalling.mosika.ui.web.entity.AtomicRuleEntity;
 import com.skyfalling.mosika.ui.web.entity.RuleFlowEntity;
 import com.skyfalling.mosika.ui.web.entity.RuleNamespaceEntity;
 import com.skyfalling.mosika.ui.web.entity.UdfDefinitionEntity;
+import com.skyfalling.mosika.utils.Constants;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -309,6 +318,170 @@ public class RuleSuiteManager {
         } catch (Exception e) {
             throw new BusinessException(400, "rule eval failed: " + rootMessage(e));
         }
+    }
+
+    public FlowTryResult tryFlow(String namespace, String ruleTree,
+                                 Object target, Map<String, Object> context) {
+        RuleNamespaceEntity namespaceEntity = namespaceDao.findByCode(namespace);
+        if (namespaceEntity == null || namespaceEntity.getStatus() == null
+                || namespaceEntity.getStatus() != 1) {
+            throw new BusinessException(404, "namespace not found or disabled: " + namespace);
+        }
+
+        TreeNode tree;
+        List<RuleDefinition> definitions;
+        FlowTraceBuilder traceBuilder;
+        try {
+            RuleTreeCompiler.CompileResult compiled = RuleTreeCompiler.compile(ruleTree);
+            tree = TreeNode.fromJson(compiled.getCanonicalJson());
+            definitions = new ArrayList<>();
+            definitions.addAll(toAtomicDefinitions(
+                    runtimeAtomics(namespace, namespaceEntity.getId())));
+            definitions.addAll(toFlowDefinitions(runtimeFlows(namespaceEntity.getId())));
+            traceBuilder = new FlowTraceBuilder(tracePrefix(definitions));
+            String entryId = traceBuilder.defineTree(tree);
+            definitions.addAll(traceBuilder.definitions());
+
+            RuleSuite suite = new RuleSuite(definitions, runtimeUdfs(namespace));
+            Map<String, Object> mutableContext = context == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(context);
+            NodeResult result = suite.evalWithDetails(entryId, target, mutableContext);
+            List<String> paths = executedPaths(result.getDetails(), traceBuilder.paths());
+            return new FlowTryResult(result, mutableContext, paths);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(400, "flow eval failed: " + rootMessage(e));
+        }
+    }
+
+    private static String tracePrefix(List<RuleDefinition> definitions) {
+        int suffix = 0;
+        while (true) {
+            String prefix = "tryFlowTrace" + suffix + "N";
+            boolean conflict = definitions.stream()
+                    .anyMatch(definition -> definition.getRuleId().startsWith(prefix));
+            if (!conflict) {
+                return prefix;
+            }
+            suffix++;
+        }
+    }
+
+    private static List<String> executedPaths(List<RuleResult> details,
+                                              Map<String, String> pathByRuleId) {
+        Set<String> paths = new LinkedHashSet<>();
+        collectExecutedPaths(details, pathByRuleId, paths);
+        return new ArrayList<>(paths);
+    }
+
+    private static void collectExecutedPaths(List<RuleResult> details,
+                                             Map<String, String> pathByRuleId,
+                                             Set<String> paths) {
+        for (RuleResult detail : details) {
+            String expr = detail.getExpr();
+            if (expr != null) {
+                int boundary = expr.indexOf('[');
+                String ruleId = boundary < 0 ? expr : expr.substring(0, boundary);
+                String path = pathByRuleId.get(ruleId);
+                if (path != null) {
+                    paths.add(path);
+                }
+            }
+            collectExecutedPaths(detail.getSubRules(), pathByRuleId, paths);
+        }
+    }
+
+    private static final class FlowTraceBuilder {
+
+        private final String prefix;
+        private final List<RuleDefinition> definitions = new ArrayList<>();
+        private final Map<String, String> paths = new LinkedHashMap<>();
+        private int sequence;
+
+        private FlowTraceBuilder(String prefix) {
+            this.prefix = prefix;
+        }
+
+        private String defineTree(TreeNode tree) {
+            String next = tree.getNext() == null ? Constants.NOP : defineNode(tree.getNext(), "$.next");
+            return add("$", next);
+        }
+
+        private String defineNode(UINode node, String path) {
+            if (node instanceof ANode action) {
+                String expression = action.getRule().ruleExpr();
+                if (action.getNext() != null) {
+                    expression += "->" + defineNode(action.getNext(), path + ".next");
+                }
+                return add(path, expression);
+            }
+            if (node instanceof CNode condition) {
+                String expression = condition.getRule().ruleExpr();
+                if (condition.getNext() != null) {
+                    expression += "?" + defineNode(condition.getNext(), path + ".next");
+                }
+                return add(path, expression);
+            }
+            if (node instanceof SNode serial) {
+                List<String> expressions = new ArrayList<>();
+                expressions.add(Constants.NOP);
+                for (int i = 0; i < serial.getBranches().size(); i++) {
+                    expressions.add(defineNode(serial.getBranches().get(i),
+                            path + ".branches[" + i + "]"));
+                }
+                return add(path, String.join("->", expressions));
+            }
+            if (node instanceof PNode parallel) {
+                List<String> expressions = new ArrayList<>();
+                expressions.add(Constants.NOP);
+                for (int i = 0; i < parallel.getBranches().size(); i++) {
+                    expressions.add(defineNode(parallel.getBranches().get(i),
+                            path + ".branches[" + i + "]"));
+                }
+                return add(path, String.join("=>", expressions));
+            }
+            if (node instanceof DNode decision) {
+                String fallback = decision.getDefaultBranch() == null
+                        ? null
+                        : defineNode(decision.getDefaultBranch(), path + ".defaultBranch");
+                for (int i = decision.getBranches().size() - 1; i >= 0; i--) {
+                    CNode branch = decision.getBranches().get(i);
+                    String branchPath = path + ".branches[" + i + "]";
+                    String condition = add(branchPath, branch.getRule().ruleExpr());
+                    String matched = branch.getNext() == null
+                            ? Constants.NOP
+                            : defineNode(branch.getNext(), branchPath + ".next");
+                    fallback = condition + "?" + matched
+                            + (fallback == null ? "" : ":(" + fallback + ")");
+                }
+                return add(path, fallback);
+            }
+            throw new UnsupportedOperationException(
+                    "not support node type: " + node.getClass().getSimpleName());
+        }
+
+        private String add(String path, String expression) {
+            String ruleId = prefix + sequence++;
+            paths.put(ruleId, path);
+            definitions.add(new RuleDefinition(
+                    ruleId, expression, path, RuleDefinition.RULE_TYPE_COMPOSITE));
+            return ruleId;
+        }
+
+        private List<RuleDefinition> definitions() {
+            return definitions;
+        }
+
+        private Map<String, String> paths() {
+            return paths;
+        }
+    }
+
+    public record FlowTryResult(NodeResult result,
+                                Map<String, Object> context,
+                                List<String> executedPaths) {
     }
 
     /** 提取异常链最深层的稳定错误信息 */

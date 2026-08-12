@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260802-1">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260812-2">
 </head>
 <body>
 <main class="app-shell">
@@ -42,6 +42,10 @@
                 <div class="canvas-tools">
                     <button id="collapseAllButton" type="button">折叠全部</button>
                     <button id="expandAllButton" type="button">展开全部</button>
+                    <button id="testFlowButton" type="button" disabled>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5Z"/></svg>
+                        测试
+                    </button>
                     <button id="saveDraftButton" type="button">保存草稿</button>
                     <button id="promoteButton" class="primary" type="button">生效</button>
                     <span class="status" id="docStatus"><i></i> <span id="docStatusText">草稿</span></span>
@@ -62,6 +66,47 @@
         <button class="inspector-expand" id="inspectorExpand" type="button" aria-label="展开属性栏" title="展开属性栏" hidden>«</button>
         <aside class="inspector" id="inspector">
             <button class="inspector-collapse" id="inspectorCollapse" type="button" aria-label="收起属性栏" title="收起属性栏">»</button>
+            <section class="test-panel" id="testPanel" hidden>
+                <div class="test-panel-heading">
+                    <div>
+                        <strong>测试规则流</strong>
+                        <span>执行当前画布内容</span>
+                    </div>
+                    <button class="icon-button" id="testPanelClose" type="button" aria-label="关闭测试面板">×</button>
+                </div>
+                <label class="test-json-field">
+                    <span><code>$</code> 输入数据</span>
+                    <textarea id="testTargetInput" spellcheck="false" aria-label="测试输入 JSON">{
+}</textarea>
+                </label>
+                <label class="test-json-field">
+                    <span><code>$$</code> 上下文</span>
+                    <textarea id="testContextInput" spellcheck="false" aria-label="测试上下文 JSON">{
+}</textarea>
+                </label>
+                <button class="primary test-run-button" id="runTestButton" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5Z"/></svg>
+                    <span>执行测试</span>
+                </button>
+                <div class="test-result" id="testResult" hidden>
+                    <div class="test-result-summary">
+                        <i id="testResultDot"></i>
+                        <strong id="testResultStatus">执行完成</strong>
+                    </div>
+                    <div class="test-result-section">
+                        <span>返回结果</span>
+                        <pre id="testResultValue"></pre>
+                    </div>
+                    <div class="test-result-section">
+                        <span>执行后上下文</span>
+                        <pre id="testContextValue"></pre>
+                    </div>
+                    <div class="test-result-section">
+                        <span>执行路径</span>
+                        <ol class="test-path-list" id="testPathList"></ol>
+                    </div>
+                </div>
+            </section>
             <div class="inspector-empty" id="inspectorEmpty">
                 <span>↖</span>
                 <strong>选择一个节点</strong>
@@ -270,8 +315,8 @@
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
 <script src="/ui/treenode.js?v=20260810-1"></script>
-<script src="/ui/api.js?v=20260810-1"></script>
+<script src="/ui/api.js?v=20260812-2"></script>
 <script src="/ui/ns.js?v=20260810-1"></script>
-<script src="/ui/app.js?v=20260810-1"></script>
+<script src="/ui/app.js?v=20260812-3"></script>
 </body>
 </html>

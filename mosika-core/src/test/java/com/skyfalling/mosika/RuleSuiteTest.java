@@ -146,6 +146,25 @@ class RuleSuiteTest {
     }
 
     @Test
+    void contextExecutionCanKeepDetails() {
+        RuleSuite suite = new RuleSuite(
+                List.of(
+                        new RuleDefinition(
+                                "remember",
+                                "$$.setProperty('visited', true)",
+                                "remember"),
+                        composite("entry", "remember")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+
+        NodeResult result = suite.evalWithDetails("entry", null, context);
+
+        assertEquals(true, context.get("visited"));
+        assertEquals("entry[remember]", result.getDetails().get(0).getExpr());
+        assertEquals("remember", result.getDetails().get(0).getSubRules().get(0).getExpr());
+    }
+
+    @Test
     void parameterizedRuleCacheComparesNestedJsonStructure() {
         RuleSuite suite = new RuleSuite(
                 List.of(new RuleDefinition(

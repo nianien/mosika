@@ -122,6 +122,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .load-error button { min-height: 26px; height: 26px; color: #9f3038; border-color: #e7aeb2; background: #fff; }
 .canvas-tools { display: flex; align-items: center; gap: 10px; }
 .canvas-tools button { min-height: 26px; height: 26px; padding: 0 10px; font-size: var(--fs-minor); }
+.canvas-tools button svg {
+    width: 13px; height: 13px; margin-right: 4px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px;
+}
 .canvas-titlebar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 14px; border-bottom: 1px solid var(--border); background: #f8fafd;
@@ -143,7 +147,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .tree-viewport.dragging { cursor: grabbing; }
 .grid { display: none; }
 .tree-stage { position: absolute; left: 0; top: 0; padding: 50px; transform-origin: 0 0; will-change: transform; }
-#treeRoot { width: max-content; min-width: 1px; }
+#treeRoot { position: relative; width: max-content; min-width: 1px; }
+#executionTrace {
+    position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%;
+    overflow: visible; pointer-events: none;
+}
+#executionTrace path {
+    fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+}
 
 .tree-branch { position: relative; display: flex; flex-direction: column; align-items: center; flex: 0 0 auto; }
 .tree-children { position: relative; display: flex; justify-content: center; padding-top: 26px; }
@@ -272,6 +283,67 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .inspector-panel {
     display: grid; gap: 12px; padding: 16px; border: 1px solid #edf0f5;
     border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(38,50,76,.05);
+}
+.test-panel {
+    min-height: 100%; display: grid; align-content: start; gap: 14px;
+    padding: 16px; border: 1px solid #edf0f5; border-radius: 10px;
+    background: #fff; box-shadow: 0 8px 24px rgba(38,50,76,.05);
+}
+.test-panel-heading {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    padding-bottom: 12px; border-bottom: 1px solid #e8edf4;
+}
+.test-panel-heading > div { display: grid; gap: 3px; }
+.test-panel-heading strong { color: #24324a; font-size: var(--fs-panel); }
+.test-panel-heading span { color: #8b97a9; font-size: var(--fs-note); }
+.test-panel-heading .icon-button { min-height: 28px; height: 28px; }
+.test-json-field { gap: 7px; }
+.test-json-field > span { color: #65738a; font-size: var(--fs-label); font-weight: 700; }
+.test-json-field code { color: #0e7f96; font-family: var(--ff-mono); }
+.test-json-field textarea {
+    width: 100%; min-height: 118px; resize: vertical; padding: 9px 10px;
+    border: 1px solid #d6deea; border-radius: 7px; color: #263550; background: #fbfcfe;
+    font: 12px/1.55 var(--ff-mono); letter-spacing: 0; tab-size: 2;
+}
+.test-json-field textarea:hover { border-color: #b8c4d5; }
+.test-json-field textarea:focus {
+    outline: 2px solid rgba(15,157,138,.18); outline-offset: 0; border-color: var(--primary);
+}
+.test-run-button {
+    width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.test-run-button svg {
+    width: 15px; height: 15px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.test-result {
+    display: grid; gap: 13px; padding-top: 14px; border-top: 1px solid #e8edf4;
+}
+.test-result-summary { display: flex; align-items: center; gap: 7px; color: #177052; }
+.test-result-summary i { width: 8px; height: 8px; border-radius: 50%; background: #22b777; }
+.test-result-summary strong { font-size: var(--fs-base); }
+.test-result.is-error .test-result-summary { color: #bd444c; }
+.test-result.is-error .test-result-summary i { background: #d95961; }
+.test-result-section { display: grid; gap: 6px; }
+.test-result-section > span { color: #7b879b; font-size: var(--fs-label); font-weight: 700; }
+.test-result-section pre {
+    max-height: 170px; margin: 0; padding: 8px 9px; overflow: auto;
+    border: 1px solid #e4e9f1; border-radius: 7px; color: #33415d; background: #f7f9fc;
+    font: 11px/1.55 var(--ff-mono); white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: 0;
+}
+.test-path-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.test-path-list li {
+    min-width: 0; display: grid; gap: 2px; padding-left: 10px;
+    border-left: 2px solid;
+    border-image: linear-gradient(180deg,#ef4444,#f97316,#facc15,#22c55e,#06b6d4,#2563eb) 1;
+}
+.test-path-list span {
+    overflow: hidden; color: #33415d; font-size: var(--fs-label);
+    font-weight: 600; text-overflow: ellipsis; white-space: nowrap;
+}
+.test-path-list code {
+    overflow: hidden; color: #7b879b; font: 10px/1.4 var(--ff-mono);
+    text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0;
 }
 .inspector-heading {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -598,6 +670,55 @@ dialog.rule-dialog {
     100% { box-shadow: 0 0 0 0 rgba(34,192,122,0); }
 }
 .status.status-pulse { animation: status-pulse-kf .8s ease-out; }
+
+@property --trace-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+@keyframes trace-border-flow {
+    to { --trace-angle: 360deg; }
+}
+
+/* 测试执行路径：彩虹只覆盖连线和节点描边，保留节点原有填充色。 */
+.node-shell.trace-node .node-card.root::after,
+.node-shell.trace-node .node-card.structure::after,
+.node-shell.trace-node .node-card.action::after {
+    content: ""; position: absolute; inset: 0; z-index: 2; padding: 2px;
+    border-radius: inherit; pointer-events: none;
+    background: conic-gradient(
+        from var(--trace-angle),
+        #ef4444 0%, #f97316 10%, #facc15 20%, #84cc16 30%, #22c55e 40%,
+        #06b6d4 50%, #2563eb 60%, #06b6d4 70%, #22c55e 80%, #facc15 90%, #ef4444 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: trace-border-flow 2.4s linear infinite;
+}
+.node-shell.trace-node .node-card.condition::after {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background: conic-gradient(
+        from var(--trace-angle),
+        #ef4444 0%, #f97316 10%, #facc15 20%, #84cc16 30%, #22c55e 40%,
+        #06b6d4 50%, #2563eb 60%, #06b6d4 70%, #22c55e 80%, #facc15 90%, #ef4444 100%
+    );
+    clip-path: polygon(11% 0,89% 0,100% 50%,89% 100%,11% 100%,0 50%);
+    animation: trace-border-flow 2.4s linear infinite;
+}
+.node-shell.trace-node .node-card.condition::before {
+    inset: 2px; z-index: 1;
+}
+.node-shell.trace-node .node-card.condition .node-title,
+.node-shell.trace-node .node-card.condition .node-expression {
+    z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+    .node-shell.trace-node .node-card.root::after,
+    .node-shell.trace-node .node-card.structure::after,
+    .node-shell.trace-node .node-card.action::after,
+    .node-shell.trace-node .node-card.condition::after { animation: none; }
+}
 
 /* 结构校验问题清单 */
 .validate-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
