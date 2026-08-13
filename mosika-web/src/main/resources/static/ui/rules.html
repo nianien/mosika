@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>业务规则 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
@@ -18,14 +18,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <style>
-:root{
-  color:#123038;background:#edf4f3;
-  --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
-  --cyan:#0891b2;--cyan-soft:#e3fafd;
-  --green:#1f7a43;--green-soft:#dcf9e4;
-  --lemon:#8a6d0e;--lemon-soft:#fdf6d5;
-  --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
-}
 *{box-sizing:border-box;margin:0;padding:0}
 /* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
 [hidden]{display:none!important}
@@ -292,12 +284,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 }
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.pager{justify-content:space-between}}
 </style>
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
-<body>
+<body class="control-page">
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <a class="brand brand-home" href="/" aria-label="返回 Mosika 首页"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><b>Mosika</b></a>
+      <a class="brand brand-home" href="/" aria-label="返回 Mosika 首页"><div class="brand-mark"><img src="/ui/logo.svg" alt=""></div><b>Mosika</b></a>
       <div id="nsSlot"></div>
       <div class="tabs"><a class="tab" href="/scenes">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
     </div>
@@ -315,6 +308,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <button type="button" class="chip" data-f="action">执行动作</button>
         <button type="button" class="chip" data-f="off">已停用</button>
       </div>
+    </div>
+    <div class="core-context" aria-label="规则生产链路">
+      <span class="core-context-label">Definition path</span>
+      <span class="core-chain"><b>RuleDefinition</b><i>→</i><b>Precompile</b><i>→</i><b>ruleId reference</b></span>
+      <span class="core-context-note">稳定规则定义与可变场景编排分离演进</span>
     </div>
     <div class="panel">
       <div class="table-scroll"><table>
@@ -412,16 +410,20 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-foot"><button class="btn" id="dlgCancel">取消</button><button class="btn primary" id="dlgSave">保存</button></div>
 </dialog>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/api.js?v=20260810-1"></script>
-<script src="/ui/ns.js?v=20260810-1"></script>
+<script src="/ui/ui-common.js?v=20260813-1"></script>
+<script src="/ui/code-editor.js?v=20260813-1"></script>
+<script src="/ui/api.js?v=20260813-1"></script>
+<script src="/ui/ns.js?v=20260813-1"></script>
 <script>
 (() => {
   "use strict";
   const Api = window.MosikaApi;
   const Ns = window.MosikaNs;
-  const $ = (s) => document.querySelector(s);
+  const Ui = window.MosikaUi;
+  const Code = window.MosikaCode;
+  const $ = Ui.$;
   let filter = "";  // "" | atom | table | off
   let keyword = "";
   let pageNumber = 1;
@@ -432,8 +434,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   let refCount = new Map(); // ruleId(String) -> 引用场景数
   let editing = null;
 
-  const toast = (m) => { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
-  const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+  const toast = Ui.createToast("#toast", { duration: 2000 });
+  const esc = Ui.escapeHtml;
 
   // 参数模板编辑：参数名由表达式里的 $args.xxx 自动提取，其余字段手工补全。
   const PARAM_TYPES = [["string", "文本"], ["number", "数字"], ["boolean", "布尔"], ["enum", "枚举"]];
@@ -657,22 +659,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   // acorn 解析表达式，返回 CodeMirror lint 标注；表达式非完整语句，需用括号包裹后解析
   function lintExpression(text) {
-    const src = String(text || "").trim();
-    if (!src || typeof window.acorn === "undefined") return [];
-    try {
-      window.acorn.parse(`(\n${src}\n)`, { ecmaVersion: 2020 });
-      return [];
-    } catch (e) {
-      const loc = e.loc || { line: 2, column: 0 };
-      const line = Math.max(0, loc.line - 2);
-      const col = Math.max(0, loc.column | 0);
-      return [{
-        message: String(e.message || "语法错误").replace(/\s*\(\d+:\d+\)\s*$/, ""),
-        severity: "error",
-        from: window.CodeMirror.Pos(line, col),
-        to: window.CodeMirror.Pos(line, col + 1)
-      }];
-    }
+    return Code.toLintAnnotations(Code.parseExpression(text), window.CodeMirror);
   }
 
   const JS_KEYWORDS = ["true", "false", "null", "undefined", "&&", "||", "!", "includes(", "startsWith(",
@@ -772,13 +759,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   function formatExpression() {
     const cm = ensureExprEditor();
     if (!cm) return;
-    const beautify = window.js_beautify || (window.beautify && window.beautify.js);
-    if (typeof beautify !== "function") { toast("格式化组件未加载"); return; }
     const src = cm.getValue().trim();
     if (!src) return;
     try {
-      cm.setValue(beautify(src, { indent_size: 2, brace_style: "collapse,preserve-inline", wrap_line_length: 0 }));
-    } catch (_) { toast("表达式无法格式化，请先修正语法"); }
+      cm.setValue(Code.formatExpression(src, { brace_style: "collapse,preserve-inline" }));
+    } catch (error) { toast(error.message || "表达式无法格式化，请先修正语法"); }
   }
 
   // ── 试运行面板 ─────────────────────────────────────────────
@@ -1071,8 +1056,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     document.querySelectorAll("#filters .chip").forEach((c) => c.classList.remove("on"));
     chip.classList.add("on"); filter = chip.dataset.f; pageNumber = 1; loadRules();
   });
-  let searchTimer;
-  $("#searchInput").addEventListener("input", (e) => { keyword = e.target.value.trim(); pageNumber = 1; clearTimeout(searchTimer); searchTimer = setTimeout(loadRules, 250); });
+  $("#searchInput").addEventListener("input", Ui.debounce((e) => { keyword = e.target.value.trim(); pageNumber = 1; loadRules(); }, 250));
   $("#prevPage").addEventListener("click", () => { if (pageNumber > 1) { pageNumber -= 1; loadRules(); } });
   $("#nextPage").addEventListener("click", () => { if (pageNumber * pageSize < total) { pageNumber += 1; loadRules(); } });
   $("#newRuleBtn").addEventListener("click", () => openDialog(null));

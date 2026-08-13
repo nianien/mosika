@@ -2,16 +2,16 @@
     color: #17223b;
     background: #eef2f8;
     --line: #6f82a0;
-    --blue: #5b7ce2;
-    --blue-soft: #eaf0ff;
-    --primary: #0f9d8a;
-    --primary-strong: #0c8676;
-    --primary-soft: #e6f6f2;
-    --green: #2c9b78;
-    --green-soft: #e9f8f2;
-    --amber: #d88916;
-    --amber-soft: #fff6df;
-    --border: #d8e0ec;
+    --blue: var(--color-structure);
+    --blue-soft: var(--color-structure-soft);
+    --primary: var(--color-brand);
+    --primary-strong: var(--color-brand-strong);
+    --primary-soft: var(--color-brand-soft);
+    --green: var(--color-action);
+    --green-soft: var(--color-action-soft);
+    --amber: var(--color-condition);
+    --amber-soft: var(--color-condition-soft);
+    --border: var(--border-default);
 }
 
 * { box-sizing: border-box; }

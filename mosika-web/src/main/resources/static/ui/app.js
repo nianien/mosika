@@ -174,7 +174,8 @@
 
     const TREE_LIMITS = { maxDepth: 128, maxNodes: 2000 };
 
-    const $ = (selector) => document.querySelector(selector);
+    const $ = window.MosikaUi.$;
+    const escapeText = window.MosikaUi.escapeHtml;
     const treeRoot = $("#treeRoot");
     const viewport = $("#treeViewport");
     const stage = $("#treeStage");
@@ -427,12 +428,6 @@
         } else if (relation === "default") {
             parent.defaultBranch = null;
         }
-    }
-
-    function escapeText(value) {
-        return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
-            "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
-        })[char]);
     }
 
     function compactStructureLabel(node, type) {
@@ -3250,7 +3245,7 @@
                     if (nsWrap) nsWrap.hidden = false;
                 }
                 const backEl = document.getElementById("backToFlows");
-                if (backEl) backEl.setAttribute("href", window.MosikaNs.link("/"));
+                if (backEl) backEl.setAttribute("href", window.MosikaNs.link("/scenes"));
             }
             applyLoadedFlow(flow);
         } catch (e) {

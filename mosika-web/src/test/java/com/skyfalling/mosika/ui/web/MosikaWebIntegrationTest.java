@@ -720,6 +720,12 @@ class MosikaWebIntegrationTest {
     void webRoutesUseSpringBootStaticResources() throws Exception {
         mvc.perform(get("/ui/console.html"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"capabilities\"")));
+        mvc.perform(get("/ui/namespaces.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"newBtn\"")));
+        mvc.perform(get("/ui/scenes.html"))
+                .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"newFlowBtn\"")));
         mvc.perform(get("/ui/rules.html"))
                 .andExpect(status().isOk())
@@ -734,6 +740,12 @@ class MosikaWebIntegrationTest {
         mvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/ui/console.html"));
+        mvc.perform(get("/namespaces"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/namespaces.html"));
+        mvc.perform(get("/scenes"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/ui/scenes.html"));
         mvc.perform(get("/rules"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/ui/rules.html"));

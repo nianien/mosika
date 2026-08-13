@@ -6,7 +6,7 @@
  * 拿到当前命名空间；未选择时统一跳转门禁页 /namespaces。
  *
  * 解析优先级：URL 的 ?ns= → localStorage → 都没有则跳门禁页。
- * 选择器样式在本文件内注入，避免三个列表页各自内联 CSS 的变量命名差异。
+ * 选择器样式由 ui-common.css 统一提供。
  */
 (function (root) {
     "use strict";
@@ -99,33 +99,11 @@
         return { code: state.code, list: state.list };
     }
 
-    const STYLE = `
-.ns-picker{display:flex;align-items:center;gap:8px;margin-left:14px;height:34px}
-.ns-picker>.ns-sep{color:#cfd9d5;font-size:var(--fs-panel);line-height:1;font-weight:300}
-.ns-picker select{height:100%;border:0;outline:none;background:none;cursor:pointer;padding:0;
-font-weight:700;font-size:var(--fs-panel);font-family:var(--ff-mono);color:#123038}
-.ns-picker select:hover{color:var(--teal-d)}
-.ns-tag{display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:7px;
-border:1px solid var(--border);background:#f4faf9;color:var(--teal-d);
-font-weight:600;font-size:var(--fs-minor);font-family:var(--ff-mono)}
-`;
-
-    function injectStyle() {
-        if (document.getElementById("ns-style")) {
-            return;
-        }
-        const el = document.createElement("style");
-        el.id = "ns-style";
-        el.textContent = STYLE;
-        document.head.appendChild(el);
-    }
-
     /** 在指定容器内渲染命名空间选择器，末项为管理入口 */
     function mountSelector(container) {
         if (!container || !state.code) {
             return;
         }
-        injectStyle();
         const box = document.createElement("div");
         box.className = "ns-picker";
         const sep = document.createElement("span");
@@ -177,7 +155,6 @@ font-weight:600;font-size:var(--fs-minor);font-family:var(--ff-mono)}
 
     /** 渲染只读命名空间标签，用于新建弹窗内展示归属 */
     function tagHtml() {
-        injectStyle();
         return `<span class="ns-tag">${state.code || ""}</span>`;
     }
 

@@ -5,16 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>业务场景 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
 <style>
-:root{
-  color:#123038;background:#edf4f3;
-  --teal:#0f9d8a;--teal-d:#0c8477;--teal-soft:#dff5f1;
-  --cyan:#0891b2;--cyan-soft:#e3fafd;
-  --green:#1f7a43;--green-soft:#dcf9e4;
-  --lemon:#8a6d0e;--lemon-soft:#fdf6d5;
-  --grey:#7b8aa5;--grey-soft:#eef1f6;--border:#cfe3e0;
-}
 *{box-sizing:border-box;margin:0;padding:0}
 /* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
 [hidden]{display:none!important}
@@ -123,12 +115,13 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 @media(max-width:1100px){.workspace-head{align-items:flex-start;flex-direction:column}.workspace-tools{width:100%;justify-content:space-between}}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{grid-template-columns:minmax(0,1fr) auto;gap:10px 12px;padding:10px 14px}.brandwrap{min-width:0;gap:10px}.brand-mark{width:32px;height:32px}.tabs{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(3,1fr);width:100%;gap:6px}.tab{justify-content:center;white-space:nowrap}.top-right{grid-column:2;grid-row:1;width:auto}.main{padding:16px 12px 24px}.workspace-tools{align-items:stretch;flex-direction:column}.search{width:100%}.search input{width:100%}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.drawer{width:100%;max-width:100vw}.pager{justify-content:space-between}}
 </style>
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
-<body>
+<body class="control-page">
 <div class="app-shell">
   <div class="topbar">
     <div class="brandwrap">
-      <a class="brand brand-home" href="/" aria-label="返回 Mosika 首页"><div class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></div><b>Mosika</b></a>
+      <a class="brand brand-home" href="/" aria-label="返回 Mosika 首页"><div class="brand-mark"><img src="/ui/logo.svg" alt=""></div><b>Mosika</b></a>
       <div id="nsSlot"></div>
     </div>
     <div class="tabs"><a class="tab on" href="/scenes">业务场景</a><a class="tab" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
@@ -149,6 +142,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
             <button type="button" class="chip" data-status="2">已停用</button>
           </div>
         </div>
+      </div>
+      <div class="core-context" aria-label="场景编译链路">
+        <span class="core-context-label">Compile path</span>
+        <span class="core-chain"><b>UI AST</b><i>→</i><b>RuleNode</b><i>→</i><b>RuleSuite</b></span>
+        <span class="core-context-note">草稿保留编辑模型，发布前完成结构校验与单向编译</span>
       </div>
       <div class="panel">
         <div class="table-scroll"><table>
@@ -211,16 +209,18 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   <div class="dlg-foot"><button class="btn primary" id="errDlgClose">知道了</button></div>
 </dialog>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/api.js?v=20260812-1"></script>
-<script src="/ui/ns.js?v=20260810-1"></script>
+<script src="/ui/ui-common.js?v=20260813-1"></script>
+<script src="/ui/api.js?v=20260813-1"></script>
+<script src="/ui/ns.js?v=20260813-1"></script>
 <script>
 (() => {
   "use strict";
   const Api = window.MosikaApi;
   const Ns = window.MosikaNs;
-  const $ = (s) => document.querySelector(s);
+  const Ui = window.MosikaUi;
+  const $ = Ui.$;
   let statusFilter = "1";
   let keyword = "";
   let pageNumber = 1;
@@ -235,8 +235,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   let statusDialogTarget = null;
   const pendingFlowIds = new Set();
 
-  const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
-  const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
+  const toast = Ui.createToast("#toast", { duration: 2000 });
+  const esc = Ui.escapeHtml;
 
   // 把后端英文技术错误映射为可读中文；返回 {msg, detail}。detail 为原始信息（仅在有助于排查时展示）。
   function friendlyError(raw) {
@@ -532,8 +532,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const chip = e.target.closest(".chip"); if (!chip) return;
     selectStatus(chip.dataset.status);
   });
-  let searchTimer;
-  $("#searchInput").addEventListener("input", (e) => { keyword = e.target.value.trim(); pageNumber = 1; clearTimeout(searchTimer); searchTimer = setTimeout(loadFlows, 250); });
+  $("#searchInput").addEventListener("input", Ui.debounce((e) => {
+    keyword = e.target.value.trim();
+    pageNumber = 1;
+    loadFlows();
+  }, 250));
   $("#prevPage").addEventListener("click", () => { if (pageNumber > 1) { pageNumber -= 1; loadFlows(); } });
   $("#nextPage").addEventListener("click", () => { if (pageNumber * pageSize < total) { pageNumber += 1; loadFlows(); } });
   $("#dwClose").addEventListener("click", () => closeDrawer());

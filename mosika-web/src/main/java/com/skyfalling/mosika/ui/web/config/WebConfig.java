@@ -12,7 +12,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *       不携带凭证；若要对外提供服务，需显式配置受信 Origin 并补充鉴权</li>
  *   <li>静态资源：规则编排前端位于 Spring Boot 标准目录
  *       {@code classpath:/static/ui/}，直接以 {@code /ui/**} 对外提供</li>
- *   <li>入口：根路径 {@code /} 转发到规则流列表控制台</li>
+ *   <li>入口：根路径 {@code /} 转发到产品首页，管理入口按命名空间、业务场景、
+ *       原子规则和 UDF 分页组织</li>
  * </ul>
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
@@ -47,10 +48,10 @@ public class WebConfig implements WebMvcConfigurer {
         // 正式干净路由，forward 到静态页并保留浏览器地址，页面静态资源使用 /ui/ 绝对引用
         //   /            产品首页
         //   /namespaces  命名空间选择门禁与管理页
-        //   /scenes      规则流列表
+        //   /scenes      业务场景与版本列表
         //   /rules       原子规则库
         //   /udfs        JavaScript UDF 注册中心
-        //   /flow/{id}   规则画布（id 在路径中，由前端 app.js 解析）
+        //   /flow/{id}   规则画布（flowId 在路径中，由前端 app.js 解析）
         //   /flow        缺 id 时回列表
         registry.addViewController("/").setViewName("forward:/ui/console.html");
         registry.addViewController("/scenes").setViewName("forward:/ui/scenes.html");

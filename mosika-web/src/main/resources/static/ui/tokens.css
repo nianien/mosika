@@ -1,8 +1,7 @@
 /* ============================================================
-   Mosika 字体统一配置
-   全站唯一的字体族与字号刻度来源。所有页面（console / rules / udfs /
-   namespaces / index 画布）在自身样式之前引入本文件，禁止再各自声明
-   font-family 与 --fs-* 变量。
+   Mosika 设计令牌
+   全站唯一的字体、颜色、间距、圆角、阴影和动效来源。所有页面在自身
+   样式之前引入本文件，页面可以保留兼容别名，但不再重复声明基础令牌。
 
    字号刻度共 11 级，按用途划分：
      note     10px    角标、极小注释
@@ -37,6 +36,61 @@
     --fs-panel: 15px;
     --fs-title: 17px;
     --fs-page: 19px;
+
+    --color-ink: #173630;
+    --color-text: #294942;
+    --color-muted: #6f8580;
+    --color-subtle: #91a39f;
+
+    --color-brand: #0f9d8a;
+    --color-brand-strong: #08796c;
+    --color-brand-soft: #e7f6f2;
+    --color-structure: #0e7490;
+    --color-structure-soft: #e8f7fa;
+    --color-condition: #a9690c;
+    --color-condition-soft: #fff4dc;
+    --color-action: #217a4b;
+    --color-action-soft: #e4f6ea;
+    --color-danger: #b94743;
+    --color-danger-soft: #fff0ef;
+
+    --surface-page: #f3f7f6;
+    --surface-panel: #ffffff;
+    --surface-subtle: #f7faf9;
+    --border-default: #d2e0dd;
+    --border-strong: #b7ccc7;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --shadow-panel: 0 1px 3px rgba(24, 66, 58, .06);
+    --shadow-overlay: 0 24px 64px rgba(18, 48, 56, .24);
+    --focus-ring: 0 0 0 3px rgba(15, 157, 138, .16);
+    --motion-fast: 140ms ease;
+
+    /* Legacy aliases used by the existing page-local layout rules. */
+    --teal: var(--color-brand);
+    --teal-d: var(--color-brand-strong);
+    --teal-soft: var(--color-brand-soft);
+    --soft: var(--color-brand-soft);
+    --cyan: var(--color-structure);
+    --cyan-soft: var(--color-structure-soft);
+    --green: var(--color-action);
+    --green-soft: var(--color-action-soft);
+    --lemon: var(--color-condition);
+    --lemon-soft: var(--color-condition-soft);
+    --grey: #7b8aa5;
+    --grey-soft: #eef1f6;
+    --border: var(--border-default);
+    --muted: var(--color-muted);
 
     font-family: var(--ff-sans);
     font-size: var(--fs-base);

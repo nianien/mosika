@@ -7,15 +7,16 @@
     <meta http-equiv="Pragma" content="no-cache">
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260811-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260812-6">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260813-1">
+    <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
-<body>
+<body class="editor-page">
 <main class="app-shell">
     <header class="topbar">
         <div class="brand">
             <a class="brand-home" href="/" aria-label="返回 Mosika 首页">
-                <span class="brand-mark"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M24 15V21M14 21H34M14 21V27M34 21V27"/></g><g fill="#fff"><circle cx="24" cy="13" r="3.4"/><circle cx="14" cy="30" r="3.4"/><circle cx="34" cy="30" r="3.4"/></g></svg></span>
+                <span class="brand-mark"><img src="/ui/logo.svg" alt=""></span>
                 <b class="brand-name">Mosika</b>
             </a>
             <div class="brand-crumbs">
@@ -39,6 +40,7 @@
             <div class="canvas-titlebar">
                 <div class="canvas-title-meta">
                     <strong>流程画布</strong>
+                    <span class="core-runtime-label">UI AST → RuleNode → RuleSuite</span>
                     <span id="nodeCount"></span>
                 </div>
                 <div class="canvas-tools">
@@ -338,9 +340,10 @@
 
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
-<script src="/ui/treenode.js?v=20260810-1"></script>
-<script src="/ui/api.js?v=20260812-3"></script>
-<script src="/ui/ns.js?v=20260810-1"></script>
-<script src="/ui/app.js?v=20260812-10"></script>
+<script src="/ui/ui-common.js?v=20260813-1"></script>
+<script src="/ui/treenode.js?v=20260813-1"></script>
+<script src="/ui/api.js?v=20260813-1"></script>
+<script src="/ui/ns.js?v=20260813-1"></script>
+<script src="/ui/app.js?v=20260813-1"></script>
 </body>
 </html>
