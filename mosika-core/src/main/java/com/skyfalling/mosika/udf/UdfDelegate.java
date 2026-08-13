@@ -6,7 +6,7 @@ import com.skyfalling.mosika.utils.JsonUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.Optional;
+import java.util.Collection;
 import java.util.function.BiFunction;
 
 /**
@@ -69,11 +69,14 @@ public interface UdfDelegate<P, R> {
          */
         private Object udf;
 
+        private final Signature[] signatures;
+
         /**
          * @param udf 代理函数
          */
         public Wrapper(Object udf) {
             this.udf = udf;
+            this.signatures = resolve(udf);
         }
 
 
@@ -87,15 +90,38 @@ public interface UdfDelegate<P, R> {
             if (udf instanceof JsUdf) {
                 params = new Object[]{params};
             }
-            int n = params.length;
-            Optional<Method> found = Reflections.getMethods(udf.getClass(), m -> m.getName().equals("apply") && m.getParameterCount() == n && !m.isBridge() //the overloaded method is marked as being a "bridge method".
-            ).stream().findFirst();
-            if (!found.isPresent()) {
+            Signature signature = params.length < signatures.length ? signatures[params.length] : null;
+            if (signature == null) {
                 throw new RuntimeException("no compatible method has " + params.length + " parameters!");
             }
-            Method method = found.get();
-            Object[] casts = Reflections.convert(params, method.getGenericParameterTypes(), converter);
-            return Reflections.invoke(method, udf, casts);
+            Object[] casts = Reflections.convert(params, signature.parameterTypes, converter);
+            return Reflections.invoke(signature.method, udf, casts);
+        }
+
+        private static Signature[] resolve(Object udf) {
+            Collection<Method> methods = Reflections.getMethods(udf.getClass(),
+                    m -> m.getName().equals("apply") && !m.isBridge());
+            int max = -1;
+            for (Method method : methods) {
+                max = Math.max(max, method.getParameterCount());
+            }
+            Signature[] result = new Signature[max + 1];
+            for (Method method : methods) {
+                int arity = method.getParameterCount();
+                result[arity] = new Signature(method);
+            }
+            return result;
+        }
+
+        private static final class Signature {
+
+            private final Method method;
+            private final Type[] parameterTypes;
+
+            private Signature(Method method) {
+                this.method = method;
+                this.parameterTypes = method.getGenericParameterTypes();
+            }
         }
 
     }
