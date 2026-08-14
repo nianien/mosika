@@ -648,6 +648,161 @@
         return fallback && fallback !== ruleId ? `${fallback} · ${ruleId}` : ruleId;
     }
 
+    function definitionChoices(definitions, selectedRuleId, fallbackLabel = "") {
+        if (!selectedRuleId || definitions.some((definition) => definition.ruleId === selectedRuleId)) {
+            return definitions;
+        }
+        return [{ ruleId: selectedRuleId, desc: fallbackLabel || selectedRuleId }, ...definitions];
+    }
+
+    function definitionLabel(definition) {
+        return `${definition.desc} · ${definition.ruleId}`;
+    }
+
+    function definitionOptionsHtml(definitions, selectedRuleId, menuId) {
+        if (!definitions.length) return `<div class="rule-picker-empty">没有匹配的规则</div>`;
+        return definitions.map((definition, index) => `
+            <button class="rule-picker-option" id="${menuId}-option-${index}" type="button" role="option"
+                    tabindex="-1" data-rule-id="${escapeText(definition.ruleId)}"
+                    data-rule-label="${escapeText(definitionLabel(definition))}"
+                    aria-selected="${definition.ruleId === selectedRuleId}">
+                <span>${escapeText(definition.desc)}</span>
+                <code>${escapeText(definition.ruleId)}</code>
+            </button>`).join("");
+    }
+
+    function definitionPickerHtml(idPrefix, kind, definitions, selectedRuleId = "", fallbackLabel = "", valueAttributes = "") {
+        const options = definitionChoices(definitions, selectedRuleId, fallbackLabel);
+        const menuId = `${idPrefix}Options`;
+        return `<div class="rule-picker" data-definition-kind="${kind}">
+            <input class="rule-picker-filter" id="${idPrefix}Filter" type="text"
+                   autocomplete="off" placeholder="输入规则名称或 ID"
+                   value="${escapeText(definitionReference(options, selectedRuleId, fallbackLabel))}"
+                   data-fallback-label="${escapeText(fallbackLabel)}"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   aria-controls="${menuId}" aria-label="选择引用规则">
+            <input id="${idPrefix}Select" type="hidden" data-rule-picker-value ${valueAttributes}
+                   value="${escapeText(selectedRuleId || "")}">
+            <div class="rule-picker-menu" id="${menuId}" role="listbox" hidden>
+                ${definitionOptionsHtml(options, selectedRuleId, menuId)}
+            </div>
+        </div>`;
+    }
+
+    function definitionPickerParts(filterInput) {
+        const picker = filterInput.closest(".rule-picker");
+        return {
+            picker,
+            valueInput: picker?.querySelector("[data-rule-picker-value]"),
+            menu: picker?.querySelector(".rule-picker-menu")
+        };
+    }
+
+    function definitionsForPicker(filterInput) {
+        const { picker, valueInput } = definitionPickerParts(filterInput);
+        if (!picker || !valueInput) return [];
+        const definitions = picker.dataset.definitionKind === "rule" ? RULE_DEFINITIONS : ACTION_DEFINITIONS;
+        return definitionChoices(definitions, valueInput.value, filterInput.dataset.fallbackLabel || valueInput.value);
+    }
+
+    function setDefinitionPickerActive(filterInput, index) {
+        const { picker, menu } = definitionPickerParts(filterInput);
+        const options = [...(menu?.querySelectorAll(".rule-picker-option") || [])];
+        if (!picker || !options.length) {
+            filterInput.removeAttribute("aria-activedescendant");
+            return;
+        }
+        const nextIndex = Math.max(0, Math.min(index, options.length - 1));
+        picker.dataset.activeIndex = String(nextIndex);
+        options.forEach((option, optionIndex) => option.classList.toggle("is-active", optionIndex === nextIndex));
+        filterInput.setAttribute("aria-activedescendant", options[nextIndex].id);
+        options[nextIndex].scrollIntoView({ block: "nearest" });
+    }
+
+    function renderDefinitionPicker(filterInput, definitions, query = "", open = true) {
+        const { picker, valueInput, menu } = definitionPickerParts(filterInput);
+        if (!picker || !valueInput || !menu) return;
+        const normalized = query.trim().toLowerCase();
+        const filtered = query
+            ? definitions.filter((definition) =>
+                `${definition.desc} ${definition.ruleId}`.toLowerCase().includes(normalized))
+            : definitions;
+        menu.innerHTML = definitionOptionsHtml(filtered, valueInput.value, menu.id);
+        menu.hidden = !open;
+        filterInput.setAttribute("aria-expanded", String(open));
+        const selectedIndex = filtered.findIndex((definition) => definition.ruleId === valueInput.value);
+        picker.dataset.activeIndex = String(selectedIndex >= 0 ? selectedIndex : 0);
+        if (open) setDefinitionPickerActive(filterInput, selectedIndex >= 0 ? selectedIndex : 0);
+        else filterInput.removeAttribute("aria-activedescendant");
+    }
+
+    function syncDefinitionPicker(filterInput, valueInput, definitions, selectedRuleId = "") {
+        const selected = definitions.find((definition) => definition.ruleId === selectedRuleId)
+            || definitions[0]
+            || null;
+        valueInput.value = selected?.ruleId || "";
+        filterInput.value = selected ? definitionLabel(selected) : "";
+        filterInput.disabled = !definitions.length;
+        renderDefinitionPicker(filterInput, definitions, "", false);
+    }
+
+    function closeDefinitionPicker(filterInput) {
+        const { menu } = definitionPickerParts(filterInput);
+        if (!menu) return;
+        menu.hidden = true;
+        filterInput.setAttribute("aria-expanded", "false");
+        filterInput.removeAttribute("aria-activedescendant");
+    }
+
+    function chooseDefinitionOption(option) {
+        const picker = option.closest(".rule-picker");
+        const filterInput = picker?.querySelector(".rule-picker-filter");
+        const valueInput = picker?.querySelector("[data-rule-picker-value]");
+        if (!filterInput || !valueInput) return;
+        valueInput.value = option.dataset.ruleId || "";
+        filterInput.value = option.dataset.ruleLabel || "";
+        closeDefinitionPicker(filterInput);
+        valueInput.dispatchEvent(new Event("change", { bubbles: true }));
+        if (filterInput.isConnected) filterInput.focus();
+    }
+
+    function filterDefinitionPicker(filterInput) {
+        const { valueInput } = definitionPickerParts(filterInput);
+        if (!valueInput) return;
+        valueInput.value = "";
+        renderDefinitionPicker(filterInput, definitionsForPicker(filterInput), filterInput.value, true);
+    }
+
+    function handleDefinitionPickerKeydown(event) {
+        const filterInput = event.target;
+        if (!filterInput.classList.contains("rule-picker-filter")) return false;
+        const { picker, menu } = definitionPickerParts(filterInput);
+        if (!picker || !menu) return false;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (menu.hidden) renderDefinitionPicker(filterInput, definitionsForPicker(filterInput), "", true);
+            const options = menu.querySelectorAll(".rule-picker-option");
+            if (!options.length) return true;
+            const currentIndex = Number(picker.dataset.activeIndex || 0);
+            const offset = event.key === "ArrowDown" ? 1 : -1;
+            setDefinitionPickerActive(filterInput, (currentIndex + offset + options.length) % options.length);
+            return true;
+        }
+        if (event.key === "Enter" && !menu.hidden) {
+            event.preventDefault();
+            const options = menu.querySelectorAll(".rule-picker-option");
+            const active = options[Number(picker.dataset.activeIndex || 0)];
+            if (active) chooseDefinitionOption(active);
+            return true;
+        }
+        if (event.key === "Escape" && !menu.hidden) {
+            event.preventDefault();
+            closeDefinitionPicker(filterInput);
+            return true;
+        }
+        return false;
+    }
+
     function judgeRuleReference(node) {
         const rule = conditionRule(node);
         if (!rule) return "未设置";
@@ -869,7 +1024,7 @@
         const nodeName = flowNodeName(node);
         const nodeId = idOf(node);
         const parts = [];
-        const pencil = (field) => `<button class="field-edit" type="button" data-field-edit="${field}" aria-label="编辑" title="编辑">
+        const pencil = (field) => editorReadOnly ? "" : `<button class="field-edit" type="button" data-field-edit="${field}" aria-label="编辑" title="编辑">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
         </button>`;
         const confirmCancel = () => `<div class="field-edit-actions">
@@ -910,16 +1065,15 @@
         </div>`);
         const ruleField = (definitions, selectedRuleId, fallbackLabel) => {
             const active = inspectorEditingField === editKey(nodeId, "expression");
-            const options = [...(selectedRuleId && !definitions.some((d) => d.ruleId === selectedRuleId)
-                ? [{ ruleId: selectedRuleId, desc: fallbackLabel || selectedRuleId }] : []), ...definitions];
+            const kind = definitions === RULE_DEFINITIONS ? "rule" : "action";
             parts.push(`<div class="detail-field editable${active ? " field-editing" : ""}" data-field="expression">
                 <span class="detail-label">引用规则</span>
                 <div class="field-row">
                     <span class="detail-value">${escapeText(definitionReference(definitions, selectedRuleId, fallbackLabel))}</span>
                     ${active ? "" : pencil("expression")}
-                    <select class="field-control" id="inspectorDefinitionSelect">
-                        ${options.map((d) => `<option value="${escapeText(d.ruleId)}" ${d.ruleId === selectedRuleId ? "selected" : ""}>${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("")}
-                    </select>
+                    <div class="field-control">
+                        ${definitionPickerHtml("inspectorDefinition", kind, definitions, selectedRuleId, fallbackLabel)}
+                    </div>
                     ${active ? confirmCancel() : ""}
                 </div>
             </div>`);
@@ -935,7 +1089,11 @@
             const selectedRuleId = node.rule?.expr === "∅" ? null : node.rule?.expr;
             ruleField(ACTION_DEFINITIONS, selectedRuleId, flowNodeName(node));
         } else if (node.type === "C") {
-            readonlyField("引用规则", judgeRuleReference(node));
+            const rule = conditionRule(node);
+            if (!rule || rule.type === "B") {
+                ruleField(RULE_DEFINITIONS, rule?.expr || "", rule ? ruleNodeDisplayName(rule) : "");
+            }
+            else readonlyField("引用规则", judgeRuleReference(node));
         } else if (["S", "P"].includes(node.type)) {
             readonlyField("分支数", `${node.branches.length} 个`);
         } else if (node.type === "D") {
@@ -951,7 +1109,9 @@
         $("#nodeDetailFields").innerHTML = parts.join("");
         if (inspectorEditingField && inspectorEditingField.startsWith(`${nodeId}:`)) {
             requestAnimationFrame(() => {
-                const control = $("#nodeDetailFields .field-editing .field-control");
+                const control = $("#nodeDetailFields .field-editing .rule-picker-filter, "
+                    + "#nodeDetailFields .field-editing input.field-control, "
+                    + "#nodeDetailFields .field-editing select.field-control");
                 control?.focus();
                 if (control?.tagName === "INPUT") control.select();
             });
@@ -1188,9 +1348,14 @@
                 </div>`;
             }
             return `<div class="rule-add-row${activeClass}">
-                <select data-subrule-select="${index}">
-                    ${RULE_DEFINITIONS.map((definition) => `<option value="${escapeText(definition.ruleId)}" ${definition.ruleId === child.expr ? "selected" : ""}>${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}</option>`).join("")}
-                </select>
+                ${definitionPickerHtml(
+                    `ruleSubrule${index}`,
+                    "rule",
+                    RULE_DEFINITIONS,
+                    child.expr,
+                    child.expr,
+                    `data-subrule-select="${index}"`
+                )}
                 ${moveButtons}
             </div>`;
         }).join("");
@@ -1378,9 +1543,14 @@
         const container = $("#ruleCompositeRows");
         container.innerHTML = ruleCompositeRuleIds.map((ruleId, index) => `
             <div class="rule-add-row">
-                <select data-composite-select="${index}">
-                    ${RULE_DEFINITIONS.map((d) => `<option value="${escapeText(d.ruleId)}" ${d.ruleId === ruleId ? "selected" : ""}>${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("")}
-                </select>
+                ${definitionPickerHtml(
+                    `compositeDefinition${index}`,
+                    "rule",
+                    RULE_DEFINITIONS,
+                    ruleId,
+                    ruleId,
+                    `data-composite-select="${index}"`
+                )}
                 <button type="button" data-composite-remove="${index}" aria-label="删除" ${ruleCompositeRuleIds.length <= 1 ? "disabled" : ""}>×</button>
             </div>`).join("");
         $("#ruleCompositeLogicField").hidden = ruleCompositeRuleIds.length < 2;
@@ -1534,22 +1704,26 @@
             const params = renderParamsSectionHtml(stagingRuleNode(index));
             return `
             <div class="rule-add-row">
-                <label>
-                    引用规则 ${index + 1}
-                    <select data-rule-add-select="${index}">
-                        ${RULE_DEFINITIONS.map((definition) => `
-                            <option value="${escapeText(definition.ruleId)}" ${definition.ruleId === ruleId ? "selected" : ""}>
-                                ${escapeText(definition.desc)} · ${escapeText(definition.ruleId)}
-                            </option>`).join("")}
-                    </select>
-                </label>
+                <div class="rule-add-field">
+                    <span class="detail-label">引用规则 ${index + 1}</span>
+                    ${definitionPickerHtml(
+                        `ruleAddDefinition${index}`,
+                        "rule",
+                        RULE_DEFINITIONS,
+                        ruleId,
+                        ruleId,
+                        `data-rule-add-select="${index}"`
+                    )}
+                </div>
                 <button type="button" data-rule-add-remove="${index}" aria-label="删除规则 ${index + 1}" ${ruleAddRuleIds.length === 1 ? "disabled" : ""}>×</button>
             </div>
             ${params ? `<div class="rule-add-params" data-rule-add-params="${index}">${params}</div>` : ""}`;
         }).join("");
         $("#ruleAddLogicField").hidden = ruleAddRuleIds.length <= 1;
         requestAnimationFrame(() => {
-            if (focusIndex >= 0) $(`[data-rule-add-select="${focusIndex}"]`)?.focus();
+            if (focusIndex < 0) return;
+            const valueInput = $(`[data-rule-add-select="${focusIndex}"]`);
+            valueInput?.closest(".rule-picker")?.querySelector(".rule-picker-filter")?.focus();
         });
     }
 
@@ -1791,8 +1965,7 @@
         const note = $("#nodeConfigNote");
         if (type === "A") {
             ruleField.hidden = false;
-            $("#nodeConfigRule").innerHTML = ACTION_DEFINITIONS
-                .map((d) => `<option value="${escapeText(d.ruleId)}">${escapeText(d.desc)} · ${escapeText(d.ruleId)}</option>`).join("");
+            syncDefinitionPicker($("#nodeConfigRuleFilter"), $("#nodeConfigRule"), ACTION_DEFINITIONS);
             note.textContent = ACTION_DEFINITIONS.length ? "" : "暂无执行动作，请先在「业务规则」中新建执行动作。";
         } else if (type === "C") {
             ruleField.hidden = true;
@@ -2092,7 +2265,10 @@
                 + "#ruleDialog input, #ruleDialog select, #ruleDialog textarea, #ruleDialog button")
                 .forEach((control) => { control.disabled = false; });
         }
+        const closeInspectorEdit = nextReadOnly && Boolean(inspectorEditingField);
+        if (closeInspectorEdit) inspectorEditingField = null;
         editorReadOnly = nextReadOnly;
+        if (closeInspectorEdit) updateInspector();
         syncReadonlyControls();
     }
 
@@ -2176,36 +2352,13 @@
     function populateTestInputsFromTree() {
         const paths = collectTestDataPaths(tree);
         const targetInput = $("#testTargetInput");
-        const contextInput = $("#testContextInput");
         if (isEmptyJsonObject(targetInput) && paths.target.length) {
             targetInput.value = formatJson(buildTestJsonSkeleton(paths.target));
         }
-        if (isEmptyJsonObject(contextInput) && paths.context.length) {
-            contextInput.value = formatJson(buildTestJsonSkeleton(paths.context));
-        }
-    }
-
-    function setTestInputTab(kind, focus = true) {
-        const targetActive = kind !== "context";
-        [
-            ["target", $("#testTargetTab"), $("#testTargetPanel"), $("#testTargetInput")],
-            ["context", $("#testContextTab"), $("#testContextPanel"), $("#testContextInput")]
-        ].forEach(([tabKind, tab, panel, input]) => {
-            const active = tabKind === (targetActive ? "target" : "context");
-            tab.classList.toggle("is-active", active);
-            tab.setAttribute("aria-selected", String(active));
-            tab.tabIndex = active ? 0 : -1;
-            panel.hidden = !active;
-            if (active && focus) requestAnimationFrame(() => input.focus());
-        });
     }
 
     function setTestInputError(input, invalid) {
-        const kind = input.id === "testContextInput" ? "context" : "target";
-        const tab = kind === "context" ? $("#testContextTab") : $("#testTargetTab");
         input.setAttribute("aria-invalid", String(invalid));
-        tab.classList.toggle("is-error", invalid);
-        if (invalid) setTestInputTab(kind, false);
     }
 
     function setTestPanelOpen(open) {
@@ -2215,7 +2368,7 @@
             setInspectorCollapsed(false);
         }
         updateInspector();
-        if (open) setTestInputTab("target");
+        if (open) requestAnimationFrame(() => $("#testTargetInput").focus());
     }
 
     function formatJson(value) {
@@ -2262,10 +2415,8 @@
         if (placeholderGate() || requiredParamGate()) return;
         materializeParamDefaults(tree);
         let target;
-        let context;
         try {
             target = parseTestJson($("#testTargetInput"), "$ 输入数据");
-            context = parseTestJson($("#testContextInput"), "$$ 上下文", true);
         } catch (error) {
             showTestFailure(error.message);
             return;
@@ -2276,7 +2427,7 @@
                 namespace: flowMeta.namespace,
                 ruleTree: JSON.stringify(T.serialize(tree)),
                 target,
-                context
+                context: {}
             });
             executedPaths.clear();
             (response.executedPaths || []).forEach((path) => executedPaths.add(path));
@@ -2688,18 +2839,7 @@
     $("#inspectorExpand").addEventListener("click", () => setInspectorCollapsed(false));
     $("#testFlowButton").addEventListener("click", () => setTestPanelOpen(!testPanelOpen));
     $("#testPanelClose").addEventListener("click", () => setTestPanelOpen(false));
-    document.querySelector(".test-json-tabs").addEventListener("click", (event) => {
-        const tab = event.target.closest("[data-test-input-tab]");
-        if (tab) setTestInputTab(tab.dataset.testInputTab);
-    });
-    document.querySelector(".test-json-tabs").addEventListener("keydown", (event) => {
-        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-        event.preventDefault();
-        setTestInputTab(event.target.dataset.testInputTab === "target" ? "context" : "target");
-    });
-    ["testTargetInput", "testContextInput"].forEach((id) => {
-        $(`#${id}`).addEventListener("input", (event) => setTestInputError(event.target, false));
-    });
+    $("#testTargetInput").addEventListener("input", (event) => setTestInputError(event.target, false));
     $("#runTestButton").addEventListener("click", runFlowTest);
     $("#saveDraftButton").addEventListener("click", saveDraft);
     $("#publishFlowButton").addEventListener("click", promoteToFormal);
@@ -2815,6 +2955,14 @@
         const button = event.target.closest("[data-composite-remove]");
         if (button) removeCompositeRow(Number(button.dataset.compositeRemove));
     });
+    $("#ruleCompositeRows").addEventListener("change", (event) => {
+        const valueInput = event.target.closest("[data-composite-select]");
+        if (!valueInput) return;
+        const index = Number(valueInput.dataset.compositeSelect);
+        if (Number.isInteger(index) && ruleCompositeRuleIds[index] !== undefined) {
+            ruleCompositeRuleIds[index] = valueInput.value;
+        }
+    });
     $("#ruleCompositeCancelButton")?.addEventListener("click", cancelCompositeBuilder);
     document.getElementById("ruleAddDialog").addEventListener("close", () => { ruleCompositeRuleIds = []; });
     $("#ruleCompositeConfirmButton").addEventListener("click", confirmCompositeBuilder);
@@ -2888,6 +3036,25 @@
     $("#nodeConfigCancelButton").addEventListener("click", closeNodeConfig);
     $("#nodeConfigCloseButton").addEventListener("click", closeNodeConfig);
     document.getElementById("nodeConfigDialog").addEventListener("cancel", (e) => { e.preventDefault(); closeNodeConfig(); });
+    document.addEventListener("click", (event) => {
+        const option = event.target.closest(".rule-picker-option");
+        if (option) chooseDefinitionOption(option);
+    });
+    document.addEventListener("input", (event) => {
+        if (event.target.classList.contains("rule-picker-filter")) filterDefinitionPicker(event.target);
+    });
+    document.addEventListener("focusin", (event) => {
+        if (!event.target.classList.contains("rule-picker-filter")) return;
+        renderDefinitionPicker(event.target, definitionsForPicker(event.target), "", true);
+    });
+    document.addEventListener("keydown", (event) => {
+        if (handleDefinitionPickerKeydown(event)) event.stopPropagation();
+    }, true);
+    document.addEventListener("pointerdown", (event) => {
+        document.querySelectorAll(".rule-picker-filter[aria-expanded='true']").forEach((filterInput) => {
+            if (!filterInput.closest(".rule-picker").contains(event.target)) closeDefinitionPicker(filterInput);
+        });
+    }, true);
     $("#newNodeCancelButton").addEventListener("click", closeAddPanel);
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !$("#inspectorAddPanel").hidden) closeAddPanel();

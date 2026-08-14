@@ -17,17 +17,17 @@ public class GetUserTypeUdf implements BiFunction<String, RuleContext, Integer> 
     @Override
     public Integer apply(String name, RuleContext context) {
         int type = findUserType(name, context);
-        context.setProperty("user_type", type);
+        context.put("user_type", type);
         return type;
     }
 
 
     private int findUserType(String name, RuleContext context) {
         if (name.contains("admin")) {
-            context.setProperty("owner", "admin");
+            context.put("owner", "admin");
             return 1;
         } else {
-            context.setProperty("owner", "user");
+            context.put("owner", "user");
             return 2;
         }
     }

@@ -94,7 +94,6 @@ public class EvalController {
      * 试运行编辑中的原子规则：POST /api/eval/try
      * <p>
      * body 包含 namespace/expression/args/target/context，规则不必已保存或已启用。
-     * 传了 context 时 core 不返回规则详情，结果里的 details 会为空。
      */
     @PostMapping("/try")
     public ApiResponse<NodeResult> tryRule(@RequestBody TryEvalRequest req) {

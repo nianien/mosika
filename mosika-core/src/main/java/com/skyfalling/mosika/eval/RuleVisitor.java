@@ -22,13 +22,13 @@ import java.util.stream.Collectors;
 /**
  * 单次规则执行使用的节点访问器和规则上下文
  * <p>
- * 附加上下文保存在当前映射中，无参数叶子结果按规则 ID 复用
+ * 附加上下文保存在独立映射中，无参数叶子结果按规则 ID 复用
  * 参数化叶子结果按规则 ID 和规范化参数复用，每个执行节点独立保存实际评估结果
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleContext {
+public class RuleVisitor implements RuleContext {
 
     /**
      * 当前执行使用的规则引擎
@@ -38,6 +38,12 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      * 当前执行的目标对象
      */
     private Object data;
+
+    /**
+     * 上下文数据，可用于节点共享<br/>
+     * 外部传入该对象，则能获取规则的写入数据
+     */
+    private Map<String, Object> contextData;
 
     /**
      * 当前线程正在评估的命名规则 ID
@@ -65,8 +71,20 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      * @param data       目标对象
      */
     public RuleVisitor(RuleEngine ruleEngine, Object data) {
+        this(ruleEngine, data, null);
+    }
+
+    /**
+     * 创建单次规则执行上下文
+     *
+     * @param ruleEngine  规则引擎
+     * @param data        目标对象
+     * @param contextData 附加上下文
+     */
+    public RuleVisitor(RuleEngine ruleEngine, Object data, Map<String, Object> contextData) {
         this.ruleEngine = ruleEngine;
         this.data = data;
+        this.contextData = contextData == null ? new LinkedHashMap<>() : contextData;
     }
 
 
@@ -145,20 +163,20 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
 
 
     @Override
-    public synchronized Object getProperty(Object name) {
-        return super.get(name);
+    public synchronized Object get(Object name) {
+        return contextData.get(name);
+    }
+
+
+    @Override
+    public synchronized void put(String name, Object value) {
+        contextData.put(name, value);
     }
 
     @Override
-    public synchronized void setProperty(String name, Object value) {
-        super.put(name, value);
+    public synchronized void remove(String name) {
+        contextData.remove(name);
     }
-
-    @Override
-    public synchronized void removeProperty(String name) {
-        super.remove(name);
-    }
-
 
     /**
      * 调用规则引擎执行单次叶子规则并发送评估事件
@@ -168,7 +186,7 @@ public class RuleVisitor extends LinkedHashMap<String, Object> implements RuleCo
      * @param arguments  当前规则调用参数
      * @return 叶子规则评估结果
      * @throws RuleNotFoundException 规则未注册时抛出
-     * @throws RuleEvalException 规则执行失败时抛出
+     * @throws RuleEvalException     规则执行失败时抛出
      */
     private EvalResult doEval(String ruleId,
                               String expression,

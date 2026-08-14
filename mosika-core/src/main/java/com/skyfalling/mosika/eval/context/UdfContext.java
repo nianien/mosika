@@ -22,16 +22,16 @@ public interface UdfContext {
     /**
      * 获取属性
      */
-    Object getProperty(Object name);
+    Object get(Object name);
 
     /**
      * 添加属性
      */
-    void setProperty(String name, Object value);
+    void put(String name, Object value);
 
 
     /**
      * 移除属性
      */
-    void removeProperty(String name);
+    void remove(String name);
 }

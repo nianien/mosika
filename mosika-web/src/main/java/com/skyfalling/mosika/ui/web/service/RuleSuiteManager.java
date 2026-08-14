@@ -250,10 +250,7 @@ public class RuleSuiteManager {
         if (flow == null || flow.getStatus() == null || flow.getStatus() != RuleFlowService.PUBLISHED) {
             throw new BusinessException(404, "active flow not found: " + flowId);
         }
-        if (context == null || context.isEmpty()) {
-            return getSuite(flow.getNamespace()).evalRule(flowId, target);
-        }
-        return getSuite(flow.getNamespace()).evalRule(flowId, target, context);
+        return getSuite(flow.getNamespace()).eval(flowId, target, context);
     }
 
     /** 执行一条已启用原子规则 */
@@ -262,7 +259,7 @@ public class RuleSuiteManager {
         if (rule == null || rule.getStatus() == null || rule.getStatus() != 1) {
             throw new BusinessException(404, "active rule not found: " + ruleId);
         }
-        return getSuite(rule.getNamespace()).evalRule(ruleId, target);
+        return getSuite(rule.getNamespace()).eval(ruleId, target);
     }
 
     /** 在指定命名空间套件中直接评估一段规则 DSL */
@@ -346,7 +343,7 @@ public class RuleSuiteManager {
             Map<String, Object> mutableContext = context == null
                     ? new LinkedHashMap<>()
                     : new LinkedHashMap<>(context);
-            NodeResult result = suite.evalWithDetails(entryId, target, mutableContext);
+            NodeResult result = suite.eval(entryId, target, mutableContext);
             List<String> paths = executedPaths(result.getDetails(), traceBuilder.paths());
             return new FlowTryResult(result, mutableContext, paths);
         } catch (BusinessException e) {

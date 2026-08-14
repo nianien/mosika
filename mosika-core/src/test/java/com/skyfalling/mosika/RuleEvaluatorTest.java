@@ -102,12 +102,12 @@ public class RuleEvaluatorTest {
                 Arrays.asList(
                         new RuleDefinition("c1", "true", "业务分支1"),
                         new RuleDefinition("c2", "true", "业务分支2"),
-                        new RuleDefinition("101", "isAdult($.name,$.age,$$)", "${$.name}的年龄(${$.age})小于${$$.minAge}岁"),
+                        new RuleDefinition("101", "isAdult($.name,$.age,$$)", "${$.name}的年龄(${$.age})小于${$$.get('minAge')}岁"),
                         new RuleDefinition("102", "$.name!='' && $.age>18", "${$.name}的年龄小于18"),
-                        new RuleDefinition("103", "isAdmin($.name,$$)", "用户【${$.name}】不是管理员用户【${$$.admin}】"),
+                        new RuleDefinition("103", "isAdmin($.name,$$)", "用户【${$.name}】不是管理员用户【${$$.get('admin')}】"),
                         new RuleDefinition("104",
                                 "var udf= Java.type('" + AdultValidateUdf.class.getName()
-                                        + "'); new udf(18).apply($.name,$.age,$$)", "用户【${$.name}】的年龄不满${$$.minAge}岁"),
+                                        + "'); new udf(18).apply($.name,$.age,$$)", "用户【${$.name}】的年龄不满${$$.get('minAge')}岁"),
                         new RuleDefinition("105", "target", "调用规则2",
                                 RuleDefinition.RULE_TYPE_COMPOSITE),
                         new RuleDefinition("106", "target", "调用规则2",
@@ -122,7 +122,7 @@ public class RuleEvaluatorTest {
                         new UdfDefinition("isAdmin", new SystemAdminUdf("system"))));
 
         RuleSuite suite = simpleRuleLoader.loadSuite();
-        assertEquals(false, suite.evalRule("entry", root).getResult());
+        assertEquals(false, suite.eval("entry", root).getResult());
     }
 
 
@@ -148,12 +148,12 @@ public class RuleEvaluatorTest {
                 Arrays.asList(
                         new RuleDefinition("c1", "false", "业务分支1"),
                         new RuleDefinition("c2", "true", "业务分支2"),
-                        new RuleDefinition("101", "isAdult($.name,$.age,$$)", "${$.name}的年龄(${$.age})小于${$$.minAge}岁"),
+                        new RuleDefinition("101", "isAdult($.name,$.age,$$)", "${$.name}的年龄(${$.age})小于${$$.get('minAge')}岁"),
                         new RuleDefinition("102", "$.name!='' && $.age>18", "${$.name}的年龄小于18"),
-                        new RuleDefinition("103", "isAdmin($.name,$$)", "用户【${$.name}】不是管理员用户【${$$.admin}】"),
+                        new RuleDefinition("103", "isAdmin($.name,$$)", "用户【${$.name}】不是管理员用户【${$$.get('admin')}】"),
                         new RuleDefinition("104",
                                 "var udf= Java.type('" + AdultValidateUdf.class.getName()
-                                        + "'); new udf(18).apply($.name,$.age,$$)", "用户【${$.name}】的年龄不满${$$.minAge}岁")
+                                        + "'); new udf(18).apply($.name,$.age,$$)", "用户【${$.name}】的年龄不满${$$.get('minAge')}岁")
                 ),
                 Arrays.asList(
                         new UdfDefinition("isAdult", new AdultValidateUdf(18)),

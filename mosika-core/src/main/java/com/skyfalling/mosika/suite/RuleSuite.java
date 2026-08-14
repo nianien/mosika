@@ -11,7 +11,6 @@ import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.eval.result.NodeResult;
 import com.skyfalling.mosika.exception.RuleEvalException;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,7 +47,7 @@ public class RuleSuite {
      * @param ruleDefinitions 规则定义
      * @param udfDefinitions  UDF 定义
      * @throws IllegalArgumentException 规则 ID 或 UDF 名称重复、规则参数不合法时抛出
-     * @throws IllegalStateException 复合规则语法错误或存在循环引用时抛出
+     * @throws IllegalStateException    复合规则语法错误或存在循环引用时抛出
      */
     public RuleSuite(List<RuleDefinition> ruleDefinitions, List<UdfDefinition> udfDefinitions) {
         this(RuleEngine.builder()
@@ -84,30 +83,6 @@ public class RuleSuite {
         this.nodeBuilder = Objects.requireNonNull(nodeBuilder, "nodeBuilder cannot be null");
     }
 
-    /**
-     * 执行当前套件中的命名规则
-     *
-     * @param ruleId 规则 ID
-     * @param target 用于规则计算的目标对象
-     * @return 包含根节点结果和规则详情的执行结果
-     * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
-     */
-    public NodeResult evalRule(String ruleId, Object target) {
-        return eval(ruleId, target);
-    }
-
-    /**
-     * 使用附加上下文执行当前套件中的命名规则
-     *
-     * @param ruleId  规则 ID
-     * @param target  用于规则计算的目标对象
-     * @param context 参与本次计算并接收执行期新增和更新值的附加上下文
-     * @return 不包含规则详情的执行结果
-     * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
-     */
-    public NodeResult evalRule(String ruleId, Object target, Map<String, Object> context) {
-        return eval(ruleId, target, context);
-    }
 
     /**
      * 解析并执行规则 ID 或任意规则 DSL 表达式
@@ -118,7 +93,7 @@ public class RuleSuite {
      * @param data     用于规则计算的数据对象
      * @return 包含根节点结果和规则详情的执行结果
      * @throws IllegalStateException DSL 语法错误时抛出
-     * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
+     * @throws RuleEvalException     叶子规则未注册或脚本执行失败时抛出
      */
     public NodeResult eval(String ruleExpr, Object data) {
         return eval(nodeBuilder.build(ruleExpr), data);
@@ -127,26 +102,19 @@ public class RuleSuite {
     /**
      * 使用附加上下文解析并执行规则 ID 或任意规则 DSL 表达式
      * <p>
-     * 执行前复制传入上下文，执行后将新增和更新的上下文值写回原集合
+     * 本次执行直接使用传入的上下文
      *
      * @param ruleExpr 规则 ID 或规则 DSL 表达式
      * @param data     用于规则计算的数据对象
-     * @param context 参与本次计算并接收执行期新增和更新值的附加上下文
-     * @return 不包含规则详情的执行结果
+     * @param context  参与本次计算的附加上下文，执行期修改直接作用于该集合
+     * @return 包含根节点结果和规则详情的执行结果
      * @throws IllegalStateException DSL 语法错误时抛出
-     * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
+     * @throws RuleEvalException     叶子规则未注册或脚本执行失败时抛出
      */
     public NodeResult eval(String ruleExpr, Object data, Map<String, Object> context) {
         return eval(nodeBuilder.build(ruleExpr), data, context);
     }
 
-    public NodeResult evalWithDetails(String ruleExpr, Object data, Map<String, Object> context) {
-        RuleVisitor ruleContext = new RuleVisitor(ruleEngine, data);
-        ruleContext.putAll(context);
-        NodeResult result = doEval(nodeBuilder.build(ruleExpr), ruleContext, true);
-        context.putAll(ruleContext);
-        return result;
-    }
 
     /**
      * 执行已经构建的规则节点
@@ -157,26 +125,22 @@ public class RuleSuite {
      * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
      */
     public NodeResult eval(RuleNode ruleNode, Object data) {
-        return doEval(ruleNode, new RuleVisitor(ruleEngine, data), true);
+        return doEval(ruleNode, new RuleVisitor(ruleEngine, data));
     }
 
     /**
      * 使用附加上下文执行已经构建的规则节点
      * <p>
-     * 执行前复制传入上下文，执行后将新增和更新的上下文值写回原集合
+     * 本次执行直接使用传入的上下文
      *
      * @param ruleNode 规则节点
      * @param data     用于规则计算的数据对象
-     * @param context 参与本次计算并接收执行期新增和更新值的附加上下文
-     * @return 不包含规则详情的执行结果
+     * @param context  参与本次计算的附加上下文，执行期修改直接作用于该集合
+     * @return 包含根节点结果和规则详情的执行结果
      * @throws RuleEvalException 叶子规则未注册或脚本执行失败时抛出
      */
     public NodeResult eval(RuleNode ruleNode, Object data, Map<String, Object> context) {
-        RuleVisitor ruleContext = new RuleVisitor(ruleEngine, data);
-        ruleContext.putAll(context);
-        NodeResult result = doEval(ruleNode, ruleContext, false);
-        context.putAll(ruleContext);
-        return result;
+        return doEval(ruleNode, new RuleVisitor(ruleEngine, data, context));
     }
 
     /**
@@ -184,17 +148,15 @@ public class RuleSuite {
      * <p>
      * 节点业务结果本身为 {@link NodeResult} 时直接返回
      *
-     * @param ruleNode      规则节点
-     * @param context       本次执行的规则上下文
-     * @param includeDetail 是否在返回结果中包含规则详情
+     * @param ruleNode 规则节点
+     * @param context  本次执行的规则上下文
      * @return 规则节点执行结果
      */
-    private NodeResult doEval(RuleNode ruleNode, RuleContext context, boolean includeDetail) {
+    private NodeResult doEval(RuleNode ruleNode, RuleContext context) {
         EvalResult evalResult = context.visit(ruleNode);
         if (evalResult.getResult() instanceof NodeResult nodeResult) {
             return nodeResult;
         }
-        return new NodeResult(ruleNode.expr(), evalResult.getResult(),
-                includeDetail ? context.getRuleResults() : Collections.emptyList());
+        return new NodeResult(ruleNode.expr(), evalResult.getResult(), context.getRuleResults());
     }
 }

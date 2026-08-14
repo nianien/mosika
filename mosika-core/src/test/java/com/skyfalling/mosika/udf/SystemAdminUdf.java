@@ -21,7 +21,7 @@ public class SystemAdminUdf implements BiFunction<String, UdfContext, Boolean> {
     @Override
     public Boolean apply(String name, UdfContext ruleContext) {
         System.out.println("@@@@" + ruleContext.getRule());
-        ruleContext.setProperty("admin", admin);
+        ruleContext.put("admin", admin);
         return Objects.equals(name, admin);
     }
 

@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260813-1">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260814-3">
     <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
 <body class="editor-page">
@@ -94,27 +94,14 @@
                     <div><strong>测试规则流</strong></div>
                     <button class="icon-button" id="testPanelClose" type="button" aria-label="关闭测试面板">×</button>
                 </div>
-                <div class="test-json-tabs" role="tablist" aria-label="测试输入类型">
-                    <button class="test-json-tab is-active" id="testTargetTab" type="button"
-                            role="tab" aria-selected="true" aria-controls="testTargetPanel"
-                            data-test-input-tab="target">
-                        <code>$</code><span>输入数据</span><i aria-hidden="true"></i>
-                    </button>
-                    <button class="test-json-tab" id="testContextTab" type="button"
-                            role="tab" aria-selected="false" aria-controls="testContextPanel"
-                            data-test-input-tab="context" tabindex="-1">
-                        <code>$$</code><span>上下文</span><i aria-hidden="true"></i>
-                    </button>
+                <div class="test-json-tabs" aria-label="测试输入类型">
+                    <div class="test-json-tab is-active">
+                        <code>$</code><span>输入数据</span>
+                    </div>
                 </div>
                 <div class="test-json-editors">
-                    <label class="test-json-field" id="testTargetPanel"
-                           role="tabpanel" aria-labelledby="testTargetTab">
+                    <label class="test-json-field" id="testTargetPanel">
                         <textarea id="testTargetInput" spellcheck="false" aria-label="测试输入 JSON">{
-}</textarea>
-                    </label>
-                    <label class="test-json-field" id="testContextPanel"
-                           role="tabpanel" aria-labelledby="testContextTab" hidden>
-                        <textarea id="testContextInput" spellcheck="false" aria-label="测试上下文 JSON">{
 }</textarea>
                     </label>
                 </div>
@@ -210,7 +197,13 @@
         </label>
         <label class="detail-field" id="nodeConfigRuleField">
             <span class="detail-label">引用规则</span>
-            <select id="nodeConfigRule"></select>
+            <div class="rule-picker" data-definition-kind="action">
+                <input class="rule-picker-filter" id="nodeConfigRuleFilter" type="text" autocomplete="off"
+                       placeholder="输入规则名称或 ID" role="combobox" aria-autocomplete="list"
+                       aria-expanded="false" aria-controls="nodeConfigRuleOptions" aria-label="选择引用规则">
+                <input id="nodeConfigRule" type="hidden" data-rule-picker-value>
+                <div class="rule-picker-menu" id="nodeConfigRuleOptions" role="listbox" hidden></div>
+            </div>
         </label>
         <p class="form-note" id="nodeConfigNote"></p>
         <div class="dialog-actions">
@@ -344,6 +337,6 @@
 <script src="/ui/treenode.js?v=20260813-1"></script>
 <script src="/ui/api.js?v=20260813-1"></script>
 <script src="/ui/ns.js?v=20260813-1"></script>
-<script src="/ui/app.js?v=20260813-1"></script>
+<script src="/ui/app.js?v=20260814-3"></script>
 </body>
 </html>

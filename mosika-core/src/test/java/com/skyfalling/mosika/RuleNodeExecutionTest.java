@@ -285,16 +285,16 @@ public class RuleNodeExecutionTest {
                                 RuleDefinition.RULE_TYPE_COMPOSITE)),
                 List.of());
 
-        Map<String, String> serialDescriptions = suite.evalRule("serial", null)
+        Map<String, String> serialDescriptions = suite.eval("serial", null)
                 .getDetails().get(0).getSubRules().get(0).getSubRules().stream()
                 .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
-        Map<String, String> parallelDescriptions = suite.evalRule("parallel", null)
+        Map<String, String> parallelDescriptions = suite.eval("parallel", null)
                 .getDetails().get(0).getSubRules().get(0).getSubRules().stream()
                 .collect(Collectors.toMap(EvalResult::getExpr, result -> result.getDesc()));
 
         assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), serialDescriptions);
         assertEquals(Map.of("a", "desc-rule=a", "b", "desc-rule=b"), parallelDescriptions);
-        assertEquals("desc-rule=composite", suite.evalRule("composite", null)
+        assertEquals("desc-rule=composite", suite.eval("composite", null)
                 .getDetails().get(0).getDesc());
     }
 
@@ -320,18 +320,18 @@ public class RuleNodeExecutionTest {
 
             context.visit(new ParNode(branches));
 
-            assertEquals(6_400, context.size());
-            assertEquals(199, context.getProperty("31-199"));
+            assertEquals(6_400, context.getContextData().size());
+            assertEquals(199, context.get("31-199"));
         }
     }
 
     @Test
     public void testContextSupportsNullValues() {
         RuleVisitor ruleContext = new RuleVisitor(ruleEngine, null);
-        assertInstanceOf(LinkedHashMap.class, ruleContext);
-        ruleContext.setProperty("nullable", null);
-        assertTrue(ruleContext.containsKey("nullable"));
-        assertNull(ruleContext.getProperty("nullable"));
+        assertInstanceOf(LinkedHashMap.class, ruleContext.getContextData());
+        ruleContext.put("nullable", null);
+        assertTrue(ruleContext.getContextData().containsKey("nullable"));
+        assertNull(ruleContext.get("nullable"));
 
         RuleSuite ruleSuite = new RuleSuite(ruleEngine);
         Map<String, Object> context = new HashMap<>();
@@ -348,7 +348,7 @@ public class RuleNodeExecutionTest {
             @Override
             public EvalResult eval(RuleContext context) {
                 for (int i = 0; i < properties; i++) {
-                    context.setProperty(branch + "-" + i, i);
+                    context.put(branch + "-" + i, i);
                 }
                 return new EvalResult(expr(), true);
             }

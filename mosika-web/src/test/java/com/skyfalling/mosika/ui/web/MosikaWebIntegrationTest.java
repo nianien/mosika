@@ -561,7 +561,7 @@ class MosikaWebIntegrationTest {
     void flowTryExecutesUnsavedTreeAndReturnsVisualPaths() throws Exception {
         Map<String, Object> action = ruleBody(
                 "remember-preview",
-                "$$.setProperty('visited', $.value)");
+                "$$.put('visited', $.value)");
         action.put("kind", "action");
         String actionRuleId = data(mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)

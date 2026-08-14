@@ -24,11 +24,11 @@ class RuleSuiteTest {
                         composite("entry", "ready")),
                 List.of());
 
-        assertEquals(true, suite.evalRule("entry", new Object()).getResult());
+        assertEquals(true, suite.eval("entry", new Object()).getResult());
 
         RuleEvalException exception = assertThrows(
                 RuleEvalException.class,
-                () -> suite.evalRule("missing", new Object()));
+                () -> suite.eval("missing", new Object()));
         assertEquals("unregistered rule:missing", exception.getMessage());
     }
 
@@ -45,8 +45,8 @@ class RuleSuiteTest {
                         composite("composite", "candidateLeaf")),
                 List.of());
 
-        assertEquals(true, active.evalRule("composite", new Object()).getResult());
-        assertEquals(false, candidate.evalRule("composite", new Object()).getResult());
+        assertEquals(true, active.eval("composite", new Object()).getResult());
+        assertEquals(false, candidate.eval("composite", new Object()).getResult());
     }
 
     @Test
@@ -58,7 +58,7 @@ class RuleSuiteTest {
                         new RuleDefinition("leaf", "true", "leaf")),
                 List.of());
 
-        NodeResult result = suite.evalRule("entry", new Object());
+        NodeResult result = suite.eval("entry", new Object());
 
         assertEquals(true, result.getResult());
         assertEquals("nested[leaf]", result.getDetails().get(0)
@@ -74,7 +74,7 @@ class RuleSuiteTest {
                         composite("child", "leaf")),
                 List.of());
 
-        NodeResult result = suite.evalRule("caller", new Object());
+        NodeResult result = suite.eval("caller", new Object());
 
         assertEquals(true, result.getResult());
         RuleResult child = result.getDetails().get(0).getSubRules().get(0);
@@ -131,7 +131,7 @@ class RuleSuiteTest {
         RuleSuite suite = new RuleSuite(
                 List.of(new RuleDefinition(
                         "increment",
-                        "$$.setProperty('count', ($$.getProperty('count') || 0) + $args.step)",
+                        "$$.put('count', ($$.get('count') || 0) + $args.step)",
                         "increment")),
                 List.of());
         Map<String, Object> context = new HashMap<>();
@@ -151,13 +151,13 @@ class RuleSuiteTest {
                 List.of(
                         new RuleDefinition(
                                 "remember",
-                                "$$.setProperty('visited', true)",
+                                "$$.put('visited', true)",
                                 "remember"),
                         composite("entry", "remember")),
                 List.of());
         Map<String, Object> context = new HashMap<>();
 
-        NodeResult result = suite.evalWithDetails("entry", null, context);
+        NodeResult result = suite.eval("entry", null, context);
 
         assertEquals(true, context.get("visited"));
         assertEquals("entry[remember]", result.getDetails().get(0).getExpr());
@@ -165,11 +165,27 @@ class RuleSuiteTest {
     }
 
     @Test
+    void inputAndContextAreAvailableDuringEvaluation() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "remember",
+                        "($$.put('name', $.name), $.name)",
+                        "remember")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+
+        NodeResult result = suite.eval("remember", Map.of("name", "mosika"), context);
+
+        assertEquals("mosika", result.getResult());
+        assertEquals("mosika", context.get("name"));
+    }
+
+    @Test
     void parameterizedRuleCacheComparesNestedJsonStructure() {
         RuleSuite suite = new RuleSuite(
                 List.of(new RuleDefinition(
                         "increment",
-                        "$$.setProperty('count', ($$.getProperty('count') || 0) + $args.step)",
+                        "$$.put('count', ($$.get('count') || 0) + $args.step)",
                         "increment")),
                 List.of());
         String first = "increment(\"\"\"{\"step\":1,\"user\":{\"name\":\"Tom\","
@@ -196,7 +212,7 @@ class RuleSuiteTest {
                 List.of(new RuleDefinition("plain", "$args.limit == null", "plain")),
                 List.of());
 
-        assertEquals(true, suite.evalRule("plain", null).getResult());
+        assertEquals(true, suite.eval("plain", null).getResult());
     }
 
     private static RuleDefinition composite(String ruleId, String expression) {

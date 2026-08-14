@@ -193,12 +193,11 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .targs .targ-name small{display:block;margin-top:3px;font-family:var(--ff-sans);font-size:var(--fs-note);font-weight:400;color:#93a89f}
 .targs input,.targs select{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:var(--fs-meta);color:#123038;background:#fff}
 .targs-empty{font-size:var(--fs-minor);color:#8aa39d}
-/* 入参 / 上下文 分页填写，避免下面再另起一块 */
+/* 入参与参数分页填写，避免测试区纵向拉长 */
 .test-tabs{display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #e6f0ee}
 .ttab{position:relative;padding:6px 10px;border:0;background:none;color:#6f8b86;font-size:var(--fs-minor);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .ttab:hover{color:var(--teal-d)}
 .ttab.on{color:var(--teal-d);font-weight:600;border-bottom-color:var(--teal)}
-.ttab .filled-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);margin-left:5px;vertical-align:middle}
 .ttab .tab-count{display:inline-block;margin-left:5px;padding:0 5px;border-radius:8px;background:var(--cyan-soft);color:var(--cyan);font-size:var(--fs-note);font-weight:700;font-style:normal;vertical-align:middle}
 .test-result:empty{display:none}
 .result-box{border:1px solid #bfe4d4;border-radius:8px;background:#fff;overflow:hidden}
@@ -309,11 +308,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <button type="button" class="chip" data-f="off">已停用</button>
       </div>
     </div>
-    <div class="core-context" aria-label="规则生产链路">
-      <span class="core-context-label">Definition path</span>
-      <span class="core-chain"><b>RuleDefinition</b><i>→</i><b>Precompile</b><i>→</i><b>ruleId reference</b></span>
-      <span class="core-context-note">稳定规则定义与可变场景编排分离演进</span>
-    </div>
     <div class="panel">
       <div class="table-scroll"><table>
         <thead><tr><th style="width:26%">规则名称 / 描述</th><th style="width:30%">表达式</th><th>类型</th><th>被引用</th><th style="text-align:right">状态 / 操作</th></tr></thead>
@@ -389,13 +383,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <div class="test-tabs" role="tablist">
           <button type="button" class="ttab on" data-tab="target" role="tab">入参 $</button>
           <button type="button" class="ttab" data-tab="args" role="tab">参数 $args<i class="tab-count" id="argsCount" hidden></i></button>
-          <button type="button" class="ttab" data-tab="context" role="tab">上下文 $$<i class="filled-dot" id="ctxDot" hidden title="已填写"></i></button>
         </div>
         <textarea id="tTarget" class="mono-area tpane" spellcheck="false" data-pane="target" data-json>{}</textarea>
         <div class="json-err" data-json-err="target" hidden></div>
         <div class="targs tpane" id="tArgs" data-pane="args" hidden></div>
-        <textarea id="tContext" class="mono-area tpane" spellcheck="false" data-pane="context" data-json hidden>{}</textarea>
-        <div class="json-err" data-json-err="context" hidden></div>
       </div>
       <div class="test-output">
         <div class="field-bar">
@@ -840,8 +831,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   function renderTestResult(html) { $("#tResult").innerHTML = html; }
 
-  // 规则说明按本次输入插值。core 用 String.raw`...` 求值，这里用同样语义在本地渲染，
-  // $ / $$ / $args 三样输入测试面板里都有，不必绕后端
+  // 规则说明按本次输入插值。core 用 String.raw`...` 求值，这里用同样语义在本地渲染
   function renderDescription(template, target, context, args) {
     const raw = String(template || "");
     if (!raw.trim()) return { text: "" };
@@ -864,9 +854,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const expression = currentExpression().trim();
     if (!expression) { renderTestError("表达式不能为空"); return; }
     if (!validateJsonField($("#tTarget"))) { switchTestPane("target"); $("#tTarget").focus(); return; }
-    if (!validateJsonField($("#tContext"))) { switchTestPane("context"); $("#tContext").focus(); return; }
     const target = parseJsonField($("#tTarget").value, "入参 $");
-    const context = parseJsonField($("#tContext").value, "上下文 $$");
+    const context = {};
     const collected = collectTestArgs();
     if (collected.error) { renderTestError(collected.error); return; }
     const btn = $("#runExprBtn");
@@ -878,7 +867,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         namespace: Ns.code(), expression,
         args: collected.args,
         target: target.value === undefined ? null : target.value,
-        context: context.value === undefined ? null : context.value
+        context
       });
       const cost = Math.round(performance.now() - started);
       const result = data ? data.result : undefined;
@@ -889,7 +878,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       // 规则说明按本次输入渲染，和结果一起给出
       const rendered = renderDescription($("#fDesc").value,
         target.value === undefined ? null : target.value,
-        context.value === undefined ? {} : context.value,
+        context,
         collected.args);
       const descRow = rendered.error
         ? `<div class="result-desc bad"><span>说明</span><code>渲染失败：${esc(rendered.error)}</code></div>`
@@ -897,7 +886,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       // 布尔结果已经在徽标上，正文只回显本次实际输入；非布尔结果单独展示返回值
       const echo = [["$", target.value === undefined ? null : target.value]];
       if (Object.keys(collected.args).length) echo.push(["$args", collected.args]);
-      if (context.value !== undefined && context.value !== null) echo.push(["$$", context.value]);
       const returned = isBool ? "" : `<div class="result-value"><div><span>返回值</span><code>${
         esc(typeof result === "object" && result !== null ? JSON.stringify(result, null, 2) : String(result))}</code></div></div>`;
       const rows = echo.map(([k, v]) => `<div><span>${k}</span><code>${esc(JSON.stringify(v))}</code></div>`).join("");
@@ -914,17 +902,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }
   }
 
-  // 入参 / 参数 / 上下文 三页切换。非当前页的内容一样参与运行，
-  // 所以参数页标出个数、上下文页标出已填写，避免看不见的输入悄悄影响结果
+  // 入参与参数分页切换，参数页标出当前参数个数
   function switchTestPane(pane) {
     document.querySelectorAll("#ruleDlg .ttab").forEach((b) => b.classList.toggle("on", b.dataset.tab === pane));
     document.querySelectorAll("#ruleDlg .tpane").forEach((a) => { a.hidden = a.dataset.pane !== pane; });
-  }
-
-  // {} 视为空上下文，只有填了实际内容才点亮圆点
-  function refreshCtxDot() {
-    const v = String($("#tContext").value || "").trim();
-    $("#ctxDot").hidden = v === "" || v === "{}";
   }
 
   // 实时校验 JSON 输入框；合法返回 true，非法标红并给出错误行
@@ -957,11 +938,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   function resetTestPanel() {
     $("#tTarget").value = "{}";
-    $("#tContext").value = "{}";
     document.querySelectorAll("#ruleDlg [data-json]").forEach((a) => validateJsonField(a));
     switchTestPane("target");
     switchDialogPane("edit");
-    refreshCtxDot();
     renderTestResult("");
   }
 
@@ -1116,7 +1095,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     b.addEventListener("click", () => switchTestPane(b.dataset.tab));
   });
   document.querySelectorAll("#ruleDlg [data-json]").forEach((a) => {
-    a.addEventListener("input", () => { validateJsonField(a); if (a.id === "tContext") refreshCtxDot(); });
+    a.addEventListener("input", () => validateJsonField(a));
   });
   document.querySelectorAll("#ruleDlg .dtab").forEach((b) => {
     b.addEventListener("click", () => switchDialogPane(b.dataset.dtab));

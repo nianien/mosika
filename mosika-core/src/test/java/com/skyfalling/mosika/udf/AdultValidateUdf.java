@@ -20,7 +20,7 @@ public class AdultValidateUdf implements Function3<String, Integer, UdfContext, 
     @Override
     public Boolean apply(String name, Integer age, UdfContext ruleContext) {
         System.out.println("@@@@current rule:" + ruleContext.getRule());
-        ruleContext.setProperty("minAge", minAge);
+        ruleContext.put("minAge", minAge);
         return age > minAge;
     }
 }

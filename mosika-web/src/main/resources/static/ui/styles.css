@@ -436,6 +436,36 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .detail-field .field-row { display: flex; align-items: center; gap: 6px; }
 .detail-field .field-row .detail-value { flex: 1; min-width: 0; }
 .detail-field .field-control { display: none; flex: 1; min-width: 0; }
+.rule-picker { position: relative; width: 100%; min-width: 0; }
+.rule-picker::after {
+    content: ""; position: absolute; top: 14px; right: 12px; z-index: 1;
+    width: 7px; height: 7px; border-right: 1.5px solid #7b879b; border-bottom: 1.5px solid #7b879b;
+    transform: rotate(45deg); pointer-events: none;
+}
+.rule-picker input.rule-picker-filter {
+    min-width: 0; padding-right: 32px; cursor: text;
+}
+.rule-picker input.rule-picker-filter[aria-expanded="true"] {
+    border-color: var(--primary); box-shadow: 0 0 0 2px rgba(16, 165, 139, .14); outline: none;
+}
+.rule-picker:has(input[aria-expanded="true"]) { z-index: 25; }
+.rule-picker-menu {
+    position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 20;
+    max-height: 220px; padding: 5px; overflow-y: auto;
+    border: 1px solid #d8e1ec; border-radius: 8px; background: #fff;
+    box-shadow: 0 10px 28px rgba(33, 48, 74, .16);
+}
+.rule-picker-option {
+    width: 100%; min-height: 34px; padding: 7px 9px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border: 0; border-radius: 5px; color: #2b3a54; background: transparent;
+    font-size: var(--fs-minor); text-align: left; cursor: pointer;
+}
+.rule-picker-option span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-picker-option code { flex: 0 0 auto; color: #8793a6; font-size: var(--fs-note); letter-spacing: 0; }
+.rule-picker-option:hover, .rule-picker-option.is-active { color: #087b69; background: #edf9f6; }
+.rule-picker-option[aria-selected="true"] { font-weight: 600; }
+.rule-picker-empty { padding: 16px 10px; color: #8b97a9; font-size: var(--fs-label); text-align: center; }
 .field-edit {
     flex: 0 0 auto; width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 0;
     display: inline-grid; place-items: center; border: 0; border-radius: 6px;
@@ -443,6 +473,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 }
 .field-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .field-edit:hover { color: #4a6bd3; background: #eef3ff; }
+.editor-readonly .field-edit { display: none; }
 /* 模板参数（$args）录入区 */
 .args-section { display: grid; gap: 10px; margin-top: 6px; padding-top: 12px; border-top: 1px dashed #e2e7f0; }
 .args-title { color: #4a6bd3; font-size: var(--fs-label); font-weight: 700; letter-spacing: .02em; }
@@ -466,6 +497,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .arg-field .arg-error { color: #c22f2c; font-size: var(--fs-note); line-height: 1.4; font-weight: 600; }
 .detail-field.field-editing .detail-value { display: none; }
 .detail-field.field-editing .field-control { display: block; }
+.detail-field.field-editing .field-control.rule-picker { display: block; }
 .field-edit-actions { flex: 0 0 auto; display: inline-flex; gap: 4px; }
 .field-confirm, .field-cancel {
     width: 30px; min-width: 30px; height: 32px; min-height: 32px; padding: 0;
@@ -542,8 +574,9 @@ dialog form { display: grid; gap: 15px; padding: 19px; }
 .node-config-form .dialog-heading h2 { font-size: var(--fs-title); letter-spacing: .2px; }
 .node-config-form .detail-field { gap: 8px; }
 .node-config-form .detail-label { color: #56617a; font-size: var(--fs-minor); font-weight: 600; letter-spacing: .2px; }
-.node-config-form select { height: 42px; padding: 0 12px; border-color: #dbe2ee; border-radius: 9px; font-size: var(--fs-base); color: #263550; }
-.node-config-form select:hover { border-color: #c3cedd; }
+.node-config-form input, .node-config-form select { height: 42px; padding: 0 12px; border-color: #dbe2ee; border-radius: 9px; font-size: var(--fs-base); color: #263550; }
+.node-config-form input:hover, .node-config-form select:hover { border-color: #c3cedd; }
+.node-config-form .rule-picker::after { top: 15px; }
 .node-config-form .form-note { font-size: var(--fs-label); color: #8a94a6; }
 .node-config-form .dialog-actions { margin-top: 4px; padding-top: 16px; border-top: 1px solid #eef1f6; gap: 10px; }
 .node-config-form .dialog-actions button { min-width: 74px; height: 38px; border-radius: 9px; font-size: var(--fs-base); }
@@ -614,7 +647,9 @@ dialog.rule-dialog {
 .rule-add-row { display: flex; align-items: center; gap: 6px; }
 .rule-add-params { margin: 2px 0 8px 10px; padding-left: 12px; border-left: 2px solid #dbe3f2; }
 .rule-add-params .args-section { margin-top: 0; padding-top: 0; border-top: 0; }
-.rule-add-row > label { flex: 1; min-width: 0; }
+.rule-add-row > label, .rule-add-row > .rule-picker, .rule-add-row > .rule-add-field { flex: 1; min-width: 0; }
+.rule-add-field { display: grid; gap: 6px; }
+.rule-add-field > .detail-label { color: #7b879b; font-size: var(--fs-label); font-weight: 600; }
 .rule-add-row > select, .rule-add-row > .detail-value { flex: 1; min-width: 0; }
 .rule-add-row > button { flex: 0 0 auto; min-width: 30px; width: 30px; padding: 0; }
 .rule-add-row > button[data-subrule-remove],
