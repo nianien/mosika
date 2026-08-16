@@ -29,7 +29,7 @@
         <jackson-datatype-protobuf.version>0.9.18</jackson-datatype-protobuf.version>
         <revision>1.0.0</revision>
         <antlr4.version>4.13.2</antlr4.version>
-        <graalvm.version>25.0.2</graalvm.version>
+        <rhino.version>1.9.1</rhino.version>
         <byte-buddy.version>1.18.7</byte-buddy.version>
     </properties>
     <licenses>
@@ -80,16 +80,9 @@
                 <version>${byte-buddy.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.graalvm.polyglot</groupId>
-                <artifactId>polyglot</artifactId>
-                <version>${graalvm.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.graalvm.polyglot</groupId>
-                <artifactId>js-community</artifactId>
-                <version>${graalvm.version}</version>
-                <type>pom</type>
-                <scope>runtime</scope>
+                <groupId>org.mozilla</groupId>
+                <artifactId>rhino</artifactId>
+                <version>${rhino.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>

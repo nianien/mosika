@@ -1,91 +1,240 @@
 package com.skyfalling.mosika.utils;
 
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Engine;
-import org.graalvm.polyglot.HostAccess;
-import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.Value;
+import com.skyfalling.mosika.eval.context.UdfContext;
+import org.mozilla.javascript.BaseFunction;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.NativeArray;
+import org.mozilla.javascript.NativeJavaClass;
+import org.mozilla.javascript.NativeJavaMap;
+import org.mozilla.javascript.NativeJavaObject;
+import org.mozilla.javascript.NativeObject;
+import org.mozilla.javascript.Script;
+import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.Undefined;
+import org.mozilla.javascript.WrapFactory;
+import org.mozilla.javascript.Wrapper;
+import org.mozilla.javascript.lc.type.TypeInfo;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 /**
- * GraalJS运行时。所有上下文共享同一个编译引擎，但不共享可变的JS状态。
+ * Rhino运行时。编译结果跨线程共享，每次执行使用独立的JavaScript作用域。
  */
 public final class JsRuntime {
 
-    public static final String LANGUAGE_ID = "js";
+    private static final WrapFactory WRAP_FACTORY = new RuleWrapFactory();
 
-    private static final Engine ENGINE = Engine.create();
+    private static final RhinoContextFactory CONTEXT_FACTORY = new RhinoContextFactory();
+
+    static {
+        WRAP_FACTORY.setJavaPrimitiveWrap(false);
+    }
+
+    private static final ScriptableObject GLOBAL_SCOPE = CONTEXT_FACTORY.call(context -> {
+        ScriptableObject standardScope = context.initStandardObjects(null, true);
+        NativeObject scope = new NativeObject();
+        scope.setPrototype(standardScope);
+        scope.setParentScope(null);
+        NativeObject javaObject = new NativeObject();
+        javaObject.setParentScope(scope);
+        javaObject.setPrototype(ScriptableObject.getObjectPrototype(scope));
+        BaseFunction typeFunction = new BaseFunction(
+                scope, ScriptableObject.getFunctionPrototype(scope)) {
+            @Override
+            public Object call(Context context,
+                               Scriptable scope,
+                               Scriptable thisObject,
+                               Object[] arguments) {
+                try {
+                    String className = Context.toString(arguments[0]);
+                    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                    Class<?> type = Class.forName(className, true, classLoader);
+                    return new NativeJavaClass(scope, type);
+                } catch (ClassNotFoundException e) {
+                    throw Context.throwAsScriptRuntimeEx(e);
+                }
+            }
+        };
+        typeFunction.sealObject();
+        javaObject.defineProperty(
+                "type", typeFunction, ScriptableObject.READONLY | ScriptableObject.PERMANENT);
+        javaObject.sealObject();
+        scope.defineProperty(
+                "Java", javaObject, ScriptableObject.READONLY | ScriptableObject.PERMANENT);
+        scope.sealObject();
+        return scope;
+    });
 
     private JsRuntime() {
     }
 
-    /**
-     * 创建隔离的JS上下文。保留原有Nashorn兼容和Java互操作能力。
-     */
-    public static Context createContext() {
-        return Context.newBuilder(LANGUAGE_ID)
-                .engine(ENGINE)
-                .allowExperimentalOptions(true)
-                .allowHostAccess(HostAccess.ALL)
-                .allowHostClassLookup(className -> true)
-                .option("js.nashorn-compat", "true")
-                .option("js.ecmascript-version", "latest")
-                .build();
+    public static Script compile(String code, String name) {
+        return CONTEXT_FACTORY.call(context -> context.compileString(code, name, 1, null));
     }
 
-    /**
-     * 创建可被共享引擎缓存的脚本源。
-     */
-    public static Source createSource(String code, String name) {
-        return Source.newBuilder(LANGUAGE_ID, code, name)
-                .cached(true)
-                .buildLiteral();
+    public static <T> T execute(BiFunction<Context, Scriptable, T> action) {
+        return CONTEXT_FACTORY.call(context -> {
+            NativeObject scope = new NativeObject();
+            scope.setPrototype(GLOBAL_SCOPE);
+            scope.setParentScope(null);
+            scope.defineProperty("globalThis", scope, ScriptableObject.DONTENUM);
+            return action.apply(context, scope);
+        });
     }
 
-    /**
-     * 将绑定到Polyglot Context的结果转换为独立Java值。
-     */
-    public static Object toJava(Value value) {
-        if (value == null || value.isNull()) {
+    public static Object toJava(Object value) {
+        if (value == null || Undefined.isUndefined(value)) {
             return null;
         }
-        if (value.isHostObject()) {
-            return value.asHostObject();
+        if (value instanceof Wrapper wrapper) {
+            return wrapper.unwrap();
         }
-        if (value.isBoolean()) {
-            return value.asBoolean();
-        }
-        if (value.isString()) {
-            return value.asString();
-        }
-        if (value.isNumber()) {
-            if (value.fitsInInt()) {
-                return value.asInt();
-            }
-            if (value.fitsInLong()) {
-                return value.asLong();
-            }
-            return value.asDouble();
-        }
-        if (value.hasArrayElements()) {
-            int size = Math.toIntExact(value.getArraySize());
+        if (value instanceof NativeArray array) {
+            int size = Math.toIntExact(array.getLength());
             List<Object> result = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                result.add(toJava(value.getArrayElement(i)));
+                result.add(toJava(array.get(i, array)));
             }
             return result;
         }
-        if (value.hasMembers()) {
+        if (value instanceof NativeObject object) {
             Map<String, Object> result = new LinkedHashMap<>();
-            for (String key : value.getMemberKeys()) {
-                result.put(key, toJava(value.getMember(key)));
+            for (Object id : object.getIds()) {
+                String key = String.valueOf(id);
+                Object member = id instanceof Number number
+                        ? object.get(number.intValue(), object)
+                        : object.get(key, object);
+                result.put(key, toJava(member));
             }
             return result;
         }
-        return value.as(Object.class);
+        if (value instanceof Double number
+                && Double.isFinite(number)
+                && number == Math.rint(number)) {
+            if (number >= Integer.MIN_VALUE && number <= Integer.MAX_VALUE) {
+                return number.intValue();
+            }
+            if (number >= Long.MIN_VALUE && number <= Long.MAX_VALUE) {
+                return number.longValue();
+            }
+        }
+        if (value instanceof CharSequence sequence) {
+            return sequence.toString();
+        }
+        return value;
+    }
+
+    private static final class RhinoContextFactory extends ContextFactory {
+
+        private RhinoContextFactory() {
+        }
+
+        @Override
+        protected boolean hasFeature(Context context, int featureIndex) {
+            return featureIndex == Context.FEATURE_THREAD_SAFE_OBJECTS
+                    || featureIndex == Context.FEATURE_ENABLE_JAVA_MAP_ACCESS
+                    || super.hasFeature(context, featureIndex);
+        }
+
+        @Override
+        protected void onContextCreated(Context context) {
+            context.setLanguageVersion(Context.VERSION_ECMASCRIPT);
+            context.setWrapFactory(WRAP_FACTORY);
+        }
+    }
+
+    private static final class RuleWrapFactory extends WrapFactory {
+
+        @Override
+        public Scriptable wrapAsJavaObject(Context context,
+                                           Scriptable scope,
+                                           Object javaObject,
+                                           TypeInfo staticType) {
+            if (javaObject instanceof UdfContext udfContext) {
+                return new RuleNativeJavaObject(scope, udfContext, staticType);
+            }
+            if (javaObject instanceof Map<?, ?> map) {
+                return new RuleNativeJavaMap(scope, map, staticType);
+            }
+            return super.wrapAsJavaObject(context, scope, javaObject, staticType);
+        }
+    }
+
+    private static final class RuleNativeJavaObject extends NativeJavaObject {
+
+        private final BaseFunction putFunction;
+
+        private RuleNativeJavaObject(Scriptable scope,
+                                     UdfContext udfContext,
+                                     TypeInfo staticType) {
+            super(scope, udfContext, staticType);
+            this.putFunction = new BaseFunction(
+                    scope, ScriptableObject.getFunctionPrototype(scope)) {
+                @Override
+                public Object call(Context context,
+                                   Scriptable scope,
+                                   Scriptable thisObject,
+                                   Object[] arguments) {
+                    udfContext.put(Context.toString(arguments[0]), toJava(arguments[1]));
+                    return Undefined.instance;
+                }
+            };
+        }
+
+        @Override
+        public Object get(String name, Scriptable start) {
+            if ("put".equals(name)) {
+                return putFunction;
+            }
+            return super.get(name, start);
+        }
+    }
+
+    private static final class RuleNativeJavaMap extends NativeJavaMap {
+
+        private final Map<Object, Object> map;
+
+        private final BaseFunction putFunction;
+
+        private RuleNativeJavaMap(Scriptable scope, Map<?, ?> map, TypeInfo staticType) {
+            super(scope, map, staticType);
+            this.map = (Map<Object, Object>) map;
+            this.putFunction = new BaseFunction(
+                    scope, ScriptableObject.getFunctionPrototype(scope)) {
+                @Override
+                public Object call(Context context,
+                                   Scriptable scope,
+                                   Scriptable thisObject,
+                                   Object[] arguments) {
+                    Object previous = RuleNativeJavaMap.this.map.put(
+                            toJava(arguments[0]), toJava(arguments[1]));
+                    return Context.javaToJS(previous, scope);
+                }
+            };
+        }
+
+        @Override
+        public Object get(String name, Scriptable start) {
+            if ("put".equals(name) && !map.containsKey(name)) {
+                return putFunction;
+            }
+            return super.get(name, start);
+        }
+
+        @Override
+        public void put(String name, Scriptable start, Object value) {
+            map.put(name, toJava(value));
+        }
+
+        @Override
+        public void put(int index, Scriptable start, Object value) {
+            map.put(index, toJava(value));
+        }
     }
 }

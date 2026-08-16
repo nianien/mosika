@@ -5,15 +5,11 @@ import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.engine.RuleEngine;
 import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.result.EvalResult;
-import com.skyfalling.mosika.utils.JsRuntime;
-import lombok.SneakyThrows;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Source;
+import com.skyfalling.mosika.udf.Functions.Function1;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,59 +28,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class RuleEngineTest {
 
-    @SneakyThrows
     @Test
-    public void ruleRuleEngine2() {
-        Source source = JsRuntime.createSource("$.value + 1", "concurrent-source");
-        List<CompletableFuture<Integer>> futures = IntStream.range(0, 10)
-                .mapToObj(value -> CompletableFuture.supplyAsync(() -> {
-                    try (Context context = JsRuntime.createContext()) {
-                        context.getBindings(JsRuntime.LANGUAGE_ID)
-                                .putMember("$", Map.of("value", value));
-                        return context.eval(source).asInt();
-                    }
-                }))
+    public void testRuleEvaluationIsThreadSafe() {
+        RuleEngine engine = RuleEngine.builder().build();
+        List<CompletableFuture<Integer>> futures = IntStream.range(0, 100)
+                .mapToObj(value -> CompletableFuture.supplyAsync(
+                        () -> (Integer) engine.evalExpr(
+                                "$.value + 1", Map.of("value", value), null)))
                 .toList();
         for (int i = 0; i < futures.size(); i++) {
             assertEquals(i + 1, futures.get(i).join());
         }
     }
 
-
-    /**
-     * 测试js函数
-     */
-    @SneakyThrows
     @Test
-    public void testJsUdf0() {
-        RuleEngine.RuleEngineBuilder builder = RuleEngine.builder();
-        builder.udfDefinition(new UdfDefinition("jdUdf", "test", """
-                function test(begin,end) {
-                    var sum = begin; for (var i = 0; i < end; i++) {
-                        sum = sum + i % 8
-                    }
-                    return sum;
-                }
-                """));
-        RuleEngine engine = builder.build();
-        Object object = engine.evalExpr("jdUdf.test(1001,10000)", null, null);
-        System.out.println(object);
-    }
-
-    @Test
-    public void testJsUdfAcceptsAnonymousFunctions() {
+    public void testJsUdfAcceptsSupportedFunctionExpressions() {
         RuleEngine engine = RuleEngine.builder()
                 .udfDefinitions(List.of(
                         new UdfDefinition("math", "arrowSum", "(a, b) => a + b;"),
-                        new UdfDefinition("math", "functionSum", """
+                        new UdfDefinition("math", "anonymousSum", """
                                 function (a, b) {
+                                    return a + b;
+                                }
+                                """),
+                        new UdfDefinition("math", "namedSum", """
+                                function namedSum(a, b) {
                                     return a + b;
                                 }
                                 """)))
                 .build();
 
         assertEquals(3, engine.evalExpr("math.arrowSum(1, 2)", null, null));
-        assertEquals(7, engine.evalExpr("math.functionSum(3, 4)", null, null));
+        assertEquals(7, engine.evalExpr("math.anonymousSum(3, 4)", null, null));
+        assertEquals(11, engine.evalExpr("math.namedSum(5, 6)", null, null));
     }
 
     @Test
@@ -113,19 +89,101 @@ public class RuleEngineTest {
     }
 
     @Test
-    public void testJsUdfKeepsLegacyScriptWithHelperFunctions() {
+    public void testJsUdfsUseTheRuleContext() {
         RuleEngine engine = RuleEngine.builder()
-                .udfDefinition(new UdfDefinition("math", "sum", """
-                        function normalize(value) {
-                            return Number(value);
-                        }
-                        function sum(a, b) {
-                            return normalize(a) + normalize(b);
+                .udfDefinitions(List.of(
+                        new UdfDefinition("math", "javaIncrement", new IncrementUdf()),
+                        new UdfDefinition("math", "increment", """
+                                function increment(value) {
+                                    return math.javaIncrement(value);
+                                }
+                                """),
+                        new UdfDefinition("math", "twiceIncrement", """
+                                function twiceIncrement(value) {
+                                    return math.increment(value) * 2;
+                                }
+                                """)))
+                .build();
+
+        assertEquals(8, engine.evalExpr("math.twiceIncrement(3)", null, null));
+    }
+
+    @Test
+    public void testJsUdfEvaluationIsThreadSafe() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("math", "increment", "value => value + 1"))
+                .build();
+
+        List<CompletableFuture<Integer>> futures = IntStream.range(0, 10)
+                .mapToObj(value -> CompletableFuture.supplyAsync(
+                        () -> (Integer) engine.evalExpr("math.increment($.value)", Map.of("value", value), null)))
+                .toList();
+
+        for (int i = 0; i < futures.size(); i++) {
+            assertEquals(i + 1, futures.get(i).join());
+        }
+    }
+
+    @Test
+    public void testTopLevelEvalUdfDoesNotOverrideRuleEvaluation() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("eval", """
+                        function eval(source) {
+                            return 'overridden';
                         }
                         """))
                 .build();
 
-        assertEquals(3, engine.evalExpr("math.sum('1', '2')", null, null));
+        assertEquals(3, engine.evalExpr("1 + 2", null, null));
+        assertEquals("overridden", engine.evalExpr("eval('1 + 2')", null, null));
+        assertEquals(3, engine.evalExpr("const value = 1; value + 2;", null, null));
+    }
+
+    @Test
+    public void testRuleEvaluationDoesNotShareScriptState() {
+        RuleEngine engine = RuleEngine.builder().build();
+
+        assertEquals(1, engine.evalExpr("globalThis.marker = 1", null, null));
+        assertEquals("undefined", engine.evalExpr("typeof globalThis.marker", null, null));
+        assertEquals(2, engine.evalExpr("const value = 1; value + 1", null, null));
+        assertEquals(2, engine.evalExpr("const value = 1; value + 1", null, null));
+    }
+
+    @Test
+    public void testRuleEvaluationDoesNotSharePrototypeState() {
+        RuleEngine engine = RuleEngine.builder().build();
+
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("Array.prototype.marker = 1", null, null));
+        assertEquals("undefined", engine.evalExpr("typeof [].marker", null, null));
+    }
+
+    @Test
+    public void testRuleScriptReturnsLastExpression() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinitions(List.of(
+                        new UdfDefinition("sep", "value => value"),
+                        new UdfDefinition("dist", "(name, separator) => name + separator")))
+                .build();
+
+        assertEquals(10, engine.evalExpr(
+                "var n = 0; for (var i = 0; i < 5; i++) n += i; n;", null, null));
+        assertEquals("ning;", engine.evalExpr(
+                "sep(';'); dist($.name, ';');", Map.of("name", "ning"), null));
+        assertEquals(2, engine.evalExpr(
+                "var s = 'a;b'; s.split(';').length;", null, null));
+        assertEquals(1, engine.evalExpr(
+                "if ($.age > 18) { var result = 1; } result;", Map.of("age", 20), null));
+    }
+
+    @Test
+    public void testRuleScriptKeepsStatementCompletionValue() {
+        RuleEngine engine = RuleEngine.builder().build();
+
+        assertEquals(2, engine.evalExpr(
+                "var result = 1; if ($.age > 18) { result = 2; }",
+                Map.of("age", 20),
+                null));
     }
 
     @Test
@@ -148,38 +206,6 @@ public class RuleEngineTest {
         assertEquals(100, engine.evalExpr("group2.factorial(5)", null, null));
         assertEquals(120, engine.evalExpr("group1.factorial(5)", null, null));
     }
-
-    /**
-     * 测试多线程下的js函数
-     */
-    @SneakyThrows
-    @Test
-    public void testJsUdf() {
-        RuleEngine.RuleEngineBuilder builder = RuleEngine.builder();
-        builder.udfDefinition(new UdfDefinition("jdUdf", "test", """
-                function test(begin) {
-                    var sum = begin; for (var i = 0; i < 1000000; i++) {
-                        sum = sum + i % 8
-                    }
-                    return sum;
-                }
-                """));
-        RuleEngine engine = builder.build();
-        List<Thread> threads = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            int begin = i;
-            Thread thread = new Thread(() -> {
-                Object object = engine.evalExpr("jdUdf.test(" + begin + ")", null, null);
-                System.out.println(object);
-            });
-            thread.start();
-            threads.add(thread);
-        }
-        for (Thread thread : threads) {
-            thread.join();
-        }
-    }
-
 
     @Test
     public void testDesc() {
@@ -302,5 +328,13 @@ public class RuleEngineTest {
         System.out.println(tc.timePassed()*1.0/times);
 
         assertEquals(5, res);
+    }
+
+    public static class IncrementUdf implements Function1<Integer, Integer> {
+
+        @Override
+        public Integer apply(Integer value) {
+            return value + 1;
+        }
     }
 }

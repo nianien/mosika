@@ -6,22 +6,23 @@ import com.skyfalling.mosika.utils.Constants;
 import com.skyfalling.mosika.utils.JsRuntime;
 import lombok.Builder;
 import lombok.Singular;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.Value;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Script;
+import org.mozilla.javascript.ScriptableObject;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
  * 规则定义和 UDF 的注册执行引擎
  * <p>
  * 构造阶段注册内置规则和输入定义，预编译原子规则脚本、规则描述模板和 UDF
- * 执行阶段为每次调用创建独立的 JavaScript 上下文并绑定目标对象、规则上下文、节点参数和 UDF
+ * 执行阶段为每次调用创建独立的 JavaScript 作用域
  * 复合规则 DSL 由 {@link com.skyfalling.mosika.eval.parser.NodeBuilder NodeBuilder} 编译
  * 本类只负责其中普通规则 ID 的脚本求值
  *
@@ -29,22 +30,26 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class RuleEngine {
 
+    private static final AtomicLong SOURCE_SEQUENCE = new AtomicLong();
+
     /**
      * 按规则 ID 保存内置规则和输入规则定义
      */
     private Map<String, RuleDefinition> ruleDefinitions = new HashMap<>();
+
+    private final Map<String, Script> compiledRules = new HashMap<>();
+
     /**
-     * 按 JavaScript 源码缓存已验证的规则脚本
+     * 按 JavaScript 源码缓存已编译的规则脚本
      */
-    private final ConcurrentMap<String, Source> compiledScripts = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Script> compiledScripts = new ConcurrentHashMap<>();
+
     /**
-     * 按描述模板缓存已验证的 JavaScript 脚本
+     * 按描述模板缓存已编译的 JavaScript 脚本
      */
-    private final ConcurrentMap<String, Source> compiledDesc = new ConcurrentHashMap<>();
-    /**
-     * 按顶层名称保存编译后的 UDF 绑定对象
-     */
-    private Map<String, Object> compiledUdfs;
+    private final ConcurrentMap<String, Script> compiledDesc = new ConcurrentHashMap<>();
+
+    private final UdfContainer udfContainer;
 
     /**
      * 注册规则定义和 UDF 定义并完成可执行内容的预编译
@@ -55,13 +60,12 @@ public class RuleEngine {
      */
     @Builder
     public RuleEngine(@Singular List<RuleDefinition> ruleDefinitions, @Singular List<UdfDefinition> udfDefinitions) {
-        // 注册内置规则
         this.register(new RuleDefinition(Constants.TRUE, Constants.TRUE, "SUCCESS"));
         this.register(new RuleDefinition(Constants.FALSE, Constants.FALSE, "FAILED"));
         this.register(new RuleDefinition(Constants.NULL, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NULL"));
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
-        this.compiledUdfs = new UdfContainer(udfDefinitions).compile();
+        this.udfContainer = new UdfContainer(udfDefinitions);
     }
 
     /**
@@ -74,7 +78,7 @@ public class RuleEngine {
      * @param root    规则计算的目标对象，通过 {@code $} 访问
      * @param context 规则执行上下文，通过 {@code $$} 访问
      * @return JavaScript 表达式返回值
-     * @throws IllegalArgumentException 规则未注册时抛出
+     * @throws IllegalArgumentException 规则未注册或不是原子规则时抛出
      */
     public Object evalRule(String ruleId, Object root, Object context) {
         return evalRule(ruleId, root, context, null);
@@ -89,13 +93,18 @@ public class RuleEngine {
      * @param arguments 当前规则调用绑定的参数对象，通过 {@code $args} 访问
      * @return JavaScript 表达式返回值
      * @throws RuleNotFoundException 规则未注册时抛出
+     * @throws IllegalArgumentException 规则不是原子规则时抛出
      */
     public Object evalRule(String ruleId, Object root, Object context, Map<String, Object> arguments) {
         RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
         if (ruleDefinition == null) {
             throw new RuleNotFoundException(ruleId);
         }
-        return doEval(compile(ruleDefinition.getExpression()), root, context, arguments);
+        Script script = compiledRules.get(ruleId);
+        if (script == null) {
+            throw new IllegalArgumentException("rule is not atomic: " + ruleId);
+        }
+        return doEval(script, root, context, arguments);
     }
 
     /**
@@ -141,9 +150,8 @@ public class RuleEngine {
         return doEval(compile(expression), root, context, null);
     }
 
-
     /**
-     * 在独立 JavaScript 上下文中执行已编译脚本
+     * 在独立 JavaScript 作用域中执行已编译脚本
      *
      * @param script      已编译脚本
      * @param root        规则计算的目标对象
@@ -151,15 +159,15 @@ public class RuleEngine {
      * @param arguments   当前规则调用绑定的参数对象
      * @return 转换为 Java 对象的脚本返回值
      */
-    private Object doEval(Source script, Object root, Object ruleContext, Map<String, Object> arguments) {
-        try (Context context = JsRuntime.createContext()) {
-            Value bindings = context.getBindings(JsRuntime.LANGUAGE_ID);
-            bindings.putMember("$", root);
-            bindings.putMember("$$", ruleContext);
-            bindings.putMember("$args", arguments == null ? Map.of() : arguments);
-            compiledUdfs.forEach(bindings::putMember);
-            return JsRuntime.toJava(context.eval(script));
-        }
+    private Object doEval(Script script, Object root, Object ruleContext, Map<String, Object> arguments) {
+        return JsRuntime.execute((context, scope) -> {
+            udfContainer.bind(context, scope);
+            ScriptableObject.putProperty(scope, "$", Context.javaToJS(root, scope));
+            ScriptableObject.putProperty(scope, "$$", Context.javaToJS(ruleContext, scope));
+            ScriptableObject.putProperty(scope, "$args",
+                    Context.javaToJS(arguments == null ? Map.of() : arguments, scope));
+            return JsRuntime.toJava(script.exec(context, scope));
+        });
     }
 
     /**
@@ -174,8 +182,7 @@ public class RuleEngine {
         }
         ruleDefinitions.put(definition.getRuleId(), definition);
         if (definition.getRuleType() == RuleDefinition.RULE_TYPE_ATOMIC) {
-            // 仅原子规则表达式作为 JavaScript 脚本预编译
-            compile(definition.getExpression());
+            compiledRules.put(definition.getRuleId(), compile(definition.getExpression()));
         }
         compileDesc(definition.getDesc());
     }
@@ -184,9 +191,9 @@ public class RuleEngine {
      * 获取或编译 JavaScript 规则脚本
      *
      * @param expression JavaScript 表达式
-     * @return 已验证的脚本
+     * @return 已编译的脚本
      */
-    private Source compile(String expression) {
+    private Script compile(String expression) {
         return compiledScripts.computeIfAbsent(expression, this::compileExpression);
     }
 
@@ -194,12 +201,11 @@ public class RuleEngine {
      * 编译 JavaScript 规则表达式
      * <p>
      * 顶层对象字面量会按代码块解析，首尾为大括号时补充分组括号
-     * 其他表达式保持原样
      *
      * @param expression JavaScript 表达式
-     * @return 已验证的脚本
+     * @return 已编译的脚本
      */
-    private Source compileExpression(String expression) {
+    private Script compileExpression(String expression) {
         String trimmed = expression.trim();
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
             return doCompile("(" + trimmed + ")");
@@ -207,34 +213,27 @@ public class RuleEngine {
         return doCompile(expression);
     }
 
-
     /**
      * 获取或编译规则描述模板
      * <p>
      * 描述通过 {@code String.raw} 模板支持访问 {@code $.agent}、{@code $$.agent} 和 {@code $args.agent}
      *
      * @param originDesc 规则描述模板
-     * @return 已验证的描述模板脚本
+     * @return 已编译的描述模板脚本
      */
-    private Source compileDesc(String originDesc) {
+    private Script compileDesc(String originDesc) {
         return compiledDesc.computeIfAbsent(originDesc,
                 desc -> doCompile("String.raw`" + desc + "`"));
     }
 
-
     /**
-     * 创建并验证 JavaScript 脚本
+     * 编译 JavaScript 脚本
      *
      * @param expression JavaScript 源码
-     * @return 已通过语法解析的脚本
+     * @return 已编译的脚本
      */
-    private Source doCompile(String expression) {
-        Source source = JsRuntime.createSource(expression, "rule-" + Integer.toHexString(expression.hashCode()));
-        try (Context context = JsRuntime.createContext()) {
-            context.parse(source);
-        }
-        return source;
+    private Script doCompile(String expression) {
+        return JsRuntime.compile(
+                expression, "rule-" + SOURCE_SEQUENCE.incrementAndGet());
     }
-
-
 }

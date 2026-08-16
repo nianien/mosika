@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -149,6 +150,36 @@ public class UdfGroupTest {
         String arg = "China";
         NodeResult result = new RuleSuite(builder.build()).eval(nodeBuilder.build("1"), arg);
         System.out.println(result);
+    }
+
+    @Test
+    public void testUdfAsJavaUdfArgument() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinitions(Arrays.asList(
+                        new UdfDefinition("math", "jsSum3", "(a, b, c) => a + b + c"),
+                        new UdfDefinition("math", "javaSum", new SumUdf()),
+                        new UdfDefinition("policy", "invoke", new InvokeUdf())))
+                .build();
+
+        assertEquals(3, engine.evalExpr("policy.invoke(math.javaSum, 1, 2)", null, null));
+        assertEquals(6, engine.evalExpr("policy.invoke(math.jsSum3, 1, 2, 3)", null, null));
+    }
+
+    public static class InvokeUdf
+            implements Functions.Function2<Function<Object[], Object>, Object[], Object> {
+
+        @Override
+        public Object apply(Function<Object[], Object> function, Object... arguments) {
+            return function.apply(arguments);
+        }
+    }
+
+    public static class SumUdf implements Functions.Function2<Integer, Integer, Integer> {
+
+        @Override
+        public Integer apply(Integer left, Integer right) {
+            return left + right;
+        }
     }
 
 }

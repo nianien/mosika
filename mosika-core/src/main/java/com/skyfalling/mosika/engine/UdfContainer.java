@@ -3,84 +3,59 @@ package com.skyfalling.mosika.engine;
 import com.cudrania.core.utils.StringUtils;
 import com.skyfalling.mosika.udf.JsUdf;
 import com.skyfalling.mosika.udf.UdfDelegate;
-import lombok.SneakyThrows;
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.description.modifier.Visibility;
-import net.bytebuddy.dynamic.DynamicType.Builder;
+import com.skyfalling.mosika.utils.JsRuntime;
+import org.mozilla.javascript.BaseFunction;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.NativeObject;
+import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.Wrapper;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * UDF容器，用于将UDF分组编译成对象
+ * UDF容器，用于将UDF绑定为JavaScript命名空间对象
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * @since 2023/11/7
  * Copyright (c) 2004-2029 All Rights Reserved.
  **/
 public class UdfContainer {
-    /**
-     * 注册的UDF
-     */
-    private Map<String, Object> udfDefined = new ConcurrentHashMap<>();
 
-    /**
-     * UDF列表
-     *
-     * @param udfDefinitions
-     */
+    private final Map<String, Object> udfDefined = new ConcurrentHashMap<>();
+
     public UdfContainer(List<UdfDefinition> udfDefinitions) {
-        udfDefinitions.forEach(udf -> register(udf));
+        udfDefinitions.forEach(this::register);
     }
 
-    /**
-     * 分组的UDF集成一个对象
-     *
-     * @return
-     */
-    public Map<String, Object> compile() {
-        Map<String, Object> udfCompiled = new ConcurrentHashMap<>();
-        //编译udf
-        this.udfDefined.forEach((k, v) -> udfCompiled.put(k, compileUdf("UDF$" + StringUtils.capitalize(k), v)));
-        return udfCompiled;
+    public void bind(Context context, Scriptable scope) {
+        udfDefined.forEach((name, udf) ->
+                ScriptableObject.putProperty(scope, name, bindUdf(context, scope, udf)));
     }
 
-
-    /**
-     * 注册自定义函数
-     *
-     * @param udfDefinition
-     */
     public void register(UdfDefinition udfDefinition) {
         register(udfDefinition.getGroup(), udfDefinition.getName(), udfDefinition.getUdf());
     }
 
-    /**
-     * 注册自定义函数
-     *
-     * @param group
-     * @param name
-     * @param udf
-     */
     private void register(String group, String name, Object udf) {
-        Map map = this.udfDefined;
+        Map<String, Object> map = udfDefined;
         if (StringUtils.isNotEmpty(group)) {
             String[] tokens = group.replaceAll("\\s", "").split("\\.+");
             int i = 0;
             for (; i < tokens.length; i++) {
                 String token = tokens[i];
-                Object o = map.computeIfAbsent(token, k -> new HashMap<>());
-                if (o instanceof Map) {
-                    map = (Map) o;
+                Object value = map.computeIfAbsent(token, key -> new HashMap<>());
+                if (value instanceof Map) {
+                    map = (Map<String, Object>) value;
                 } else {
-                    String conflictName = Arrays.stream(tokens).limit(i + 1).collect(Collectors.joining("."));
+                    String conflictName = Arrays.stream(tokens)
+                            .limit(i + 1)
+                            .collect(Collectors.joining("."));
                     throw new IllegalArgumentException("udf: " + conflictName + " is already defined!");
                 }
             }
@@ -88,58 +63,53 @@ public class UdfContainer {
         if (map.containsKey(name)) {
             throw new IllegalArgumentException("udf: " + name + " is already defined!");
         }
-        doRegister(map, name, udf);
-    }
-
-    /**
-     * 注册自定义函数
-     *
-     * @param map
-     * @param name
-     * @param udf
-     */
-    private void doRegister(Map map, String name, Object udf) {
-        if (udf instanceof String) {
-            udf = new JsUdf(name, (String) udf);
+        if (udf instanceof String source) {
+            udf = new JsUdf(name, source);
+        } else {
+            udf = UdfDelegate.of(udf);
         }
-        //代理JsUdf
-        map.put(name, UdfDelegate.of(udf));
+        map.put(name, udf);
     }
 
-
-    /**
-     * 将udf映射表编译成类对象<p/>
-     *
-     * @param name
-     * @param udf
-     * @return
-     */
-    @SneakyThrows
-    private static Object compileUdf(String name, Object udf) {
+    private Object bindUdf(Context context, Scriptable scope, Object udf) {
+        if (udf instanceof JsUdf jsUdf) {
+            return jsUdf.bind(context, scope);
+        }
         if (!(udf instanceof Map)) {
-            return udf;
+            return new JavaUdfFunction((UdfDelegate<Object, Object>) udf, scope);
         }
-        Map<String, Object> udfMap = (Map<String, Object>) udf;
-        Builder<Object> subclass = new ByteBuddy()
-                .subclass(Object.class)
-                .name(name);
-        for (Entry<String, Object> entry : udfMap.entrySet()) {
-            subclass = subclass.defineField(entry.getKey(), Object.class, Visibility.PUBLIC);
+        NativeObject group = new NativeObject();
+        group.setParentScope(scope);
+        group.setPrototype(ScriptableObject.getObjectPrototype(scope));
+        ((Map<String, Object>) udf).forEach((name, value) ->
+                ScriptableObject.putProperty(group, name, bindUdf(context, scope, value)));
+        return group;
+    }
+
+    private static final class JavaUdfFunction extends BaseFunction implements Wrapper {
+
+        private final UdfDelegate<Object, Object> delegate;
+
+        private JavaUdfFunction(UdfDelegate<Object, Object> delegate, Scriptable scope) {
+            super(scope, ScriptableObject.getFunctionPrototype(scope));
+            this.delegate = delegate;
         }
-        Object instance = subclass
-                .make()
-                .load(Thread.currentThread().getContextClassLoader())
-                .getLoaded().getDeclaredConstructor().newInstance();
-        for (Entry<String, Object> entry : udfMap.entrySet()) {
-            //udf的名称,不含命名空间
-            String key = entry.getKey();
-            //udf的实例
-            Object value = entry.getValue();
-            String clazz = name + "$" + StringUtils.capitalize(key);
-            //注意: 这里不是setter方法,而是setField的底层实现,直接访问字段
-            MethodHandle setter = MethodHandles.lookup().findSetter(instance.getClass(), key, Object.class);
-            setter.bindTo(instance).invoke(compileUdf(clazz, value));
+
+        @Override
+        public Object call(Context context,
+                           Scriptable scope,
+                           Scriptable thisObject,
+                           Object[] arguments) {
+            Object[] parameters = new Object[arguments.length];
+            for (int i = 0; i < arguments.length; i++) {
+                parameters[i] = JsRuntime.toJava(arguments[i]);
+            }
+            return Context.javaToJS(delegate.apply(parameters), scope);
         }
-        return instance;
+
+        @Override
+        public Object unwrap() {
+            return delegate;
+        }
     }
 }
