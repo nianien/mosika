@@ -1,6 +1,5 @@
 package com.skyfalling.mosika.udf;
 
-import com.cudrania.core.reflection.Reflections;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.skyfalling.mosika.utils.JsonUtils;
 import com.skyfalling.mosika.utils.JsRuntime;
@@ -8,10 +7,13 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 /**
@@ -227,8 +229,8 @@ public interface UdfDelegate<P, R> {
                 invocationParams[fixedCount] = variableParams;
                 params = invocationParams;
             }
-            Object[] casts = Reflections.convert(params, signature.parameterTypes, converter);
-            return Reflections.invoke(signature.method, udf, casts);
+            Object[] casts = convertParams(params, signature.parameterTypes);
+            return invoke(signature.method, udf, casts);
         }
 
         /**
@@ -240,8 +242,7 @@ public interface UdfDelegate<P, R> {
          * @return 按参数个数索引的方法签名数组
          */
         private static Signature[] resolve(Object udf) {
-            Collection<Method> methods = Reflections.getMethods(udf.getClass(),
-                    m -> m.getName().equals("apply") && !m.isBridge());
+            Collection<Method> methods = applyMethods(udf.getClass());
             int max = -1;
             for (Method method : methods) {
                 max = Math.max(max, method.getParameterCount());
@@ -252,6 +253,130 @@ public interface UdfDelegate<P, R> {
                 result[arity] = new Signature(method);
             }
             return result;
+        }
+
+        /**
+         * 收集类及其父类型声明的名为 {@code apply} 的非桥接方法。
+         * <p>
+         * 合并 {@link Class#getMethods()}（含继承的 public 方法）与
+         * {@link Class#getDeclaredMethods()}（本类声明的方法），去重后过滤，
+         * 语义与原 {@code Reflections.getMethods} 一致。
+         *
+         * @param type UDF 实现类
+         * @return 名为 {@code apply} 的非桥接方法集合
+         */
+        private static Collection<Method> applyMethods(Class<?> type) {
+            Set<Method> methods = new LinkedHashSet<>();
+            for (Method method : type.getMethods()) {
+                methods.add(method);
+            }
+            for (Method method : type.getDeclaredMethods()) {
+                methods.add(method);
+            }
+            methods.removeIf(method -> !method.getName().equals("apply") || method.isBridge());
+            return methods;
+        }
+
+        /**
+         * 按目标参数类型逐个转换实参。
+         *
+         * @param parameters     待转换的实参
+         * @param parameterTypes 目标 {@code apply} 方法的泛型参数类型
+         * @return 转换后的实参数组
+         */
+        private static Object[] convertParams(Object[] parameters, Type[] parameterTypes) {
+            Object[] castParams = new Object[parameters.length];
+            for (int i = 0; i < parameterTypes.length; i++) {
+                castParams[i] = doConvert(parameters[i], parameterTypes[i]);
+            }
+            return castParams;
+        }
+
+        /**
+         * 把单个实参转换为目标类型。
+         * <p>
+         * 顺序与原 {@code Reflections.doConvert} 保持一致：{@code null} 直接返回；
+         * 目标是 {@link Class} 且实参已是其实例时原样返回（该分支先于 {@link #converter}，
+         * 决定了 Java UDF 作为 {@code Object} 参数时保留 {@code Wrapper} 而非解包）；
+         * 字符串到原始类型和枚举按名称解析；其余情况交给 {@link #converter}。
+         *
+         * @param value 原始实参
+         * @param type  目标参数类型
+         * @return 转换后的值
+         */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private static Object doConvert(Object value, Type type) {
+            if (value == null) {
+                return null;
+            }
+            if (type instanceof Class<?> clazz) {
+                if (clazz.isInstance(value)) {
+                    return value;
+                }
+                if (value instanceof String valueString) {
+                    if (clazz.equals(String.class)) {
+                        return valueString;
+                    }
+                    if (clazz.equals(Boolean.TYPE) || clazz.equals(Boolean.class)) {
+                        return Boolean.valueOf(valueString);
+                    }
+                    if (clazz.equals(Byte.TYPE) || clazz.equals(Byte.class)) {
+                        return Byte.valueOf(valueString);
+                    }
+                    if (clazz.equals(Short.TYPE) || clazz.equals(Short.class)) {
+                        return Short.valueOf(valueString);
+                    }
+                    if (clazz.equals(Integer.TYPE) || clazz.equals(Integer.class)) {
+                        return Integer.valueOf(valueString);
+                    }
+                    if (clazz.equals(Long.TYPE) || clazz.equals(Long.class)) {
+                        return Long.valueOf(valueString);
+                    }
+                    if (clazz.equals(Float.TYPE) || clazz.equals(Float.class)) {
+                        return Float.valueOf(valueString);
+                    }
+                    if (clazz.equals(Double.TYPE) || clazz.equals(Double.class)) {
+                        return Double.valueOf(valueString);
+                    }
+                    if (clazz.equals(Character.TYPE) || clazz.equals(Character.class)) {
+                        return Character.valueOf(valueString.charAt(0));
+                    }
+                    if (clazz.isEnum()) {
+                        return Enum.valueOf((Class<Enum>) clazz, valueString);
+                    }
+                }
+            }
+            return converter.apply(value, type);
+        }
+
+        /**
+         * 反射调用 UDF 方法。
+         * <p>
+         * 解包 {@link InvocationTargetException}，向上抛出 UDF 实际抛出的异常，
+         * 使 UDF 内部异常按业务语义正常传播；反射本身的
+         * {@link IllegalAccessException} 作为基础设施错误包装为 {@link IllegalStateException}。
+         *
+         * @param method     目标方法
+         * @param target     UDF 实例
+         * @param arguments  已转换的实参
+         * @return 方法返回值
+         */
+        private static Object invoke(Method method, Object target, Object[] arguments) {
+            try {
+                return method.invoke(target, arguments);
+            } catch (InvocationTargetException e) {
+                // FunctionN.apply 不声明受检异常，UDF 只会抛非受检异常，直接透传其真实异常
+                Throwable cause = e.getCause();
+                if (cause instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                if (cause instanceof Error error) {
+                    throw error;
+                }
+                throw new IllegalStateException(cause != null ? cause : e);
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
         }
 
         /**
@@ -268,6 +393,8 @@ public interface UdfDelegate<P, R> {
             private final Type[] parameterTypes;
 
             private Signature(Method method) {
+                // 注册时一次性放开可达性，避免每次调用重复设置，并让不可访问的方法尽早暴露
+                method.setAccessible(true);
                 this.method = method;
                 this.parameterTypes = method.getGenericParameterTypes();
             }

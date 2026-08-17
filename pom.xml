@@ -23,7 +23,6 @@
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.38</logback.version>
         <jackson.version>2.21.3</jackson.version>
-        <cudrania.version>1.2.5</cudrania.version>
         <spring.version>6.2.19</spring.version>
         <junit-jupiter.version>5.11.4</junit-jupiter.version>
         <jackson-datatype-protobuf.version>0.9.18</jackson-datatype-protobuf.version>
@@ -106,11 +105,6 @@
                 <artifactId>spring-context</artifactId>
                 <version>${spring.version}</version>
                 <scope>compile</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.github.nianien</groupId>
-                <artifactId>cudrania</artifactId>
-                <version>${cudrania.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.hubspot.jackson</groupId>

@@ -1,11 +1,11 @@
 package com.skyfalling.mosika;
 
-import com.cudrania.core.utils.TimeCounter;
 import com.skyfalling.mosika.engine.RuleDefinition;
 import com.skyfalling.mosika.engine.RuleEngine;
 import com.skyfalling.mosika.engine.UdfDefinition;
 import com.skyfalling.mosika.eval.result.EvalResult;
 import com.skyfalling.mosika.udf.Functions.Function1;
+import com.skyfalling.mosika.udf.UdfDelegate;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -356,14 +356,24 @@ public class RuleEngineTest {
         Map<String, Object> map = new HashMap<>();
         map.put("currentMonth", 5);
         Object res = ruleEngine.evalExpr("$.currentMonth*1.0", map, null);
-        TimeCounter tc=new TimeCounter();
+        long start = System.nanoTime();
         int times=10000;
         for (int i = 0; i < times; i++) {
             ruleEngine.evalExpr("$.currentMonth*1.0", map, null);
         }
-        System.out.println(tc.timePassed()*1.0/times);
+        System.out.println((System.nanoTime() - start) / 1_000_000.0 / times);
 
         assertEquals(5, res);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void testJavaUdfExceptionPropagatesUnwrapped() {
+        UdfDelegate delegate = UdfDelegate.of(new BoomUdf());
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> delegate.apply(1));
+        assertEquals("boom", exception.getMessage());
     }
 
     public static class IncrementUdf implements Function1<Integer, Integer> {
@@ -371,6 +381,14 @@ public class RuleEngineTest {
         @Override
         public Integer apply(Integer value) {
             return value + 1;
+        }
+    }
+
+    public static class BoomUdf implements Function1<Integer, Integer> {
+
+        @Override
+        public Integer apply(Integer value) {
+            throw new IllegalStateException("boom");
         }
     }
 }

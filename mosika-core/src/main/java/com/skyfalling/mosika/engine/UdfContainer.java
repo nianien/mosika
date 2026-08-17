@@ -1,6 +1,5 @@
 package com.skyfalling.mosika.engine;
 
-import com.cudrania.core.utils.StringUtils;
 import com.skyfalling.mosika.udf.JsUdf;
 import com.skyfalling.mosika.udf.UdfDelegate;
 import com.skyfalling.mosika.utils.JsRuntime;
@@ -44,7 +43,7 @@ public class UdfContainer {
 
     private void register(String group, String name, Object udf) {
         Map<String, Object> map = udfDefined;
-        if (StringUtils.isNotEmpty(group)) {
+        if (group != null && !group.isEmpty()) {
             String[] tokens = group.replaceAll("\\s", "").split("\\.+");
             int i = 0;
             for (; i < tokens.length; i++) {

@@ -1,6 +1,5 @@
 package com.skyfalling.mosika.ui.tree.node.rule;
 
-import com.cudrania.core.utils.StringUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonCreator.Mode;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -43,7 +42,7 @@ public class RNode extends RuleNode {
      */
     @Override
     public String ruleExpr() {
-        if (StringUtils.isEmpty(args) || args.isBlank()) {
+        if (args == null || args.isBlank()) {
             return expr;
         }
         return expr + "(\"\"\"" + args.trim() + "\"\"\")";

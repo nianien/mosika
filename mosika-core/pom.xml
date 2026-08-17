@@ -20,11 +20,6 @@
             <artifactId>antlr4-runtime</artifactId>
         </dependency>
         <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.mozilla</groupId>
             <artifactId>rhino</artifactId>
         </dependency>
@@ -51,10 +46,6 @@
         <dependency>
             <groupId>com.hubspot.jackson</groupId>
             <artifactId>jackson-datatype-protobuf</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.github.nianien</groupId>
-            <artifactId>cudrania</artifactId>
         </dependency>
     </dependencies>
 
