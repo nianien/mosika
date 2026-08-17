@@ -64,6 +64,22 @@ public class RuleEngineTest {
     }
 
     @Test
+    public void testJsUdfKeepsLegacyScriptWithHelperFunctions() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("math", "sum", """
+                        function normalize(value) {
+                            return Number(value);
+                        }
+                        function sum(a, b) {
+                            return normalize(a) + normalize(b);
+                        }
+                        """))
+                .build();
+
+        assertEquals(3, engine.evalExpr("math.sum('1', '2')", null, null));
+    }
+
+    @Test
     public void testJsUdfRequiresNamedFunctionToMatchRegistrationName() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
                 () -> RuleEngine.builder()
@@ -289,6 +305,26 @@ public class RuleEngineTest {
         assertEquals(new BigDecimal("12.50"), ruleEngine.evalExpr("$.amount", data, null));
         assertEquals(new BigDecimal("13.50"), ruleEngine.evalExpr(
                 "$.amount.add(new (Java.type('java.math.BigDecimal'))('1.00'))", data, null));
+    }
+
+    @Test
+    public void testJavaScriptIntegerOutsideLongRangeRemainsDouble() {
+        RuleEngine ruleEngine = RuleEngine.builder().build();
+
+        Object upperBound = ruleEngine.evalExpr("9223372036854775808", null, null);
+
+        assertTrue(upperBound instanceof Double);
+        assertEquals(Double.valueOf(0x1.0p63), upperBound);
+        assertEquals(9223372036854774784L,
+                ruleEngine.evalExpr("9223372036854774784", null, null));
+    }
+
+    @Test
+    public void testJavaScriptSparseArrayHolesBecomeNull() {
+        RuleEngine ruleEngine = RuleEngine.builder().build();
+
+        assertEquals(java.util.Arrays.asList(null, 1, null),
+                ruleEngine.evalExpr("[, 1, undefined]", null, null));
     }
 
     @Test

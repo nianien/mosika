@@ -239,6 +239,16 @@ public class RuleSuiteManager {
     private List<UdfDefinition> runtimeUdfs(String namespace) {
         List<UdfDefinition> definitions = new ArrayList<>();
         for (UdfDefinitionEntity entity : udfDao.listActive(namespace)) {
+            if ("__proto__".equals(entity.getName())) {
+                throw new IllegalArgumentException("udf name is reserved: " + entity.getName());
+            }
+            String group = entity.getGroup();
+            if ("__proto__".equals(group)
+                    || group.startsWith("__proto__.")
+                    || group.endsWith(".__proto__")
+                    || group.contains(".__proto__.")) {
+                throw new IllegalArgumentException("udf group is reserved: __proto__");
+            }
             definitions.add(new UdfDefinition(entity.getGroup(), entity.getName(), entity.getSource()));
         }
         return definitions;

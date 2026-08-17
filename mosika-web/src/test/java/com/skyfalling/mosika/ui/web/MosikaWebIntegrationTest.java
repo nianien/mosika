@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -266,6 +267,14 @@ class MosikaWebIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(udfBody("", "class", "() => true"))))
                 .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("", "__proto__", "() => true"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/udfs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(udfBody("content.__proto__", "custom", "() => true"))))
+                .andExpect(status().isBadRequest());
 
         Map<String, Object> valid = udfBody("content", "normalize", "value => value");
         mvc.perform(post("/api/udfs").contentType(MediaType.APPLICATION_JSON).content(json(valid)))
@@ -273,6 +282,23 @@ class MosikaWebIntegrationTest {
         mvc.perform(post("/api/udfs").contentType(MediaType.APPLICATION_JSON).content(json(valid)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    void runtimeSuiteRejectsPrototypePathLoadedFromDatabase() {
+        RuleSuite active = suiteManager.getSuite("default");
+        Long namespaceId = jdbc.queryForObject(
+                "SELECT id FROM rule_namespace WHERE code='default'", Long.class);
+        jdbc.update("INSERT INTO udf_definition "
+                        + "(namespace_id, group_name, name, description, source, status, version) "
+                        + "VALUES (?, 'content.__proto__', 'custom', '', '() => true', 1, 0)",
+                namespaceId);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class, suiteManager::refresh);
+
+        assertTrue(exception.getMessage().contains("__proto__"));
+        assertSame(active, suiteManager.getSuite("default"));
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.skyfalling.mosika.udf;
 
 import com.skyfalling.mosika.utils.JsRuntime;
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.Script;
@@ -52,13 +53,28 @@ public class JsUdf {
     }
 
     private static Script compileFunction(String registeredName, String source) {
+        String sourceName = "udf-" + registeredName + "-" + SOURCE_SEQUENCE.incrementAndGet();
+        Script functionScript;
         try {
-            Script functionScript = JsRuntime.compile(
-                    "(\n" + trimTrailingSemicolons(source) + "\n)",
-                    "udf-" + registeredName + "-" + SOURCE_SEQUENCE.incrementAndGet());
+            functionScript = JsRuntime.compile(
+                    "(\n" + trimTrailingSemicolons(source) + "\n)", sourceName);
+        } catch (EvaluatorException e) {
+            try {
+                functionScript = JsRuntime.compile("(function () {\n"
+                        + source + "\n"
+                        + "return typeof " + registeredName + " === 'function' ? "
+                        + registeredName + " : null;\n"
+                        + "})()", sourceName);
+            } catch (RhinoException legacyException) {
+                throw new IllegalArgumentException(
+                        "JavaScript UDF compile failed: " + registeredName, legacyException);
+            }
+        }
+        Script validatedScript = functionScript;
+        try {
             JsRuntime.execute((context, scope) ->
-                    requireFunction(registeredName, functionScript.exec(context, scope)));
-            return functionScript;
+                    requireFunction(registeredName, validatedScript.exec(context, scope)));
+            return validatedScript;
         } catch (RhinoException e) {
             throw new IllegalArgumentException(
                     "JavaScript UDF compile failed: " + registeredName, e);

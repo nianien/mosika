@@ -250,6 +250,9 @@ public class UdfDefinitionService {
      * @throws IllegalArgumentException 标识符格式无效时抛出
      */
     private static void requireIdentifier(String value, String label) {
+        if ("__proto__".equals(value)) {
+            throw new IllegalArgumentException(label + " is reserved: " + value);
+        }
         if (!IDENTIFIER.matcher(value).matches()) {
             throw new IllegalArgumentException(label + " must be a JavaScript identifier: " + value);
         }

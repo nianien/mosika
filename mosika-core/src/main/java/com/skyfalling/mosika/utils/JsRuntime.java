@@ -99,7 +99,8 @@ public final class JsRuntime {
             int size = Math.toIntExact(array.getLength());
             List<Object> result = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                result.add(toJava(array.get(i, array)));
+                Object item = array.get(i, array);
+                result.add(item == Scriptable.NOT_FOUND ? null : toJava(item));
             }
             return result;
         }
@@ -120,7 +121,7 @@ public final class JsRuntime {
             if (number >= Integer.MIN_VALUE && number <= Integer.MAX_VALUE) {
                 return number.intValue();
             }
-            if (number >= Long.MIN_VALUE && number <= Long.MAX_VALUE) {
+            if (number >= Long.MIN_VALUE && number < 0x1.0p63) {
                 return number.longValue();
             }
         }
