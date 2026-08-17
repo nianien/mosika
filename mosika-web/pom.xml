@@ -117,7 +117,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <configuration>
-                    <mainClass>com.skyfalling.mosika.ui.web.MosikaWebApplication</mainClass>
+                    <mainClass>com.nianien.mosika.ui.web.MosikaWebApplication</mainClass>
                 </configuration>
                 <executions>
                     <!-- 绑定 repackage：mvn package 产出可执行胖包

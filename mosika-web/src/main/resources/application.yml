@@ -30,4 +30,4 @@ mosika:
 logging:
   level:
     root: INFO
-    com.skyfalling.mosika: DEBUG
+    com.nianien.mosika: DEBUG

@@ -71,4 +71,4 @@ Rule = R | And(Rule, Rule+) | Or(Rule, Rule+) | Hits(bounds, Rule+)
 
 ## Conventions
 
-Java, 4-space indent, package under `com.skyfalling.mosika`. Types UpperCamelCase, methods lowerCamelCase, constants UPPER_SNAKE. Do not infer semantics from method names — e.g. `ParNode.next()` is a covariant override that appends a parallel node, not a serial one. Commit messages: short Chinese subject, one concern per commit; PRs state affected modules, semantic changes, and verification commands (attach representative DSL/JSON/structure for UI-tree changes).
+Java, 4-space indent, package under `com.nianien.mosika`. Types UpperCamelCase, methods lowerCamelCase, constants UPPER_SNAKE. Do not infer semantics from method names — e.g. `ParNode.next()` is a covariant override that appends a parallel node, not a serial one. Commit messages: short Chinese subject, one concern per commit; PRs state affected modules, semantic changes, and verification commands (attach representative DSL/JSON/structure for UI-tree changes).
