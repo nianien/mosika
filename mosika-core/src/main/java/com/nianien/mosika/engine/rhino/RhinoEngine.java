@@ -4,6 +4,7 @@ import com.nianien.mosika.eval.context.UdfContext;
 import org.mozilla.javascript.BaseFunction;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.Function;
 import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.NativeJavaClass;
 import org.mozilla.javascript.NativeJavaMap;
@@ -167,6 +168,10 @@ public final class RhinoEngine {
         }
         if (value instanceof Wrapper wrapper) {
             return wrapper.unwrap();
+        }
+        if (value instanceof Function function) {
+            // JS UDF 作为参数传入时,预先适配为 java Function,使通用 UdfDelegate 无需感知 Rhino
+            return new RhinoFunctionAdapter(function);
         }
         if (value instanceof NativeArray array) {
             int size = Math.toIntExact(array.getLength());

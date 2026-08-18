@@ -1,6 +1,7 @@
 package com.nianien.mosika.engine;
 
 import com.nianien.mosika.engine.rhino.RhinoEngine;
+import com.nianien.mosika.engine.rhino.RhinoUdfBinder;
 import com.nianien.mosika.eval.result.NaResult;
 import com.nianien.mosika.exception.RuleNotFoundException;
 import com.nianien.mosika.udf.UdfContainer;
@@ -70,7 +71,7 @@ public class RuleEngine {
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
         this.udfContainer = new UdfContainer(udfDefinitions);
-        this.udfScope = RhinoEngine.sharedScope(this.udfContainer::bind);
+        this.udfScope = RhinoEngine.sharedScope(new RhinoUdfBinder(this.udfContainer.tree())::bind);
     }
 
     /**

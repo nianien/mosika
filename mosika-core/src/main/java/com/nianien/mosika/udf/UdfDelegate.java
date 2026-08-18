@@ -2,10 +2,6 @@ package com.nianien.mosika.udf;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.nianien.mosika.utils.JsonUtils;
-import com.nianien.mosika.engine.rhino.RhinoEngine;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.Function;
-import org.mozilla.javascript.Scriptable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -39,6 +35,16 @@ public interface UdfDelegate<P, R> {
 
 
     /**
+     * 返回被代理的原始对象;非代理实现返回自身。
+     * <p>
+     * 供脚本引擎适配层在需要"对象成员访问"语义时取回原始 Java 对象。
+     */
+    default Object target() {
+        return this;
+    }
+
+
+    /**
      * 创建带参数转换和重载分派能力的 UDF 代理。
      *
      * @param udf 原始 Java UDF
@@ -56,8 +62,8 @@ public interface UdfDelegate<P, R> {
      * <p>
      * 当一个 UDF 作为另一个 Java UDF 的参数时，本类还负责保留其可调用语义：
      * Java UDF 可以还原为注册时的原始实例，也可以适配为
-     * {@link java.util.function.Function}；JavaScript UDF 则通过
-     * {@link RhinoFunctionAdapter} 适配为同一 Java 函数接口。
+     * {@link java.util.function.Function}；JavaScript UDF 则由脚本引擎适配层
+     * 预先适配为同一 Java 函数接口。
      * <p>
      * 只有参数声明为 {@code Function<Object[], Object>} 时才能同时接收 Java UDF
      * 和 JavaScript UDF。参数声明为 {@code Functions.Function0} 至
@@ -141,13 +147,12 @@ public interface UdfDelegate<P, R> {
             }
 
             /*
-             * JavaScript UDF 在 Rhino 中是 org.mozilla.javascript.Function，并不实现
-             * java.util.function.Function；调用它还需要 Rhino Context 和 Scriptable
-             * 作用域。因此这里保存 Rhino 函数，在 Java UDF 调用 Function.apply()
-             * 时由适配器补齐 Rhino 调用参数。
+             * JavaScript UDF 作为参数传入时,已由脚本引擎适配层预先包装为
+             * java.util.function.Function(见 engine.rhino.RhinoFunctionAdapter),
+             * 因此这里按 Java 函数原样透传,通用代码无需感知具体脚本引擎。
              */
-            if (s instanceof Function function && javaFunction) {
-                return new RhinoFunctionAdapter(function);
+            if (javaFunction && s instanceof java.util.function.Function) {
+                return s;
             }
 
             /*
@@ -195,6 +200,11 @@ public interface UdfDelegate<P, R> {
                 }
             }
             this.varArgsSignature = varArgs;
+        }
+
+        @Override
+        public Object target() {
+            return udf;
         }
 
 
@@ -397,42 +407,6 @@ public interface UdfDelegate<P, R> {
                 method.setAccessible(true);
                 this.method = method;
                 this.parameterTypes = method.getGenericParameterTypes();
-            }
-        }
-
-        /**
-         * 把 Rhino JavaScript 函数适配为 Java UDF 可接收的
-         * {@code Function<Object[], Object>}。
-         * <p>
-         * 适配器不创建 Context，也不切换线程。它只能在当前规则求值仍处于 Rhino
-         * Context 内时同步调用；Java UDF 不应保存该对象并在本次求值结束后调用。
-         */
-        private static final class RhinoFunctionAdapter
-                implements java.util.function.Function<Object[], Object> {
-
-            /** 已绑定到当前规则作用域的 Rhino 函数。 */
-            private final Function function;
-
-            private RhinoFunctionAdapter(Function function) {
-                this.function = function;
-            }
-
-            @Override
-            public Object apply(Object[] arguments) {
-                /*
-                 * Java UDF 是从 Rhino 函数调用栈中同步进入的，因此这里直接取得当前
-                 * Context。JsUdf.bind() 在规则作用域内求值函数表达式，因此函数的
-                 * parentScope 就是其绑定作用域。
-                 *
-                 * call() 的 scope 参数使用该作用域，以延续当前规则的全局名称查找；
-                 * thisObject 也使用该作用域，用于确定普通函数中的 this。函数访问同组
-                 * 或其他 UDF 依赖的是绑定时形成的作用域链，而不是 thisObject。
-                 */
-                Context context = Context.getCurrentContext();
-                Scriptable scope = function.getParentScope();
-
-                // Rhino 返回值统一转换为规则引擎使用的 Java 值。
-                return RhinoEngine.toJava(function.call(context, scope, scope, arguments));
             }
         }
 
