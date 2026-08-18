@@ -3,20 +3,16 @@ package com.nianien.mosika.engine;
 import com.nianien.mosika.eval.result.NaResult;
 import com.nianien.mosika.exception.RuleNotFoundException;
 import com.nianien.mosika.utils.Constants;
-import com.nianien.mosika.utils.JsRuntime;
 import lombok.Builder;
 import lombok.Singular;
-import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.Scriptable;
-import org.mozilla.javascript.ScriptableObject;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -30,8 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 public class RuleEngine {
-
-    private static final AtomicLong SOURCE_SEQUENCE = new AtomicLong();
 
     /**
      * 按规则 ID 保存内置规则和输入规则定义
@@ -73,7 +67,7 @@ public class RuleEngine {
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
         this.udfContainer = new UdfContainer(udfDefinitions);
-        this.udfScope = JsRuntime.sharedScope(this.udfContainer::bind);
+        this.udfScope = RhinoEngine.sharedScope(this.udfContainer::bind);
     }
 
     /**
@@ -168,13 +162,11 @@ public class RuleEngine {
      * @return 转换为 Java 对象的脚本返回值
      */
     private Object doEval(Script script, Object root, Object ruleContext, Map<String, Object> arguments) {
-        return JsRuntime.execute(udfScope, (context, scope) -> {
-            ScriptableObject.putProperty(scope, "$", Context.javaToJS(root, scope));
-            ScriptableObject.putProperty(scope, "$$", Context.javaToJS(ruleContext, scope));
-            ScriptableObject.putProperty(scope, "$args",
-                    Context.javaToJS(arguments == null ? Map.of() : arguments, scope));
-            return JsRuntime.toJava(script.exec(context, scope));
-        });
+        Map<String, Object> bindings = new HashMap<>();
+        bindings.put("$", root);
+        bindings.put("$$", ruleContext);
+        bindings.put("$args", arguments == null ? Map.of() : arguments);
+        return RhinoEngine.evaluate(script, udfScope, bindings);
     }
 
     /**
@@ -240,7 +232,6 @@ public class RuleEngine {
      * @return 已编译的脚本
      */
     private Script doCompile(String expression) {
-        return JsRuntime.compile(
-                expression, "rule-" + SOURCE_SEQUENCE.incrementAndGet());
+        return RhinoEngine.compile(expression);
     }
 }

@@ -2,7 +2,7 @@ package com.nianien.mosika.udf;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.nianien.mosika.utils.JsonUtils;
-import com.nianien.mosika.utils.JsRuntime;
+import com.nianien.mosika.engine.RhinoEngine;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
@@ -123,7 +123,7 @@ public interface UdfDelegate<P, R> {
                     && parameterizedType.getRawType() == java.util.function.Function.class;
 
             /*
-             * Java UDF 进入 Rhino 后由 JavaUdfFunction 包装；JsRuntime.toJava()
+             * Java UDF 进入 Rhino 后由 JavaUdfFunction 包装；RhinoEngine.toJava()
              * 会将其解包为当前 Wrapper。
              *
              * 目标参数是 java.util.function.Function 时，以 wrapper::apply 暴露统一的
@@ -432,7 +432,7 @@ public interface UdfDelegate<P, R> {
                 Scriptable scope = function.getParentScope();
 
                 // Rhino 返回值统一转换为规则引擎使用的 Java 值。
-                return JsRuntime.toJava(function.call(context, scope, scope, arguments));
+                return RhinoEngine.toJava(function.call(context, scope, scope, arguments));
             }
         }
 

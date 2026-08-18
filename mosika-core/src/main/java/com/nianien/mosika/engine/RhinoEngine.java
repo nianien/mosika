@@ -1,4 +1,4 @@
-package com.nianien.mosika.utils;
+package com.nianien.mosika.engine;
 
 import com.nianien.mosika.eval.context.UdfContext;
 import org.mozilla.javascript.BaseFunction;
@@ -21,13 +21,22 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
- * Rhino运行时。编译结果跨线程共享，每次执行使用独立的JavaScript作用域。
+ * 规则内核的 Rhino JavaScript 执行引擎。
+ * <p>
+ * 负责编译脚本、构建共享作用域、在隔离子作用域中求值,以及 Rhino 值到普通 Java 值的转换。
+ * 编译结果跨线程共享;共享作用域绑定一次并封闭,每次求值以其为原型建独立子作用域,
+ * 隔离本次的 {@code $}/{@code $$}/{@code $args} 与脚本产生的全局。
+ *
+ * @author skyfalling {@literal <skyfalling@live.com>}
  */
-public final class JsRuntime {
+public final class RhinoEngine {
+
+    private static final AtomicLong SOURCE_SEQUENCE = new AtomicLong();
 
     private static final WrapFactory WRAP_FACTORY = new RuleWrapFactory();
 
@@ -37,6 +46,9 @@ public final class JsRuntime {
         WRAP_FACTORY.setJavaPrimitiveWrap(false);
     }
 
+    /**
+     * 根作用域:封闭且跨线程共享,提供标准对象与宿主类型入口 {@code Java.type}。
+     */
     private static final ScriptableObject GLOBAL_SCOPE = CONTEXT_FACTORY.call(context -> {
         ScriptableObject standardScope = context.initStandardObjects(null, true);
         NativeObject scope = new NativeObject();
@@ -72,37 +84,26 @@ public final class JsRuntime {
         return scope;
     });
 
-    private JsRuntime() {
-    }
-
-    public static Script compile(String code, String name) {
-        return CONTEXT_FACTORY.call(context -> context.compileString(code, name, 1, null));
-    }
-
-    public static <T> T execute(BiFunction<Context, Scriptable, T> action) {
-        return execute(GLOBAL_SCOPE, action);
+    private RhinoEngine() {
     }
 
     /**
-     * 在以 {@code prototype} 为原型的一次性子作用域中执行。
-     * <p>
-     * {@code prototype} 通常是绑定了 UDF 的共享作用域(见 {@link #sharedScope});本次执行的
-     * {@code $}/{@code $$}/{@code $args} 及脚本产生的全局都落在这个隔离子作用域,UDF 名称经原型链
-     * 解析到共享作用域,从而避免每次执行重新绑定 UDF。
+     * 预编译 JS 源码为可跨线程复用的脚本。
+     *
+     * @param source JS 源码
+     * @return 已编译脚本
      */
-    public static <T> T execute(Scriptable prototype, BiFunction<Context, Scriptable, T> action) {
-        return CONTEXT_FACTORY.call(context -> {
-            NativeObject scope = new NativeObject();
-            scope.setPrototype(prototype);
-            scope.setParentScope(null);
-            scope.defineProperty("globalThis", scope, ScriptableObject.DONTENUM);
-            return action.apply(context, scope);
-        });
+    public static Script compile(String source) {
+        return CONTEXT_FACTORY.call(context ->
+                context.compileString(source, "script-" + SOURCE_SEQUENCE.incrementAndGet(), 1, null));
     }
 
     /**
-     * 构建一个以 {@code GLOBAL_SCOPE} 为原型的共享作用域,交由 {@code binder} 绑定跨执行复用的内容
+     * 构建一个以 {@link #GLOBAL_SCOPE} 为原型的共享作用域,交由 {@code binder} 绑定跨求值复用的内容
      * (如 UDF),随后封闭以便多线程并发只读复用。
+     *
+     * @param binder 在作用域上绑定共享内容
+     * @return 已封闭的共享作用域,可作为 {@link #evaluate} 的原型
      */
     public static Scriptable sharedScope(BiConsumer<Context, Scriptable> binder) {
         return CONTEXT_FACTORY.call(context -> {
@@ -115,6 +116,51 @@ public final class JsRuntime {
         });
     }
 
+    /**
+     * 在以 {@code scope} 为原型的一次性子作用域中注入 {@code bindings} 并求值,返回普通 Java 值。
+     * <p>
+     * {@code bindings}(如 {@code $}/{@code $$}/{@code $args})与脚本产生的全局都落在这个隔离子作用域;
+     * 共享内容(如 UDF)经原型链解析到 {@code scope}。
+     *
+     * @param script   已编译脚本
+     * @param scope    作为原型的共享作用域(见 {@link #sharedScope})
+     * @param bindings 本次求值注入的绑定,允许 {@code null} 值
+     * @return 转换为普通 Java 对象的脚本返回值
+     */
+    public static Object evaluate(Script script, Scriptable scope, Map<String, Object> bindings) {
+        return CONTEXT_FACTORY.call(context -> {
+            NativeObject local = new NativeObject();
+            local.setPrototype(scope);
+            local.setParentScope(null);
+            local.defineProperty("globalThis", local, ScriptableObject.DONTENUM);
+            bindings.forEach((name, value) ->
+                    ScriptableObject.putProperty(local, name, Context.javaToJS(value, local)));
+            return toJava(script.exec(context, local));
+        });
+    }
+
+    /**
+     * 在一个以 {@link #GLOBAL_SCOPE} 为原型的一次性子作用域中运行 {@code action},返回其结果。
+     * <p>
+     * 面向需要直接操作 Rhino {@link Context}/{@link Scriptable} 的低层场景,
+     * 如 JS UDF 编译期的可执行性校验;热路径求值请用 {@link #evaluate}。
+     */
+    public static <T> T runInScope(BiFunction<Context, Scriptable, T> action) {
+        return CONTEXT_FACTORY.call(context -> {
+            NativeObject scope = new NativeObject();
+            scope.setPrototype(GLOBAL_SCOPE);
+            scope.setParentScope(null);
+            scope.defineProperty("globalThis", scope, ScriptableObject.DONTENUM);
+            return action.apply(context, scope);
+        });
+    }
+
+    /**
+     * 把 Rhino 值转换为普通 Java 值。
+     *
+     * @param value Rhino 值
+     * @return 普通 Java 值
+     */
     public static Object toJava(Object value) {
         if (value == null || Undefined.isUndefined(value)) {
             return null;

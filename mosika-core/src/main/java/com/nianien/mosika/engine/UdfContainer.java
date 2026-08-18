@@ -2,7 +2,6 @@ package com.nianien.mosika.engine;
 
 import com.nianien.mosika.udf.JsUdf;
 import com.nianien.mosika.udf.UdfDelegate;
-import com.nianien.mosika.utils.JsRuntime;
 import org.mozilla.javascript.BaseFunction;
 import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;
@@ -120,7 +119,7 @@ public class UdfContainer {
                            Object[] arguments) {
             Object[] parameters = new Object[arguments.length];
             for (int i = 0; i < arguments.length; i++) {
-                parameters[i] = JsRuntime.toJava(arguments[i]);
+                parameters[i] = RhinoEngine.toJava(arguments[i]);
             }
             return Context.javaToJS(delegate.apply(parameters), scope);
         }

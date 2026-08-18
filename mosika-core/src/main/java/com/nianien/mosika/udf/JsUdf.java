@@ -1,6 +1,6 @@
 package com.nianien.mosika.udf;
 
-import com.nianien.mosika.utils.JsRuntime;
+import com.nianien.mosika.engine.RhinoEngine;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Function;
@@ -9,8 +9,6 @@ import org.mozilla.javascript.Script;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 把 JavaScript 函数源码适配为规则引擎可调用的 UDF
@@ -37,8 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
  **/
 public class JsUdf {
 
-    private static final AtomicLong SOURCE_SEQUENCE = new AtomicLong();
-
     private final String registeredName;
 
     private final Script functionScript;
@@ -53,18 +49,16 @@ public class JsUdf {
     }
 
     private static Script compileFunction(String registeredName, String source) {
-        String sourceName = "udf-" + registeredName + "-" + SOURCE_SEQUENCE.incrementAndGet();
         Script functionScript;
         try {
-            functionScript = JsRuntime.compile(
-                    "(\n" + trimTrailingSemicolons(source) + "\n)", sourceName);
+            functionScript = RhinoEngine.compile("(\n" + trimTrailingSemicolons(source) + "\n)");
         } catch (EvaluatorException e) {
             try {
-                functionScript = JsRuntime.compile("(function () {\n"
+                functionScript = RhinoEngine.compile("(function () {\n"
                         + source + "\n"
                         + "return typeof " + registeredName + " === 'function' ? "
                         + registeredName + " : null;\n"
-                        + "})()", sourceName);
+                        + "})()");
             } catch (RhinoException legacyException) {
                 throw new IllegalArgumentException(
                         "JavaScript UDF compile failed: " + registeredName, legacyException);
@@ -72,7 +66,7 @@ public class JsUdf {
         }
         Script validatedScript = functionScript;
         try {
-            JsRuntime.execute((context, scope) ->
+            RhinoEngine.runInScope((context, scope) ->
                     requireFunction(registeredName, validatedScript.exec(context, scope)));
             return validatedScript;
         } catch (RhinoException e) {
