@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Created on 2022-08-26
@@ -179,6 +180,58 @@ public class UdfGroupTest {
         @Override
         public Integer apply(Integer left, Integer right) {
             return left + right;
+        }
+    }
+
+    @Test
+    public void testPlainObjectMemberMethodIsCallable() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("bean", "helper", new PlainBeanUdf()))
+                .build();
+
+        // 普通对象没有 apply，仍可注册，并支持通过成员方法调用
+        assertEquals("hi jack", engine.evalExpr("bean.helper.greet('jack')", null, null));
+        assertEquals(5, engine.evalExpr("bean.helper.add(2, 3)", null, null));
+
+        // 直接以函数方式执行才因缺少兼容 apply 报错
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("bean.helper(1)", null, null));
+    }
+
+    @Test
+    public void testJavaUdfSupportsBothCallAndMemberAccess() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("math", "calc", new DualUdf()))
+                .build();
+
+        // udf(...) 进入 UdfDelegate.apply()，按 apply 签名分派
+        assertEquals(5, engine.evalExpr("math.calc(2, 3)", null, null));
+        // udf.someMethod(...) 调用原始对象的成员方法
+        assertEquals(6, engine.evalExpr("math.calc.multiply(2, 3)", null, null));
+    }
+
+    /** 没有 apply 的普通对象，仅暴露成员方法 */
+    public static class PlainBeanUdf {
+
+        public String greet(String name) {
+            return "hi " + name;
+        }
+
+        public int add(int left, int right) {
+            return left + right;
+        }
+    }
+
+    /** 同一对象既可作为函数执行（apply），又可访问其它成员方法 */
+    public static class DualUdf implements Functions.Function2<Integer, Integer, Integer> {
+
+        @Override
+        public Integer apply(Integer left, Integer right) {
+            return left + right;
+        }
+
+        public int multiply(int left, int right) {
+            return left * right;
         }
     }
 
