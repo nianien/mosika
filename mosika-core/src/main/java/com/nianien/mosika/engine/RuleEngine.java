@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Singular;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Script;
+import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 
 import java.util.HashMap;
@@ -52,6 +53,12 @@ public class RuleEngine {
     private final UdfContainer udfContainer;
 
     /**
+     * 绑定了全部 UDF 的共享作用域,构造期绑定一次并封闭;每次求值以它为原型建子作用域,
+     * 避免每次执行重新绑定 UDF
+     */
+    private final Scriptable udfScope;
+
+    /**
      * 注册规则定义和 UDF 定义并完成可执行内容的预编译
      *
      * @param ruleDefinitions 规则定义
@@ -66,6 +73,7 @@ public class RuleEngine {
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
         this.udfContainer = new UdfContainer(udfDefinitions);
+        this.udfScope = JsRuntime.sharedScope(this.udfContainer::bind);
     }
 
     /**
@@ -160,8 +168,7 @@ public class RuleEngine {
      * @return 转换为 Java 对象的脚本返回值
      */
     private Object doEval(Script script, Object root, Object ruleContext, Map<String, Object> arguments) {
-        return JsRuntime.execute((context, scope) -> {
-            udfContainer.bind(context, scope);
+        return JsRuntime.execute(udfScope, (context, scope) -> {
             ScriptableObject.putProperty(scope, "$", Context.javaToJS(root, scope));
             ScriptableObject.putProperty(scope, "$$", Context.javaToJS(ruleContext, scope));
             ScriptableObject.putProperty(scope, "$args",

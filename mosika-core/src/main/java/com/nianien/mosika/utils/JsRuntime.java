@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
@@ -79,12 +80,38 @@ public final class JsRuntime {
     }
 
     public static <T> T execute(BiFunction<Context, Scriptable, T> action) {
+        return execute(GLOBAL_SCOPE, action);
+    }
+
+    /**
+     * 在以 {@code prototype} 为原型的一次性子作用域中执行。
+     * <p>
+     * {@code prototype} 通常是绑定了 UDF 的共享作用域(见 {@link #sharedScope});本次执行的
+     * {@code $}/{@code $$}/{@code $args} 及脚本产生的全局都落在这个隔离子作用域,UDF 名称经原型链
+     * 解析到共享作用域,从而避免每次执行重新绑定 UDF。
+     */
+    public static <T> T execute(Scriptable prototype, BiFunction<Context, Scriptable, T> action) {
+        return CONTEXT_FACTORY.call(context -> {
+            NativeObject scope = new NativeObject();
+            scope.setPrototype(prototype);
+            scope.setParentScope(null);
+            scope.defineProperty("globalThis", scope, ScriptableObject.DONTENUM);
+            return action.apply(context, scope);
+        });
+    }
+
+    /**
+     * 构建一个以 {@code GLOBAL_SCOPE} 为原型的共享作用域,交由 {@code binder} 绑定跨执行复用的内容
+     * (如 UDF),随后封闭以便多线程并发只读复用。
+     */
+    public static Scriptable sharedScope(BiConsumer<Context, Scriptable> binder) {
         return CONTEXT_FACTORY.call(context -> {
             NativeObject scope = new NativeObject();
             scope.setPrototype(GLOBAL_SCOPE);
             scope.setParentScope(null);
-            scope.defineProperty("globalThis", scope, ScriptableObject.DONTENUM);
-            return action.apply(context, scope);
+            binder.accept(context, scope);
+            scope.sealObject();
+            return scope;
         });
     }
 
