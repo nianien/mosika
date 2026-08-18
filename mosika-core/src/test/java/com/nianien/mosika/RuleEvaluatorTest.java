@@ -3,7 +3,7 @@ package com.nianien.mosika;
 import com.nianien.mosika.bean.User;
 import com.nianien.mosika.engine.RuleDefinition;
 import com.nianien.mosika.engine.RuleEngine;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.parser.NodeBuilder;
 import com.nianien.mosika.eval.result.NodeResult;

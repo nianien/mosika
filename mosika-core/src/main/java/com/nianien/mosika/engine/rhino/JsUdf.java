@@ -1,6 +1,5 @@
-package com.nianien.mosika.udf;
+package com.nianien.mosika.engine.rhino;
 
-import com.nianien.mosika.engine.RhinoEngine;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Function;

@@ -1,7 +1,10 @@
 package com.nianien.mosika.engine;
 
+import com.nianien.mosika.engine.rhino.RhinoEngine;
 import com.nianien.mosika.eval.result.NaResult;
 import com.nianien.mosika.exception.RuleNotFoundException;
+import com.nianien.mosika.udf.UdfContainer;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.utils.Constants;
 import lombok.Builder;
 import lombok.Singular;

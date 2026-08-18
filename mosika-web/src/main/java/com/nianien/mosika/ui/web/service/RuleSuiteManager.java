@@ -1,7 +1,7 @@
 package com.nianien.mosika.ui.web.service;
 
 import com.nianien.mosika.engine.RuleDefinition;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.eval.node.ExprNode;
 import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.result.NodeResult;

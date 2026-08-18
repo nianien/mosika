@@ -1,7 +1,7 @@
-package com.nianien.mosika.engine;
+package com.nianien.mosika.udf;
 
-import com.nianien.mosika.udf.JsUdf;
-import com.nianien.mosika.udf.UdfDelegate;
+import com.nianien.mosika.engine.rhino.JsUdf;
+import com.nianien.mosika.engine.rhino.RhinoEngine;
 import org.mozilla.javascript.BaseFunction;
 import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;

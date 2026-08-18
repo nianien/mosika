@@ -1,7 +1,7 @@
 package com.nianien.mosika.mock;
 
 import com.nianien.mosika.engine.RuleDefinition;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.suite.RuleLoader;
 
 import java.util.List;

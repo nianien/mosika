@@ -1,6 +1,6 @@
 package com.nianien.mosika.ui.web.service;
 
-import com.nianien.mosika.udf.JsUdf;
+import com.nianien.mosika.engine.rhino.JsUdf;
 import com.nianien.mosika.ui.web.common.BusinessException;
 import com.nianien.mosika.ui.web.dao.RuleNamespaceDao;
 import com.nianien.mosika.ui.web.dao.UdfDefinitionDao;

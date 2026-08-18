@@ -2,7 +2,7 @@ package com.nianien.mosika;
 
 import com.nianien.mosika.engine.RuleDefinition;
 import com.nianien.mosika.engine.RuleEngine;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.eval.result.EvalResult;
 import com.nianien.mosika.udf.Functions.Function1;
 import com.nianien.mosika.udf.UdfDelegate;

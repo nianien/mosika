@@ -2,7 +2,7 @@ package com.nianien.mosika.suite;
 
 import com.nianien.mosika.engine.RuleDefinition;
 import com.nianien.mosika.engine.RuleEngine;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.eval.RuleVisitor;
 import com.nianien.mosika.eval.context.RuleContext;
 import com.nianien.mosika.eval.node.RuleNode;

@@ -2,7 +2,7 @@ package com.nianien.mosika.udf;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.nianien.mosika.utils.JsonUtils;
-import com.nianien.mosika.engine.RhinoEngine;
+import com.nianien.mosika.engine.rhino.RhinoEngine;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;

@@ -1,7 +1,7 @@
 package com.nianien.mosika.suite;
 
 import com.nianien.mosika.engine.RuleDefinition;
-import com.nianien.mosika.engine.UdfDefinition;
+import com.nianien.mosika.udf.UdfDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
