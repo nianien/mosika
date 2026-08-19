@@ -308,6 +308,41 @@ public class RuleEngineTest {
     }
 
     @Test
+    public void testMapBindingIsPureDataBag() {
+        RuleEngine ruleEngine = RuleEngine.builder().build();
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "jack");
+        data.put("get", 42); // 数据 key 恰好撞 Map 方法名
+
+        // 命中 key 正常读;撞方法名的 key 读到的是数据,而非 Map.get 方法
+        assertEquals("jack", ruleEngine.evalExpr("$.name", data, null));
+        assertEquals(42, ruleEngine.evalExpr("$.get", data, null));
+
+        // 不存在、但名字撞方法的 key:是 undefined,不再误得方法对象
+        assertEquals("undefined", ruleEngine.evalExpr("typeof $.size", data, null));
+        assertEquals("undefined", ruleEngine.evalExpr("typeof $.putAll", data, null));
+        assertEquals(Boolean.TRUE, ruleEngine.evalExpr("$.size === undefined", data, null));
+
+        // in 也只认数据 key
+        assertEquals(Boolean.FALSE, ruleEngine.evalExpr("'size' in $", data, null));
+        assertEquals(Boolean.TRUE, ruleEngine.evalExpr("'name' in $", data, null));
+
+        // 方法从脚本侧不可达:调用即抛错
+        assertThrows(RuntimeException.class, () -> ruleEngine.evalExpr("$.putAll({x: 1})", data, null));
+    }
+
+    @Test
+    public void testMapBindingWriteNormalizesToJava() {
+        RuleEngine ruleEngine = RuleEngine.builder().build();
+        Map<String, Object> data = new HashMap<>();
+
+        // 赋值写入:值经 toJava 归一化为纯 Java 对象(而非 Rhino NativeObject)
+        assertEquals(1, ruleEngine.evalExpr("($['k'] = {a: 1}), $['k'].a", data, null));
+        assertTrue(data.get("k") instanceof Map);
+        assertEquals(1, ((Map<?, ?>) data.get("k")).get("a"));
+    }
+
+    @Test
     public void testJavaScriptIntegerOutsideLongRangeRemainsDouble() {
         RuleEngine ruleEngine = RuleEngine.builder().build();
 

@@ -300,28 +300,43 @@ public final class RhinoEngine {
         }
     }
 
+    /**
+     * 把 Java {@link Map} 作为"纯数据袋"暴露给脚本:属性只映射数据 key,不回退到 Java 成员方法。
+     * <p>
+     * 读 {@code m.k}/{@code m['k']} 命中 key 才有值,否则视为不存在({@code undefined});写
+     * {@code m[k]=v} 经 {@link #toJava} 归一化后落库。由此彻底避免 {@code NativeJavaMap} 把 Map/Object
+     * 的方法名投影进属性命名空间带来的问题:读一个"名字撞方法、又不存在"的 key(如 {@code $.size})
+     * 误得方法对象、{@code $.class} 泄漏反射,以及 {@code putAll}/{@code merge}/{@code compute} 等绕过
+     * 归一化的写入后门(它们现在从脚本侧不可达)。确需底层 Map 方法时,从 Java/UDF 侧用
+     * {@link Wrapper#unwrap()} 取回原始 Map。
+     */
     private static final class RuleNativeJavaMap extends NativeJavaMap {
 
         private final Map<Object, Object> map;
 
-        private final BaseFunction putFunction;
-
         private RuleNativeJavaMap(Scriptable scope, Map<?, ?> map, TypeInfo staticType) {
             super(scope, map, staticType);
             this.map = (Map<Object, Object>) map;
-            this.putFunction = nativeFunction(scope, (context, callScope, thisObject, arguments) -> {
-                Object previous = RuleNativeJavaMap.this.map.put(
-                        toJava(arguments[0]), toJava(arguments[1]));
-                return Context.javaToJS(previous, callScope);
-            });
         }
 
         @Override
         public Object get(String name, Scriptable start) {
-            if ("put".equals(name) && !map.containsKey(name)) {
-                return putFunction;
-            }
-            return super.get(name, start);
+            return map.containsKey(name) ? super.get(name, start) : Scriptable.NOT_FOUND;
+        }
+
+        @Override
+        public Object get(int index, Scriptable start) {
+            return map.containsKey(index) ? super.get(index, start) : Scriptable.NOT_FOUND;
+        }
+
+        @Override
+        public boolean has(String name, Scriptable start) {
+            return map.containsKey(name);
+        }
+
+        @Override
+        public boolean has(int index, Scriptable start) {
+            return map.containsKey(index);
         }
 
         @Override
