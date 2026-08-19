@@ -1,10 +1,12 @@
 package com.nianien.mosika.engine.rhino;
 
 import com.nianien.mosika.eval.context.UdfContext;
+import com.nianien.mosika.udf.UdfContainer;
+import com.nianien.mosika.udf.UdfDefinition;
 import org.mozilla.javascript.BaseFunction;
+import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
-import org.mozilla.javascript.Function;
 import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.NativeJavaClass;
 import org.mozilla.javascript.NativeJavaMap;
@@ -23,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
@@ -58,23 +59,16 @@ public final class RhinoEngine {
         NativeObject javaObject = new NativeObject();
         javaObject.setParentScope(scope);
         javaObject.setPrototype(ScriptableObject.getObjectPrototype(scope));
-        BaseFunction typeFunction = new BaseFunction(
-                scope, ScriptableObject.getFunctionPrototype(scope)) {
-            @Override
-            public Object call(Context context,
-                               Scriptable scope,
-                               Scriptable thisObject,
-                               Object[] arguments) {
-                try {
-                    String className = Context.toString(arguments[0]);
-                    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-                    Class<?> type = Class.forName(className, true, classLoader);
-                    return new NativeJavaClass(scope, type);
-                } catch (ClassNotFoundException e) {
-                    throw Context.throwAsScriptRuntimeEx(e);
-                }
+        BaseFunction typeFunction = nativeFunction(scope, (callContext, callScope, thisObject, arguments) -> {
+            try {
+                String className = Context.toString(arguments[0]);
+                ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+                Class<?> type = Class.forName(className, true, classLoader);
+                return new NativeJavaClass(callScope, type);
+            } catch (ClassNotFoundException e) {
+                throw Context.throwAsScriptRuntimeEx(e);
             }
-        };
+        });
         typeFunction.sealObject();
         javaObject.defineProperty(
                 "type", typeFunction, ScriptableObject.READONLY | ScriptableObject.PERMANENT);
@@ -94,24 +88,27 @@ public final class RhinoEngine {
      * @param source JS 源码
      * @return 已编译脚本
      */
-    public static Script compile(String source) {
+    public static Object compile(String source) {
         return CONTEXT_FACTORY.call(context ->
                 context.compileString(source, "script-" + SOURCE_SEQUENCE.incrementAndGet(), 1, null));
     }
 
     /**
-     * 构建一个以 {@link #GLOBAL_SCOPE} 为原型的共享作用域,交由 {@code binder} 绑定跨求值复用的内容
-     * (如 UDF),随后封闭以便多线程并发只读复用。
+     * 构建绑定了 UDF 的共享作用域:用 {@link RhinoUdfCompiler} 编译 {@code udfs} 的对象图(分组为
+     * ByteBuddy Java 对象,叶子在此一次性编译成可调用值),绑入后封闭以便多线程并发只读复用。
+     * <p>
+     * 分组 Java 对象由 Rhino 原生按字段导航;字段值即已编译的叶子,无需运行期再包装。
      *
-     * @param binder 在作用域上绑定共享内容
+     * @param udfs UDF 容器
      * @return 已封闭的共享作用域,可作为 {@link #evaluate} 的原型
      */
-    public static Scriptable sharedScope(BiConsumer<Context, Scriptable> binder) {
+    public static Object sharedScope(UdfContainer udfs) {
         return CONTEXT_FACTORY.call(context -> {
             NativeObject scope = new NativeObject();
             scope.setPrototype(GLOBAL_SCOPE);
             scope.setParentScope(null);
-            binder.accept(context, scope);
+            udfs.compile(new RhinoUdfCompiler(context, scope)).forEach((name, value) ->
+                    ScriptableObject.putProperty(scope, name, Context.javaToJS(value, scope)));
             scope.sealObject();
             return scope;
         });
@@ -128,15 +125,15 @@ public final class RhinoEngine {
      * @param bindings 本次求值注入的绑定,允许 {@code null} 值
      * @return 转换为普通 Java 对象的脚本返回值
      */
-    public static Object evaluate(Script script, Scriptable scope, Map<String, Object> bindings) {
+    public static Object evaluate(Object script, Object scope, Map<String, Object> bindings) {
         return CONTEXT_FACTORY.call(context -> {
             NativeObject local = new NativeObject();
-            local.setPrototype(scope);
+            local.setPrototype((Scriptable) scope);
             local.setParentScope(null);
             local.defineProperty("globalThis", local, ScriptableObject.DONTENUM);
             bindings.forEach((name, value) ->
                     ScriptableObject.putProperty(local, name, Context.javaToJS(value, local)));
-            return toJava(script.exec(context, local));
+            return toJava(((Script) script).exec(context, local));
         });
     }
 
@@ -168,10 +165,6 @@ public final class RhinoEngine {
         }
         if (value instanceof Wrapper wrapper) {
             return wrapper.unwrap();
-        }
-        if (value instanceof Function function) {
-            // JS UDF 作为参数传入时,预先适配为 java Function,使通用 UdfDelegate 无需感知 Rhino
-            return new RhinoFunctionAdapter(function);
         }
         if (value instanceof NativeArray array) {
             int size = Math.toIntExact(array.getLength());
@@ -209,6 +202,25 @@ public final class RhinoEngine {
         return value;
     }
 
+    /**
+     * 把 {@link Callable} 包装为以 {@code scope} 为宿主的 Rhino 脚本函数。
+     * 收敛 {@code Java.type}、{@code put} 等各处内置函数的构造样板:函数对象自身挂在 {@code scope}
+     * 上,而 {@code call} 收到的是运行期作用域,由 {@code body} 决定如何使用。
+     */
+    public static BaseFunction nativeFunction(Scriptable scope, Callable body) {
+        return new BaseFunction(scope, ScriptableObject.getFunctionPrototype(scope)) {
+            @Override
+            public Object call(Context context,
+                               Scriptable callScope,
+                               Scriptable thisObject,
+                               Object[] arguments) {
+                return body.call(context, callScope, thisObject, arguments);
+            }
+        };
+    }
+
+    // ────────────────────────────── 引擎基建 ──────────────────────────────
+
     private static final class RhinoContextFactory extends ContextFactory {
 
         private RhinoContextFactory() {
@@ -245,6 +257,26 @@ public final class RhinoEngine {
         }
     }
 
+    // ────────────────────────────── UDF 绑定 ──────────────────────────────
+
+    /**
+     * UDF 叶子的 Rhino 编译回调:JS 源码编译绑定为脚本函数,Java UDF 包成"可调用+成员访问"对象。
+     * 分组由 {@link UdfContainer} 用 ByteBuddy 组装。
+     */
+    private record RhinoUdfCompiler(Context context, Scriptable scope) implements UdfContainer.UdfCompiler {
+
+        @Override
+        public Object compile(UdfDefinition definition) {
+            Object udf = definition.getUdf();
+            if (udf instanceof String source) {
+                return new JsUdf(definition.getName(), source).bind(context, scope);
+            }
+            return new JavaUdfFunction(udf, scope);
+        }
+    }
+
+    // ─────────────────────────── Java 宿主包装 ───────────────────────────
+
     private static final class RuleNativeJavaObject extends NativeJavaObject {
 
         private final BaseFunction putFunction;
@@ -253,17 +285,10 @@ public final class RhinoEngine {
                                      UdfContext udfContext,
                                      TypeInfo staticType) {
             super(scope, udfContext, staticType);
-            this.putFunction = new BaseFunction(
-                    scope, ScriptableObject.getFunctionPrototype(scope)) {
-                @Override
-                public Object call(Context context,
-                                   Scriptable scope,
-                                   Scriptable thisObject,
-                                   Object[] arguments) {
-                    udfContext.put(Context.toString(arguments[0]), toJava(arguments[1]));
-                    return Undefined.instance;
-                }
-            };
+            this.putFunction = nativeFunction(scope, (context, callScope, thisObject, arguments) -> {
+                udfContext.put(Context.toString(arguments[0]), toJava(arguments[1]));
+                return Undefined.instance;
+            });
         }
 
         @Override
@@ -284,18 +309,11 @@ public final class RhinoEngine {
         private RuleNativeJavaMap(Scriptable scope, Map<?, ?> map, TypeInfo staticType) {
             super(scope, map, staticType);
             this.map = (Map<Object, Object>) map;
-            this.putFunction = new BaseFunction(
-                    scope, ScriptableObject.getFunctionPrototype(scope)) {
-                @Override
-                public Object call(Context context,
-                                   Scriptable scope,
-                                   Scriptable thisObject,
-                                   Object[] arguments) {
-                    Object previous = RuleNativeJavaMap.this.map.put(
-                            toJava(arguments[0]), toJava(arguments[1]));
-                    return Context.javaToJS(previous, scope);
-                }
-            };
+            this.putFunction = nativeFunction(scope, (context, callScope, thisObject, arguments) -> {
+                Object previous = RuleNativeJavaMap.this.map.put(
+                        toJava(arguments[0]), toJava(arguments[1]));
+                return Context.javaToJS(previous, callScope);
+            });
         }
 
         @Override

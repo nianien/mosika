@@ -1,5 +1,6 @@
 package com.nianien.mosika.engine.rhino;
 
+
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Function;
@@ -50,10 +51,10 @@ public class JsUdf {
     private static Script compileFunction(String registeredName, String source) {
         Script functionScript;
         try {
-            functionScript = RhinoEngine.compile("(\n" + trimTrailingSemicolons(source) + "\n)");
+            functionScript = (Script) RhinoEngine.compile("(\n" + trimTrailingSemicolons(source) + "\n)");
         } catch (EvaluatorException e) {
             try {
-                functionScript = RhinoEngine.compile("(function () {\n"
+                functionScript = (Script) RhinoEngine.compile("(function () {\n"
                         + source + "\n"
                         + "return typeof " + registeredName + " === 'function' ? "
                         + registeredName + " : null;\n"

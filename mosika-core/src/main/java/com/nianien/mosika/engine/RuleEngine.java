@@ -1,7 +1,6 @@
 package com.nianien.mosika.engine;
 
 import com.nianien.mosika.engine.rhino.RhinoEngine;
-import com.nianien.mosika.engine.rhino.RhinoUdfBinder;
 import com.nianien.mosika.eval.result.NaResult;
 import com.nianien.mosika.exception.RuleNotFoundException;
 import com.nianien.mosika.udf.UdfContainer;
@@ -9,8 +8,6 @@ import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.utils.Constants;
 import lombok.Builder;
 import lombok.Singular;
-import org.mozilla.javascript.Script;
-import org.mozilla.javascript.Scriptable;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,17 +33,17 @@ public class RuleEngine {
      */
     private Map<String, RuleDefinition> ruleDefinitions = new HashMap<>();
 
-    private final Map<String, Script> compiledRules = new HashMap<>();
+    private final Map<String, Object> compiledRules = new HashMap<>();
 
     /**
      * 按 JavaScript 源码缓存已编译的规则脚本
      */
-    private final ConcurrentMap<String, Script> compiledScripts = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> compiledScripts = new ConcurrentHashMap<>();
 
     /**
      * 按描述模板缓存已编译的 JavaScript 脚本
      */
-    private final ConcurrentMap<String, Script> compiledDesc = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> compiledDesc = new ConcurrentHashMap<>();
 
     private final UdfContainer udfContainer;
 
@@ -54,7 +51,7 @@ public class RuleEngine {
      * 绑定了全部 UDF 的共享作用域,构造期绑定一次并封闭;每次求值以它为原型建子作用域,
      * 避免每次执行重新绑定 UDF
      */
-    private final Scriptable udfScope;
+    private final Object udfScope;
 
     /**
      * 注册规则定义和 UDF 定义并完成可执行内容的预编译
@@ -71,7 +68,7 @@ public class RuleEngine {
         this.register(new RuleDefinition(Constants.NOP, "Java.type('" + NaResult.class.getName() + "').DEFAULT", "NOP"));
         ruleDefinitions.forEach(this::register);
         this.udfContainer = new UdfContainer(udfDefinitions);
-        this.udfScope = RhinoEngine.sharedScope(new RhinoUdfBinder(this.udfContainer.tree())::bind);
+        this.udfScope = RhinoEngine.sharedScope(this.udfContainer);
     }
 
     /**
@@ -106,7 +103,7 @@ public class RuleEngine {
         if (ruleDefinition == null) {
             throw new RuleNotFoundException(ruleId);
         }
-        Script script = compiledRules.get(ruleId);
+        Object script = compiledRules.get(ruleId);
         if (script == null) {
             throw new IllegalArgumentException("rule is not atomic: " + ruleId);
         }
@@ -165,7 +162,7 @@ public class RuleEngine {
      * @param arguments   当前规则调用绑定的参数对象
      * @return 转换为 Java 对象的脚本返回值
      */
-    private Object doEval(Script script, Object root, Object ruleContext, Map<String, Object> arguments) {
+    private Object doEval(Object script, Object root, Object ruleContext, Map<String, Object> arguments) {
         Map<String, Object> bindings = new HashMap<>();
         bindings.put("$", root);
         bindings.put("$$", ruleContext);
@@ -196,7 +193,7 @@ public class RuleEngine {
      * @param expression JavaScript 表达式
      * @return 已编译的脚本
      */
-    private Script compile(String expression) {
+    private Object compile(String expression) {
         return compiledScripts.computeIfAbsent(expression, this::compileExpression);
     }
 
@@ -208,7 +205,7 @@ public class RuleEngine {
      * @param expression JavaScript 表达式
      * @return 已编译的脚本
      */
-    private Script compileExpression(String expression) {
+    private Object compileExpression(String expression) {
         String trimmed = expression.trim();
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
             return doCompile("(" + trimmed + ")");
@@ -224,7 +221,7 @@ public class RuleEngine {
      * @param originDesc 规则描述模板
      * @return 已编译的描述模板脚本
      */
-    private Script compileDesc(String originDesc) {
+    private Object compileDesc(String originDesc) {
         return compiledDesc.computeIfAbsent(originDesc,
                 desc -> doCompile("String.raw`" + desc + "`"));
     }
@@ -235,7 +232,7 @@ public class RuleEngine {
      * @param expression JavaScript 源码
      * @return 已编译的脚本
      */
-    private Script doCompile(String expression) {
+    private Object doCompile(String expression) {
         return RhinoEngine.compile(expression);
     }
 }
