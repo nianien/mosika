@@ -11,7 +11,7 @@ import lombok.Getter;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class CaseNode implements RuleNode {
+public class CaseNode extends AbstractRuleNode {
     /**
      * 条件节点
      */
@@ -64,7 +64,7 @@ public class CaseNode implements RuleNode {
     }
 
     @Override
-    public String expr() {
+    protected String computeExpr() {
         if (trueCase != null && falseCase != null) {
             return condition + "?" + trueCase + ":" + falseCase;
         } else if (trueCase != null) {

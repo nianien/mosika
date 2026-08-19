@@ -22,7 +22,7 @@ public class AnyNode extends OrNode {
     }
 
     @Override
-    public String expr() {
+    protected String computeExpr() {
         return "any(" + getNodes().stream()
                 .map(Objects::toString)
                 .collect(Collectors.joining(",")) + ")";

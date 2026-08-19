@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 /**
  * 规则内核的 Rhino JavaScript 执行引擎。
@@ -115,26 +116,54 @@ public final class RhinoEngine {
     }
 
     /**
-     * 在以 {@code scope} 为原型的一次性子作用域中注入 {@code bindings} 并求值,返回普通 Java 值。
+     * 在以 {@code scope} 为原型的一次性子作用域中注入 {@code $}/{@code $$}/{@code $args} 并求值,返回普通 Java 值。
      * <p>
-     * {@code bindings}(如 {@code $}/{@code $$}/{@code $args})与脚本产生的全局都落在这个隔离子作用域;
-     * 共享内容(如 UDF)经原型链解析到 {@code scope}。
+     * 绑定与脚本产生的全局都落在这个隔离子作用域;共享内容(如 UDF)经原型链解析到 {@code scope}。
+     * 若当前线程已进入 Rhino {@link Context}(见 {@link #inContext}),复用之,不再新建——同一次规则流的
+     * 多段脚本共享一个 Context,省去每段新建 Context 的开销。
      *
-     * @param script   已编译脚本
-     * @param scope    作为原型的共享作用域(见 {@link #sharedScope})
-     * @param bindings 本次求值注入的绑定,允许 {@code null} 值
+     * @param script      已编译脚本
+     * @param scope       作为原型的共享作用域(见 {@link #sharedScope})
+     * @param root        {@code $} 绑定,允许 {@code null}
+     * @param ruleContext {@code $$} 绑定,允许 {@code null}
+     * @param args        {@code $args} 绑定,允许 {@code null}
      * @return 转换为普通 Java 对象的脚本返回值
      */
-    public static Object evaluate(Object script, Object scope, Map<String, Object> bindings) {
-        return CONTEXT_FACTORY.call(context -> {
-            NativeObject local = new NativeObject();
-            local.setPrototype((Scriptable) scope);
-            local.setParentScope(null);
-            local.defineProperty("globalThis", local, ScriptableObject.DONTENUM);
-            bindings.forEach((name, value) ->
-                    ScriptableObject.putProperty(local, name, Context.javaToJS(value, local)));
-            return toJava(((Script) script).exec(context, local));
-        });
+    public static Object evaluate(Object script, Object scope,
+                                  Object root, Object ruleContext, Object args) {
+        Context current = Context.getCurrentContext();
+        if (current != null) {
+            return doEvaluate(current, script, scope, root, ruleContext, args);
+        }
+        return CONTEXT_FACTORY.call(context -> doEvaluate(context, script, scope, root, ruleContext, args));
+    }
+
+    private static Object doEvaluate(Context context, Object script, Object scope,
+                                     Object root, Object ruleContext, Object args) {
+        NativeObject local = new NativeObject();
+        local.setPrototype((Scriptable) scope);
+        local.setParentScope(null);
+        local.defineProperty("globalThis", local, ScriptableObject.DONTENUM);
+        ScriptableObject.putProperty(local, "$", Context.javaToJS(root, local));
+        ScriptableObject.putProperty(local, "$$", Context.javaToJS(ruleContext, local));
+        ScriptableObject.putProperty(local, "$args", Context.javaToJS(args, local));
+        return toJava(((Script) script).exec(context, local));
+    }
+
+    /**
+     * 在单个 Rhino {@link Context} 内运行 {@code action}:当前线程未进入 Context 时进入一次并在结束后退出,
+     * 已进入则直接复用。用于把一次规则流的多段 {@link #evaluate} 收敛到同一个 Context 下。
+     * <p>
+     * 并行分支在其它线程执行,各自独立进入 Context,不受此影响。
+     *
+     * @param action 要在 Context 内运行的动作
+     * @return {@code action} 的返回值
+     */
+    public static <T> T inContext(Supplier<T> action) {
+        if (Context.getCurrentContext() != null) {
+            return action.get();
+        }
+        return CONTEXT_FACTORY.call(context -> action.get());
     }
 
     /**

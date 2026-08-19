@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 单个规则节点的评估结果
@@ -16,6 +17,9 @@ import java.util.Map;
  */
 @Data
 public class EvalResult {
+
+    /** 字符串结果按布尔解释时的假值集合;预编译并大小写不敏感,避免每次 eval 编译正则与 toLowerCase 分配。 */
+    private static final Pattern FALSY = Pattern.compile("no|false|null|0|fail", Pattern.CASE_INSENSITIVE);
 
     /**
      * 被评估节点表达式
@@ -83,7 +87,7 @@ public class EvalResult {
             return ((Number) res).doubleValue() > 0;
         }
         if (res instanceof String) {
-            return !((String) res).toLowerCase().matches("no|false|null|0|fail");
+            return !FALSY.matcher((String) res).matches();
         }
         if (res instanceof Collection) {
             return !((Collection<?>) res).isEmpty();

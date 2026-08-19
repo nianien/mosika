@@ -153,10 +153,12 @@ public class RuleSuite {
      * @return 规则节点执行结果
      */
     private NodeResult doEval(RuleNode ruleNode, RuleContext context) {
-        EvalResult evalResult = context.visit(ruleNode);
-        if (evalResult.getResult() instanceof NodeResult nodeResult) {
-            return nodeResult;
-        }
-        return new NodeResult(ruleNode.expr(), evalResult.getResult(), context.getRuleResults());
+        return ruleEngine.inContext(() -> {
+            EvalResult evalResult = context.visit(ruleNode);
+            if (evalResult.getResult() instanceof NodeResult nodeResult) {
+                return nodeResult;
+            }
+            return new NodeResult(ruleNode.expr(), evalResult.getResult(), context.getRuleResults());
+        });
     }
 }

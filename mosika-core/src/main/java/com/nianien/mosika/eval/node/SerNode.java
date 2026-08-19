@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class SerNode implements RuleNode {
+public class SerNode extends AbstractRuleNode {
 
     /**
      * 按执行顺序保存的子节点。
@@ -46,6 +46,7 @@ public class SerNode implements RuleNode {
      */
     public SerNode next(RuleNode node) {
         nodes.add(node);
+        resetExpr();
         return this;
     }
 
@@ -57,9 +58,11 @@ public class SerNode implements RuleNode {
      */
     @Override
     public EvalResult eval(RuleContext context) {
-        nodes.stream()
-                .filter(node -> !Constants.NOP.equals(node.expr()))
-                .forEach(context::visit);
+        for (RuleNode node : nodes) {
+            if (!Constants.NOP.equals(node.expr())) {
+                context.visit(node);
+            }
+        }
         return new EvalResult(expr(), null, true);
     }
 
@@ -70,7 +73,7 @@ public class SerNode implements RuleNode {
      * @return 串行 DSL 表达式
      */
     @Override
-    public String expr() {
+    protected String computeExpr() {
         return String.join("->", nodes.stream()
                 .map(Objects::toString/*RuleNode::expr*/)
                 .collect(Collectors.toList()));

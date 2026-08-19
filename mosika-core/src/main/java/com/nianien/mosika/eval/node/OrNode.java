@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class OrNode implements RuleNode {
+public class OrNode extends AbstractRuleNode {
 
     private final List<RuleNode> nodes = new ArrayList<>();
 
@@ -30,6 +30,7 @@ public class OrNode implements RuleNode {
     @Override
     public RuleNode or(RuleNode node) {
         this.nodes.add(node);
+        resetExpr();
         return this;
     }
 
@@ -44,7 +45,8 @@ public class OrNode implements RuleNode {
         return new EvalResult(expr(), false);
     }
 
-    public String expr() {
+    @Override
+    protected String computeExpr() {
         return String.join("||", nodes.stream()
                 .map(Objects::toString)
                 .collect(Collectors.toList()));

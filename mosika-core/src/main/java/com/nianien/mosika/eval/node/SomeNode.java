@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
-public class SomeNode implements RuleNode {
+public class SomeNode extends AbstractRuleNode {
 
     @Getter
     private final Integer minHits;
@@ -26,7 +26,6 @@ public class SomeNode implements RuleNode {
     private final List<RuleNode> nodes = new ArrayList<>();
     private final int min;
     private final int max;
-    private String expression;
 
     public SomeNode(Integer minHits, Integer maxHits, RuleNode... nodes) {
         this.minHits = minHits;
@@ -58,12 +57,9 @@ public class SomeNode implements RuleNode {
     }
 
     @Override
-    public String expr() {
-        if (expression == null) {
-            expression = "some(" + boundExpr(minHits) + "," + boundExpr(maxHits) + ","
-                    + nodes.stream().map(Objects::toString).collect(Collectors.joining(",")) + ")";
-        }
-        return expression;
+    protected String computeExpr() {
+        return "some(" + boundExpr(minHits) + "," + boundExpr(maxHits) + ","
+                + nodes.stream().map(Objects::toString).collect(Collectors.joining(",")) + ")";
     }
 
     @Override

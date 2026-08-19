@@ -163,11 +163,19 @@ public class RuleEngine {
      * @return 转换为 Java 对象的脚本返回值
      */
     private Object doEval(Object script, Object root, Object ruleContext, Map<String, Object> arguments) {
-        Map<String, Object> bindings = new HashMap<>();
-        bindings.put("$", root);
-        bindings.put("$$", ruleContext);
-        bindings.put("$args", arguments == null ? Map.of() : arguments);
-        return RhinoEngine.evaluate(script, udfScope, bindings);
+        return RhinoEngine.evaluate(script, udfScope, root, ruleContext,
+                arguments == null ? Map.of() : arguments);
+    }
+
+    /**
+     * 在单个 Rhino Context 内运行 {@code action}:一次规则流的多段脚本由此复用同一个 Context,
+     * 省去每段新建 Context 的分配。并行分支在其它线程各自独立进入 Context,不受影响。
+     *
+     * @param action 要在 Context 内运行的动作
+     * @return {@code action} 的返回值
+     */
+    public <T> T inContext(java.util.function.Supplier<T> action) {
+        return RhinoEngine.inContext(action);
     }
 
     /**

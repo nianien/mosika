@@ -22,7 +22,7 @@ public class AllNode extends AndNode {
     }
 
     @Override
-    public String expr() {
+    protected String computeExpr() {
         return "all(" + getNodes().stream()
                 .map(Objects::toString)
                 .collect(Collectors.joining(",")) + ")";

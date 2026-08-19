@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class AndNode implements RuleNode {
+public class AndNode extends AbstractRuleNode {
 
     private final List<RuleNode> nodes = new ArrayList<>();
 
@@ -30,6 +30,7 @@ public class AndNode implements RuleNode {
     @Override
     public RuleNode and(RuleNode node) {
         this.nodes.add(node);
+        resetExpr();
         return this;
     }
 
@@ -45,7 +46,7 @@ public class AndNode implements RuleNode {
 
 
     @Override
-    public String expr() {
+    protected String computeExpr() {
         return String.join("&&", nodes.stream()
                 .map(Objects::toString)
                 .collect(Collectors.toList()));

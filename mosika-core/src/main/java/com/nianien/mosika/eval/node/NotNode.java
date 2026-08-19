@@ -10,7 +10,7 @@ import lombok.Getter;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class NotNode implements RuleNode {
+public class NotNode extends AbstractRuleNode {
 
     private final RuleNode node;
 
@@ -34,7 +34,8 @@ public class NotNode implements RuleNode {
         return new EvalResult(expr(), !result.isMatched());
     }
 
-    public String expr() {
+    @Override
+    protected String computeExpr() {
         return "!" + node.toString();
     }
 

@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class ParNode implements RuleNode {
+public class ParNode extends AbstractRuleNode {
 
     /**
      * 待并发执行的分支节点。
@@ -54,6 +54,7 @@ public class ParNode implements RuleNode {
     @Override
     public ParNode next(RuleNode node) {
         nodes.add(node);
+        resetExpr();
         return this;
     }
 
@@ -66,14 +67,17 @@ public class ParNode implements RuleNode {
     @Override
     public EvalResult eval(RuleContext context) {
         EvalNode parentNode = context.getCurrentEval();
-        CompletableFuture<?>[] futures = nodes.stream()
-                .filter(node -> !Constants.NOP.equals(node.expr()))
-                .map(node -> CompletableFuture.runAsync(() -> {
+        List<CompletableFuture<?>> pending = new ArrayList<>(nodes.size());
+        for (RuleNode node : nodes) {
+            if (!Constants.NOP.equals(node.expr())) {
+                pending.add(CompletableFuture.runAsync(() -> {
                     // 子线程设置当前评估节点
                     context.setCurrentEval(parentNode);
                     context.visit(node);
-                }, ForkJoinPool.commonPool()))
-                .toArray(n -> new CompletableFuture[n]);
+                }, ForkJoinPool.commonPool()));
+            }
+        }
+        CompletableFuture<?>[] futures = pending.toArray(new CompletableFuture[0]);
 
         try {
             CompletableFuture.allOf(futures).get(1, TimeUnit.MINUTES);
@@ -116,7 +120,7 @@ public class ParNode implements RuleNode {
      * @return 并行 DSL 表达式
      */
     @Override
-    public String expr() {
+    protected String computeExpr() {
         return String.join("=>", nodes.stream()
                 .map(Objects::toString/*RuleNode::expr*/)
                 .collect(Collectors.toList()));
