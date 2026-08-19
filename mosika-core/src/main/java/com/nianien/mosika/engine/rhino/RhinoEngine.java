@@ -240,6 +240,21 @@ public final class RhinoEngine {
         }
     }
 
+    /**
+     * Java 值跨入脚本时的包装分派,按对象角色定制视图(顺序敏感:{@link UdfContext} 先于 {@link Map} 判断):
+     * <ul>
+     *   <li>{@link UdfContext}(脚本里的 {@code $$},可变上下文)→ {@link RuleNativeJavaObject}:
+     *       保留完整 Java 语义,仅把 {@code put} 包装为 JS→Java 归一化写入;</li>
+     *   <li>{@link Map}(脚本里的 {@code $}/{@code $args} 及嵌套 Map,纯外部数据)→ {@link RuleNativeJavaMap}:
+     *       纯数据袋,属性只映射数据 key、不暴露 Map 方法;</li>
+     *   <li>其余 Java 对象(UDF 返回的领域对象/POJO)→ 默认 {@link NativeJavaObject}:完整 Java 语义。</li>
+     * </ul>
+     * <b>只有 {@code Map} 需要特殊处理。</b> Rhino 的 {@code NativeJavaMap} 把任意 key 投影进属性命名空间、
+     * 又在同一空间暴露 {@code Map}/{@code Object} 的方法,二者撞名:读一个"名字撞方法、又不存在"的 key
+     * (如 {@code $.size})会误得方法对象、破坏 {@code ==null}/存在性判断,{@code $.class} 泄漏反射,
+     * {@code putAll}/{@code merge} 等还绕过 {@code toJava} 脏写。非 {@code Map} 对象没有"任意 key",
+     * 属性即其成员,天然不撞——故只对 {@code Map} 收敛为数据袋,不动其余对象的 Java 语义。
+     */
     private static final class RuleWrapFactory extends WrapFactory {
 
         @Override
@@ -277,6 +292,15 @@ public final class RhinoEngine {
 
     // ─────────────────────────── Java 宿主包装 ───────────────────────────
 
+    /**
+     * 包装可变上下文 {@link UdfContext}(脚本里的 {@code $$})。
+     * <p>
+     * 它是普通 Java 对象而非 {@link Map},不存在"数据 key 撞方法名"问题,故<b>保留完整 Java 语义</b>——
+     * {@code $$.get(...)}/{@code $$.remove(...)} 等直接走真方法。唯一定制是把 {@code put} 换成归一化版本:
+     * 写入 {@code $$} 的值会驻留 Java 侧、被别的规则/线程/结果契约读取,必须先 {@code toJava} 洗成纯 Java 值
+     * (而 {@link UdfContext#put} 的 value 形参是 {@code Object},Rhino 不会自动深转)。因不是 Map,无条件
+     * 拦截 {@code put} 即可,无需像 {@link RuleNativeJavaMap} 那样加 {@code !containsKey} 守卫。
+     */
     private static final class RuleNativeJavaObject extends NativeJavaObject {
 
         private final BaseFunction putFunction;
