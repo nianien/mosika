@@ -41,9 +41,14 @@ public class RuleEngine {
     private final ConcurrentMap<String, Object> compiledScripts = new ConcurrentHashMap<>();
 
     /**
-     * 按描述模板缓存已编译的 JavaScript 脚本
+     * 构造阶段按描述模板复用已编译的 JavaScript 脚本
      */
-    private final ConcurrentMap<String, Object> compiledDesc = new ConcurrentHashMap<>();
+    private final Map<String, Object> compiledDesc = new HashMap<>();
+
+    /**
+     * 按规则 ID 保存构造阶段已编译的描述模板脚本
+     */
+    private final Map<String, Object> compiledRuleDesc = new HashMap<>();
 
     private final UdfContainer udfContainer;
 
@@ -134,11 +139,11 @@ public class RuleEngine {
      * @throws RuleNotFoundException 规则未注册时抛出
      */
     public String evalRuleDesc(String ruleId, Object root, Object context, Map<String, Object> arguments) {
-        RuleDefinition ruleDefinition = this.ruleDefinitions.get(ruleId);
-        if (ruleDefinition == null) {
+        Object script = compiledRuleDesc.get(ruleId);
+        if (script == null) {
             throw new RuleNotFoundException(ruleId);
         }
-        return (String) doEval(compileDesc(ruleDefinition.getDesc()), root, context, arguments);
+        return (String) doEval(script, root, context, arguments);
     }
 
     /**
@@ -192,7 +197,7 @@ public class RuleEngine {
         if (definition.getRuleType() == RuleDefinition.RULE_TYPE_ATOMIC) {
             compiledRules.put(definition.getRuleId(), compile(definition.getExpression()));
         }
-        compileDesc(definition.getDesc());
+        compiledRuleDesc.put(definition.getRuleId(), compileDesc(definition.getDesc()));
     }
 
     /**

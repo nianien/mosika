@@ -328,6 +328,19 @@ public class RuleEngineTest {
     }
 
     @Test
+    public void testDescriptionUsesRegisteredSnapshot() {
+        RuleDefinition definition = new RuleDefinition("snapshotDesc", "true", "value=${$.value}");
+        RuleEngine ruleEngine = RuleEngine.builder()
+                .ruleDefinition(definition)
+                .build();
+
+        definition.setDesc("changed=${$.value}");
+
+        assertEquals("value=original",
+                ruleEngine.evalRuleDesc("snapshotDesc", Map.of("value", "original"), null));
+    }
+
+    @Test
     public void testDescriptionKeepsJavaScriptStringConversion() {
         RuleEngine ruleEngine = RuleEngine.builder()
                 .ruleDefinition(new RuleDefinition("valueDesc", "true", "null=${$.nullable},number=${$.number}"))
