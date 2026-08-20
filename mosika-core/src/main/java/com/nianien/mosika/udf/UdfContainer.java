@@ -1,11 +1,6 @@
 package com.nianien.mosika.udf;
 
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.description.modifier.Visibility;
-import net.bytebuddy.dynamic.DynamicType;
-
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,11 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * UDF 容器:把 UDF 定义编译为 Java 对象图。
+ * UDF 容器:保存 UDF 定义树并通过 {@link UdfCompiler} 编译为引擎对象图
  * <p>
- * 分组由 ByteBuddy 生成带 public 字段的 Java 对象;<b>叶子由调用方通过 {@link UdfCompiler} 回调编译</b>
- * ——JS 源码/Java UDF 被脚本引擎编译成可调用值,直接设入分组字段。因此本类掌握树结构与分组生成,
- * 叶子如何变为脚本可调用值完全由引擎适配层决定,本类不含任何脚本引擎类型。
+ * 分组创建、叶子编译和成员绑定都由引擎适配层负责
+ * 本类只掌握定义树结构,不包含任何脚本引擎类型
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * @since 2023/11/7
@@ -36,54 +30,42 @@ public class UdfContainer {
     }
 
     /**
-     * 叶子编译回调:把单个 UDF 叶子({@link UdfDefinition})编译成脚本引擎可调用值。
-     * JS/Java 的区分由实现根据 {@link UdfDefinition#getUdf()} 自行判断;分组由 {@link UdfContainer}
-     * 用 ByteBuddy 组装。
+     * UDF 对象图编译回调
+     * JS/Java 的区分和分组表示都由实现决定
      */
-    @FunctionalInterface
     public interface UdfCompiler {
+        Object group(String name);
+
         Object compile(UdfDefinition definition);
+
+        void bind(Object group, String name, Object member);
+
+        void complete(Object group);
     }
 
     /**
-     * 编译 UDF 树:分组生成 ByteBuddy Java 对象,叶子经 {@code compiler} 回调编译并设入字段。
+     * 编译 UDF 定义树
      *
-     * @param compiler 叶子编译回调(引擎相关)
-     * @return 顶层命名空间:name → 分组 Java 对象 | 已编译叶子
+     * @param compiler 引擎对象图编译回调
+     * @return 顶层命名空间:name → 已编译分组或叶子
      */
     public Map<String, Object> compile(UdfCompiler compiler) {
         Map<String, Object> result = new LinkedHashMap<>();
         udfDefined.forEach((name, node) ->
-                result.put(name, compileNode("UdfGroup$" + name, node, compiler)));
+                result.put(name, compileNode(name, node, compiler)));
         return result;
     }
 
     @SuppressWarnings("unchecked")
-    private static Object compileNode(String className, Object node, UdfCompiler compiler) {
+    private static Object compileNode(String name, Object node, UdfCompiler compiler) {
         if (node instanceof UdfDefinition definition) {
             return compiler.compile(definition);
         }
-        Map<String, Object> group = (Map<String, Object>) node;
-        try {
-            DynamicType.Builder<Object> builder = new ByteBuddy()
-                    .subclass(Object.class)
-                    .name(className);
-            for (String field : group.keySet()) {
-                builder = builder.defineField(field, Object.class, Visibility.PUBLIC);
-            }
-            Class<?> type = builder.make()
-                    .load(Thread.currentThread().getContextClassLoader())
-                    .getLoaded();
-            Object instance = type.getDeclaredConstructor().newInstance();
-            for (Map.Entry<String, Object> entry : group.entrySet()) {
-                String field = entry.getKey();
-                type.getField(field).set(instance,
-                        compileNode(className + "$" + field, entry.getValue(), compiler));
-            }
-            return instance;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("failed to compile udf group: " + className, e);
-        }
+        Object group = compiler.group(name);
+        ((Map<String, Object>) node).forEach((key, value) ->
+                compiler.bind(group, key, compileNode(key, value, compiler)));
+        compiler.complete(group);
+        return group;
     }
 
     @SuppressWarnings("unchecked")

@@ -95,10 +95,10 @@ public final class RhinoEngine {
     }
 
     /**
-     * 构建绑定了 UDF 的共享作用域:用 {@link RhinoUdfCompiler} 编译 {@code udfs} 的对象图(分组为
-     * ByteBuddy Java 对象,叶子在此一次性编译成可调用值),绑入后封闭以便多线程并发只读复用。
+     * 构建绑定了 UDF 的共享作用域:用 {@link RhinoUdfCompiler} 编译 {@code udfs} 的对象图
+     * 分组和叶子在此一次性编译并封闭,供多线程并发只读复用
      * <p>
-     * 分组 Java 对象由 Rhino 原生按字段导航;字段值即已编译的叶子,无需运行期再包装。
+     * UDF 使用当前共享作用域作为自己的 {@code globalThis},运行期不能向其中写入状态
      *
      * @param udfs UDF 容器
      * @return 已封闭的共享作用域,可作为 {@link #evaluate} 的原型
@@ -108,8 +108,11 @@ public final class RhinoEngine {
             NativeObject scope = new NativeObject();
             scope.setPrototype(GLOBAL_SCOPE);
             scope.setParentScope(null);
+            scope.defineProperty("globalThis", scope,
+                    ScriptableObject.DONTENUM | ScriptableObject.READONLY | ScriptableObject.PERMANENT);
             udfs.compile(new RhinoUdfCompiler(context, scope)).forEach((name, value) ->
-                    ScriptableObject.putProperty(scope, name, Context.javaToJS(value, scope)));
+                    scope.defineProperty(name, Context.javaToJS(value, scope),
+                            ScriptableObject.READONLY | ScriptableObject.PERMANENT));
             scope.sealObject();
             return scope;
         });
@@ -299,18 +302,41 @@ public final class RhinoEngine {
     // ────────────────────────────── UDF 绑定 ──────────────────────────────
 
     /**
-     * UDF 叶子的 Rhino 编译回调:JS 源码编译绑定为脚本函数,Java UDF 包成"可调用+成员访问"对象。
-     * 分组由 {@link UdfContainer} 用 ByteBuddy 组装。
+     * UDF 对象图的 Rhino 编译回调
+     * JS 源码绑定为脚本函数,Java UDF 包成"可调用+成员访问"对象,分组使用 {@link NativeObject}
      */
     private record RhinoUdfCompiler(Context context, Scriptable scope) implements UdfContainer.UdfCompiler {
 
         @Override
+        public Object group(String name) {
+            NativeObject group = new NativeObject();
+            group.setParentScope(scope);
+            group.setPrototype(ScriptableObject.getObjectPrototype(scope));
+            return group;
+        }
+
+        @Override
         public Object compile(UdfDefinition definition) {
             Object udf = definition.getUdf();
+            ScriptableObject function;
             if (udf instanceof String source) {
-                return new JsUdf(definition.getName(), source).bind(context, scope);
+                function = (ScriptableObject) new JsUdf(definition.getName(), source).bind(context, scope);
+            } else {
+                function = new JavaUdfFunction(udf, scope);
             }
-            return new JavaUdfFunction(udf, scope);
+            function.sealObject();
+            return function;
+        }
+
+        @Override
+        public void bind(Object group, String name, Object udf) {
+            ((ScriptableObject) group).defineProperty(
+                    name, udf, ScriptableObject.READONLY | ScriptableObject.PERMANENT);
+        }
+
+        @Override
+        public void complete(Object group) {
+            ((ScriptableObject) group).sealObject();
         }
     }
 

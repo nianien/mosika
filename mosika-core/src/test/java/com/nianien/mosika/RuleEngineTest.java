@@ -175,6 +175,48 @@ public class RuleEngineTest {
     }
 
     @Test
+    public void testUdfNamespaceIsReadOnlyAcrossEvaluations() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("math", "sum", "(a, b) => a + b"))
+                .build();
+
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("math.marker = 7", null, null));
+        assertEquals("undefined", engine.evalExpr("typeof math.marker", null, null));
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("math.sum = () => 99", null, null));
+        assertEquals(3, engine.evalExpr("math.sum(1, 2)", null, null));
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("math.sum.marker = 7", null, null));
+        assertEquals("undefined", engine.evalExpr("typeof math.sum.marker", null, null));
+    }
+
+    @Test
+    public void testJsUdfGlobalDoesNotLeakAcrossEngines() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("touch", "() => globalThis.marker = 3"))
+                .build();
+
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("touch()", null, null));
+
+        RuleEngine anotherEngine = RuleEngine.builder().build();
+        assertEquals("undefined",
+                anotherEngine.evalExpr("typeof globalThis.marker", null, null));
+    }
+
+    @Test
+    public void testJsUdfClosureStateBelongsToRuleEngine() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition(
+                        "counter", "(() => { let value = 0; return () => ++value; })()"))
+                .build();
+
+        assertEquals(1, engine.evalExpr("counter()", null, null));
+        assertEquals(2, engine.evalExpr("counter()", null, null));
+    }
+
+    @Test
     public void testRuleScriptReturnsLastExpression() {
         RuleEngine engine = RuleEngine.builder()
                 .udfDefinitions(List.of(

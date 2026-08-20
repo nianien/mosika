@@ -29,7 +29,6 @@
         <revision>1.0.0</revision>
         <antlr4.version>4.13.2</antlr4.version>
         <rhino.version>1.9.1</rhino.version>
-        <byte-buddy.version>1.18.7</byte-buddy.version>
     </properties>
     <licenses>
         <license>
@@ -72,11 +71,6 @@
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-runtime</artifactId>
                 <version>${antlr4.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>${byte-buddy.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.mozilla</groupId>
