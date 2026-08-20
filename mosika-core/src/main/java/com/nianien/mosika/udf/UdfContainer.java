@@ -30,16 +30,43 @@ public class UdfContainer {
     }
 
     /**
-     * UDF 对象图编译回调
-     * JS/Java 的区分和分组表示都由实现决定
+     * UDF 对象图的编译回调:{@link UdfContainer} 递归遍历定义树,把"如何编译叶子、如何表示分组"交由
+     * 引擎适配层实现,本类不感知具体脚本引擎。一次分组的调用序列为
+     * {@link #group} → 若干次 {@link #bind} → {@link #complete}。
      */
     public interface UdfCompiler {
+
+        /**
+         * 创建一个空的分组容器(命名空间节点)。
+         *
+         * @param name 分组名(部分引擎可能据此命名生成的对象,无需要可忽略)
+         * @return 引擎相关的分组对象
+         */
         Object group(String name);
 
+        /**
+         * 把单个叶子 UDF 编译为引擎可调用值;JS 源码与 Java 对象的区分由实现依
+         * {@link UdfDefinition#getUdf()} 判断。
+         *
+         * @param definition 叶子 UDF 定义
+         * @return 引擎相关的可调用值
+         */
         Object compile(UdfDefinition definition);
 
+        /**
+         * 把已编译的成员绑定到分组的 {@code name} 槽位;成员可能是叶子值或子分组。
+         *
+         * @param group  目标分组(由 {@link #group} 创建)
+         * @param name   成员名
+         * @param member 已编译的成员:{@link #compile} 的返回值,或递归编译得到的子分组对象
+         */
         void bind(Object group, String name, Object member);
 
+        /**
+         * 分组全部成员绑定完成后调用,用于收尾——如封闭分组,使 UDF 命名空间跨求值只读。
+         *
+         * @param group 已绑定完成员的分组
+         */
         void complete(Object group);
     }
 
