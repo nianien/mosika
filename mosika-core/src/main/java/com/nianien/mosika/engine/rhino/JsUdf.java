@@ -15,7 +15,7 @@ import org.mozilla.javascript.Undefined;
  * <p>
  * 构造期间校验源码语法、可执行性和具名函数名称，执行期间绑定到当前规则作用域
  * <p>
- * 源码必须是求值结果为函数的单个 JavaScript 表达式，支持以下形式：
+ * 源码优先按求值结果为函数的单个 JavaScript 表达式解析，支持以下形式
  * <pre>{@code
  * (a, b) => a + b
  *
@@ -27,7 +27,8 @@ import org.mozilla.javascript.Undefined;
  *     return a + b;
  * }
  * }</pre>
- * 具名函数的名称必须与注册名称一致。不支持辅助函数、变量声明加入口函数等脚本形式。
+ * 同时兼容包含辅助函数或变量声明、并以注册同名函数为入口的历史脚本形式
+ * 具名入口函数的名称必须与注册名称一致
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * @since 2023/12/8
@@ -45,7 +46,7 @@ public class JsUdf {
     }
 
     public Function bind(Context context, Scriptable scope) {
-        return requireFunction(registeredName, functionScript.exec(context, scope));
+        return requireFunction(registeredName, functionScript.exec(context, scope, scope));
     }
 
     private static Script compileFunction(String registeredName, String source) {
@@ -67,7 +68,7 @@ public class JsUdf {
         Script validatedScript = functionScript;
         try {
             RhinoEngine.runInScope((context, scope) ->
-                    requireFunction(registeredName, validatedScript.exec(context, scope)));
+                    requireFunction(registeredName, validatedScript.exec(context, scope, scope)));
             return validatedScript;
         } catch (RhinoException e) {
             throw new IllegalArgumentException(

@@ -4,8 +4,6 @@ import com.nianien.antlr4.RuleBaseVisitor;
 import com.nianien.antlr4.RuleParser;
 import com.nianien.mosika.eval.node.*;
 import lombok.AllArgsConstructor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
 import java.util.List;
 
 /**

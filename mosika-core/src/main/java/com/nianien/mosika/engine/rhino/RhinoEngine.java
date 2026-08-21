@@ -150,7 +150,7 @@ public final class RhinoEngine {
         ScriptableObject.putProperty(local, "$", Context.javaToJS(root, local));
         ScriptableObject.putProperty(local, "$$", Context.javaToJS(ruleContext, local));
         ScriptableObject.putProperty(local, "$args", Context.javaToJS(args, local));
-        return toJava(((Script) script).exec(context, local));
+        return toJava(((Script) script).exec(context, local, local));
     }
 
     /**

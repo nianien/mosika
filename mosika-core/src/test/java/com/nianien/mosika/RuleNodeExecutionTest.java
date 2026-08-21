@@ -14,6 +14,7 @@ import com.nianien.mosika.eval.node.OrNode;
 import com.nianien.mosika.eval.node.ParNode;
 import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.node.SerNode;
+import com.nianien.mosika.eval.node.SomeNode;
 import com.nianien.mosika.eval.parser.NodeBuilder;
 import com.nianien.mosika.eval.result.EvalResult;
 import com.nianien.mosika.eval.result.NodeResult;
@@ -154,6 +155,15 @@ public class RuleNodeExecutionTest {
 
         assertTrue(result.isMatched());
         assertNull(result.getResult());
+    }
+
+    @Test
+    public void testVisitorClearsCurrentRuleAfterRootVisit() {
+        RuleVisitor context = new RuleVisitor(ruleEngine, null);
+
+        context.visit(new ExprNode("t1"));
+
+        assertNull(context.getRule());
     }
 
     @SneakyThrows
@@ -376,6 +386,17 @@ public class RuleNodeExecutionTest {
                 .eval(nodeBuilder.build("some(1,2,t1,f1,t2)"), root).getResult());
         assertEquals(false, new RuleSuite(ruleEngine)
                 .eval(nodeBuilder.build("some(_,1,t1,f1,t2)"), root).getResult());
+    }
+
+    @Test
+    public void testSomeNodeUnboundedMaxFollowsBuilderMutation() {
+        SomeNode node = new SomeNode(2, null, new ExprNode("t1"));
+        node.getNodes().add(new ExprNode("t2"));
+
+        NodeResult result = new RuleSuite(ruleEngine).eval(node, null);
+
+        assertEquals(true, result.getResult());
+        assertEquals("some(2,_,t1,t2)", result.getExpr());
     }
 
     @Test

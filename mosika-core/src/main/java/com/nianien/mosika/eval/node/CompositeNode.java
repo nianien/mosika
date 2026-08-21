@@ -25,7 +25,7 @@ public class CompositeNode extends ExprNode {
 
 
     /**
-     * 创建带调用参数的命名复合规则节点
+     * 创建命名复合规则节点
      *
      * @param ruleId    复合规则 ID
      * @param ruleNode  递归展开后的内部规则节点
@@ -38,9 +38,6 @@ public class CompositeNode extends ExprNode {
 
     @Override
     public EvalResult eval(RuleContext context) {
-        if (getArguments() != null) {
-            throw new UnsupportedOperationException("parameterized rule execution is not supported");
-        }
         EvalResult result = context.visit(ruleNode);
         EvalResult evalResult = new EvalResult(this.toString(), result.getResult(), result.isMatched());
         return evalResult;

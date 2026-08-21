@@ -73,7 +73,11 @@ public class ParNode extends AbstractRuleNode {
                 pending.add(CompletableFuture.runAsync(() -> {
                     // 子线程设置当前评估节点
                     context.setCurrentEval(parentNode);
-                    context.visit(node);
+                    try {
+                        context.visit(node);
+                    } finally {
+                        context.setCurrentEval(null);
+                    }
                 }, ForkJoinPool.commonPool()));
             }
         }

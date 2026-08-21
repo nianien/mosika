@@ -210,6 +210,16 @@ public class UdfGroupTest {
         assertEquals(6, engine.evalExpr("math.calc.multiply(2, 3)", null, null));
     }
 
+    @Test
+    public void testJavaUdfSupportsFixedAndVarArgsMethods() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("mixed", new MixedArityUdf()))
+                .build();
+
+        assertEquals("fixed:a,b,c", engine.evalExpr("mixed('a', 'b', 'c')", null, null));
+        assertEquals("varargs:a,b", engine.evalExpr("mixed('a', 'b')", null, null));
+    }
+
     /** 没有 apply 的普通对象，仅暴露成员方法 */
     public static class PlainBeanUdf {
 
@@ -232,6 +242,17 @@ public class UdfGroupTest {
 
         public int multiply(int left, int right) {
             return left * right;
+        }
+    }
+
+    public static class MixedArityUdf {
+
+        public String apply(String first, String second, String third) {
+            return "fixed:" + first + "," + second + "," + third;
+        }
+
+        public String apply(String first, String... values) {
+            return "varargs:" + first + "," + String.join(",", values);
         }
     }
 

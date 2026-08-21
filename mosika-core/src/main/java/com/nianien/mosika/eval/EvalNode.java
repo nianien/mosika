@@ -21,11 +21,6 @@ public class EvalNode {
     private final RuleNode ruleNode;
 
     /**
-     * 父执行节点
-     */
-    private EvalNode parent;
-
-    /**
      * 当前执行路径上该节点的独立评估结果
      */
     private EvalResult result;

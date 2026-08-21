@@ -31,7 +31,7 @@ public class SomeNode extends AbstractRuleNode {
         this.minHits = minHits;
         this.maxHits = maxHits;
         this.min = minHits == null ? 0 : minHits;
-        this.max = maxHits == null ? nodes.length : maxHits;
+        this.max = maxHits == null ? Integer.MAX_VALUE : maxHits;
         this.nodes.addAll(Arrays.asList(nodes));
     }
 

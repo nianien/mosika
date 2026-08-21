@@ -13,7 +13,6 @@ import com.nianien.mosika.exception.RuleEvalException;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * 规则定义、UDF 和命名规则节点组成的可执行套件
@@ -79,8 +78,14 @@ public class RuleSuite {
      * @throws NullPointerException 规则引擎或节点构建器为 {@code null} 时抛出
      */
     public RuleSuite(RuleEngine ruleEngine, NodeBuilder nodeBuilder) {
-        this.ruleEngine = Objects.requireNonNull(ruleEngine, "ruleEngine cannot be null");
-        this.nodeBuilder = Objects.requireNonNull(nodeBuilder, "nodeBuilder cannot be null");
+        if (ruleEngine == null) {
+            throw new NullPointerException("ruleEngine cannot be null");
+        }
+        if (nodeBuilder == null) {
+            throw new NullPointerException("nodeBuilder cannot be null");
+        }
+        this.ruleEngine = ruleEngine;
+        this.nodeBuilder = nodeBuilder;
     }
 
 

@@ -4,7 +4,6 @@ package com.nianien.mosika.eval.parser;
 import com.nianien.mosika.eval.node.RuleNode;
 
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 
 /**

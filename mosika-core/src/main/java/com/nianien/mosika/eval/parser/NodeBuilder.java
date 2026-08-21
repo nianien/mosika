@@ -9,7 +9,6 @@ import com.nianien.mosika.eval.node.ExprNode;
 import com.nianien.mosika.eval.node.RuleNode;
 import lombok.RequiredArgsConstructor;
 import org.antlr.v4.runtime.*;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,8 +31,7 @@ public class NodeBuilder {
     /**
      * 把解析器识别出的单个规则 ID 转换为命名规则节点
      */
-    @NotNull
-    private NodeGenerator generator;
+    private final NodeGenerator generator;
 
     /**
      * 按规则 ID 缓存命名复合规则节点

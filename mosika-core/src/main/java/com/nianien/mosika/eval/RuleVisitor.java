@@ -96,7 +96,11 @@ public class RuleVisitor implements RuleContext {
      */
     @Override
     public EvalResult visit(RuleNode node) {
-        if (node instanceof ExprNode exprNode) {
+        boolean updatesCurrentRule = node instanceof ExprNode;
+        String previousRule = null;
+        if (updatesCurrentRule) {
+            ExprNode exprNode = (ExprNode) node;
+            previousRule = currentRule.get();
             this.currentRule.set(exprNode.getRuleId());
         }
         EvalNode evalNode = new EvalNode(node);
@@ -104,7 +108,6 @@ public class RuleVisitor implements RuleContext {
         EvalNode parent = currentEval.get();
         parent.add(evalNode);
         if (!isExprNode) {
-            evalNode.setParent(parent);
             currentEval.set(evalNode);
         }
         try {
@@ -112,9 +115,18 @@ public class RuleVisitor implements RuleContext {
             evalNode.setResult(result);
             return result;
         } finally {
-            if (!isExprNode) {
+            if (parent == rootEval) {
+                currentEval.remove();
+            } else if (!isExprNode) {
                 // 异常路径同样回溯到父节点
                 currentEval.set(parent);
+            }
+            if (updatesCurrentRule) {
+                if (previousRule == null) {
+                    currentRule.remove();
+                } else {
+                    currentRule.set(previousRule);
+                }
             }
         }
     }
@@ -158,7 +170,11 @@ public class RuleVisitor implements RuleContext {
 
     @Override
     public void setCurrentEval(EvalNode node) {
-        currentEval.set(node);
+        if (node == null) {
+            currentEval.remove();
+        } else {
+            currentEval.set(node);
+        }
     }
 
 
