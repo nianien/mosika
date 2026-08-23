@@ -27,11 +27,11 @@ public interface UdfContext {
     /**
      * 添加属性
      */
-    void put(String name, Object value);
+    Object put(String name, Object value);
 
 
     /**
      * 移除属性
      */
-    void remove(String name);
+    Object remove(Object name);
 }

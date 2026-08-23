@@ -13,9 +13,11 @@ import com.nianien.mosika.exception.RuleEvalException;
 import com.nianien.mosika.exception.RuleNotFoundException;
 import lombok.Getter;
 
+import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -28,7 +30,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class RuleVisitor implements RuleContext {
+public class RuleVisitor extends AbstractMap<String, Object> implements RuleContext {
 
     /**
      * 当前执行使用的规则引擎
@@ -185,13 +187,23 @@ public class RuleVisitor implements RuleContext {
 
 
     @Override
-    public synchronized void put(String name, Object value) {
-        contextData.put(name, value);
+    public synchronized Object put(String name, Object value) {
+        return contextData.put(name, value);
     }
 
     @Override
-    public synchronized void remove(String name) {
-        contextData.remove(name);
+    public synchronized boolean containsKey(Object name) {
+        return contextData.containsKey(name);
+    }
+
+    @Override
+    public Set<Entry<String, Object>> entrySet() {
+        return contextData.entrySet();
+    }
+
+    @Override
+    public synchronized Object remove(Object name) {
+        return contextData.remove(name);
     }
 
     /**

@@ -5,6 +5,8 @@ import com.nianien.mosika.eval.result.NodeResult;
 import com.nianien.mosika.eval.result.RuleResult;
 import com.nianien.mosika.exception.RuleEvalException;
 import com.nianien.mosika.suite.RuleSuite;
+import com.nianien.mosika.udf.AdultValidateUdf;
+import com.nianien.mosika.udf.UdfDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -178,6 +180,95 @@ class RuleSuiteTest {
 
         assertEquals("mosika", result.getResult());
         assertEquals("mosika", context.get("name"));
+    }
+
+    @Test
+    void contextSupportsMapPropertyAccess() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "contextAccess",
+                        "($$.written = {nested: true},"
+                                + "isAdult('mosika', 20, $$)"
+                                + " && $$.enabled"
+                                + " && $$.nullable === null"
+                                + " && $$.missing === undefined"
+                                + " && ('enabled' in $$)"
+                                + " && $$.get('enabled')"
+                                + " && $$.remove('removable') === 'value'"
+                                + " && $$.put('viaMethod', 1) === undefined"
+                                + " && $$.rule === 'contextAccess'"
+                                + " && $$.data.name === 'mosika'"
+                                + " && typeof $$.size === 'undefined'"
+                                + " && typeof $$.putAll === 'undefined'"
+                                + " && typeof $$.class === 'undefined')",
+                        "enabled=${$$.enabled}")),
+                List.of(new UdfDefinition("isAdult", new AdultValidateUdf(18))));
+        Map<String, Object> context = new HashMap<>();
+        context.put("enabled", true);
+        context.put("nullable", null);
+        context.put("removable", "value");
+
+        NodeResult result = suite.eval("contextAccess", Map.of("name", "mosika"), context);
+
+        assertEquals(true, result.getResult());
+        assertEquals(Map.of("nested", true), context.get("written"));
+        assertEquals(1, context.get("viaMethod"));
+        assertEquals(18, context.get("minAge"));
+        assertEquals(false, context.containsKey("removable"));
+        assertEquals("enabled=true", result.getDetails().get(0).getDesc());
+    }
+
+    @Test
+    void contextPropertyAssignmentConvertsNestedValues() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "writeContext",
+                        "($$.payload = {items: [1, {enabled: true}]}, true)",
+                        "write context")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+
+        NodeResult result = suite.eval("writeContext", null, context);
+
+        assertEquals(true, result.getResult());
+        assertEquals(
+                Map.of("items", List.of(1, Map.of("enabled", true))),
+                context.get("payload"));
+    }
+
+    @Test
+    void contextEnumerationOnlyExposesDataKeys() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "contextKeys",
+                        "Object.keys($$).sort().join(',')",
+                        "context keys")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+        context.put("enabled", true);
+        context.put("name", "mosika");
+
+        NodeResult result = suite.eval("contextKeys", null, context);
+
+        assertEquals("enabled,name", result.getResult());
+    }
+
+    @Test
+    void contextDataKeyTakesPrecedenceOverContextMember() {
+        RuleSuite suite = new RuleSuite(
+                List.of(new RuleDefinition(
+                        "contextCollision",
+                        "[$$.rule, $$.get, $$.class].join(',')",
+                        "context collision")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+        context.put("rule", "data-rule");
+        context.put("get", "data-get");
+        context.put("class", "data-class");
+
+        NodeResult result = suite.eval("contextCollision", null, context);
+
+        assertEquals("data-rule,data-get,data-class", result.getResult());
     }
 
     @Test

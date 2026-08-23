@@ -273,14 +273,13 @@ public final class RhinoEngine {
     }
 
     /**
-     * Java 值跨入脚本时按对象角色分派包装(顺序敏感:{@link UdfContext} 先于 {@link Map}):
+     * Java 值跨入脚本时按对象角色分派包装
      * <ul>
-     *   <li>{@link UdfContext}(脚本的 {@code $$})→ {@link RuleNativeJavaObject};</li>
-     *   <li>{@link Map}(脚本的 {@code $}/{@code $args} 及嵌套 Map)→ {@link RuleNativeJavaMap};</li>
-     *   <li>其余对象 → 默认 {@link NativeJavaObject}。</li>
+     *   <li>同时实现 {@link UdfContext} 和 {@link Map} 的 {@code $$}→ {@link RuleNativeJavaContextMap}</li>
+     *   <li>其他 {@link UdfContext}→ {@link RuleNativeJavaObject}</li>
+     *   <li>{@link Map}(脚本的 {@code $}/{@code $args} 及嵌套 Map)→ {@link RuleNativeJavaMap}</li>
+     *   <li>其余对象→默认 {@link NativeJavaObject}</li>
      * </ul>
-     * 仅 {@code Map} 需要定制:{@code NativeJavaMap} 把数据 key 与方法名挤在同一属性命名空间,二者撞名
-     * (详见 {@link RuleNativeJavaMap})。其余对象的属性即其成员,无此问题,保持默认 Java 语义。
      */
     private static final class RuleWrapFactory extends WrapFactory {
 
@@ -290,6 +289,9 @@ public final class RhinoEngine {
                                            Object javaObject,
                                            TypeInfo staticType) {
             if (javaObject instanceof UdfContext udfContext) {
+                if (javaObject instanceof Map<?, ?> map) {
+                    return new RuleNativeJavaContextMap(scope, udfContext, map, staticType);
+                }
                 return new RuleNativeJavaObject(scope, udfContext, staticType);
             }
             if (javaObject instanceof Map<?, ?> map) {
@@ -369,6 +371,84 @@ public final class RhinoEngine {
                 return putFunction;
             }
             return super.get(name, start);
+        }
+    }
+
+    private static final class RuleNativeJavaContextMap extends NativeJavaMap {
+
+        private final UdfContext udfContext;
+
+        private final Map<?, ?> map;
+
+        private final BaseFunction putFunction;
+
+        private RuleNativeJavaContextMap(Scriptable scope,
+                                         UdfContext udfContext,
+                                         Map<?, ?> map,
+                                         TypeInfo staticType) {
+            super(scope, map, staticType);
+            this.udfContext = udfContext;
+            this.map = map;
+            this.putFunction = nativeFunction(scope, (context, callScope, thisObject, arguments) -> {
+                udfContext.put(Context.toString(arguments[0]), toJava(arguments[1]));
+                return Undefined.instance;
+            });
+        }
+
+        @Override
+        public Object get(String name, Scriptable start) {
+            synchronized (udfContext) {
+                if (map.containsKey(name)) {
+                    return super.get(name, start);
+                }
+                return switch (name) {
+                    case "put" -> putFunction;
+                    case "rule" -> Context.javaToJS(udfContext.getRule(), getParentScope());
+                    case "data" -> Context.javaToJS(udfContext.getData(), getParentScope());
+                    case "get", "remove", "getRule", "getData" -> super.get(name, start);
+                    default -> Scriptable.NOT_FOUND;
+                };
+            }
+        }
+
+        @Override
+        public Object get(int index, Scriptable start) {
+            return get(Integer.toString(index), start);
+        }
+
+        @Override
+        public boolean has(String name, Scriptable start) {
+            synchronized (udfContext) {
+                if (map.containsKey(name)) {
+                    return true;
+                }
+                return switch (name) {
+                    case "get", "put", "remove", "rule", "data", "getRule", "getData" -> true;
+                    default -> false;
+                };
+            }
+        }
+
+        @Override
+        public boolean has(int index, Scriptable start) {
+            return has(Integer.toString(index), start);
+        }
+
+        @Override
+        public void put(String name, Scriptable start, Object value) {
+            udfContext.put(name, toJava(value));
+        }
+
+        @Override
+        public void put(int index, Scriptable start, Object value) {
+            put(Integer.toString(index), start, value);
+        }
+
+        @Override
+        public Object[] getIds() {
+            synchronized (udfContext) {
+                return super.getIds();
+            }
         }
     }
 
