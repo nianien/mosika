@@ -26,6 +26,9 @@ spring:
 mosika:
   db:
     path: ./mosika-web/data/mosika.db
+  udf:
+    scan-packages:
+      - com.nianien.mosika.udf.builtin
 
 logging:
   level:

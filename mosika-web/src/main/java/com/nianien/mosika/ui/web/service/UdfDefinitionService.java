@@ -1,16 +1,27 @@
 package com.nianien.mosika.ui.web.service;
 
 import com.nianien.mosika.engine.rhino.JsUdf;
+import com.nianien.mosika.spring.boot.SpringUdfLoader;
+import com.nianien.mosika.udf.Functions;
+import com.nianien.mosika.udf.UdfDelegate;
+import com.nianien.mosika.udf.UdfDefinition;
 import com.nianien.mosika.ui.web.common.BusinessException;
 import com.nianien.mosika.ui.web.dao.RuleNamespaceDao;
 import com.nianien.mosika.ui.web.dao.UdfDefinitionDao;
 import com.nianien.mosika.ui.web.entity.RuleNamespaceEntity;
 import com.nianien.mosika.ui.web.entity.UdfDefinitionEntity;
+import com.nianien.mosika.ui.web.entity.UdfDefinitionEntity.MethodView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -46,6 +57,8 @@ public class UdfDefinitionService {
 
     /** 规则套件候选快照构造与发布入口 */
     private final RuleSuiteManager suiteManager;
+
+    private final SpringUdfLoader springUdfLoader;
 
     /**
      * 创建并默认启用一个 JavaScript UDF
@@ -174,9 +187,25 @@ public class UdfDefinitionService {
         int size = Math.max(1, Math.min(pageSize, 200));
         long offset = (long) (page - 1) * size;
         String normalizedNamespace = normalizeNamespace(namespace);
-        List<UdfDefinitionEntity> rows = udfDao.list(
-                status, normalizedNamespace, keyword, offset, size);
-        int total = udfDao.count(status, normalizedNamespace, keyword);
+        List<UdfDefinitionEntity> javaUdfs = javaUdfs(
+                status, normalizedNamespace, keyword);
+        int databaseTotal = udfDao.count(status, normalizedNamespace, keyword);
+        int total = javaUdfs.size() + databaseTotal;
+        List<UdfDefinitionEntity> rows = new ArrayList<>(size);
+        long databaseOffset;
+        if (offset < javaUdfs.size()) {
+            int from = (int) offset;
+            int to = Math.min(javaUdfs.size(), from + size);
+            rows.addAll(javaUdfs.subList(from, to));
+            databaseOffset = 0;
+        } else {
+            databaseOffset = offset - javaUdfs.size();
+        }
+        int remaining = size - rows.size();
+        if (remaining > 0) {
+            rows.addAll(udfDao.list(
+                    status, normalizedNamespace, keyword, databaseOffset, remaining));
+        }
         return Map.of(
                 "items", rows,
                 "total", total,
@@ -281,6 +310,12 @@ public class UdfDefinitionService {
      * @throws BusinessException 完整路径已被其他记录占用时抛出
      */
     private void ensurePathAvailable(String namespace, String group, String name, Long selfId) {
+        for (UdfDefinition definition : springUdfLoader.loadUdfs()) {
+            if (definition.getGroup().equals(group) && definition.getName().equals(name)) {
+                throw new BusinessException(409,
+                        "udf is provided by Java and cannot be modified: " + fullName(group, name));
+            }
+        }
         UdfDefinitionEntity conflict = udfDao.findByPath(namespace, group, name);
         if (conflict != null && (selfId == null || !selfId.equals(conflict.getId()))) {
             throw new BusinessException(409, "udf already exists: " + fullName(group, name));
@@ -308,5 +343,103 @@ public class UdfDefinitionService {
      */
     private static String fullName(String group, String name) {
         return group == null || group.isEmpty() ? name : group + "." + name;
+    }
+
+    /**
+     * 将 Spring Java UDF 转为只读页面项并应用状态与关键字过滤
+     * <p>
+     * 方法展示与运行时共用 {@link UdfDelegate} 中已解析的暴露方法元数据
+     */
+    private List<UdfDefinitionEntity> javaUdfs(Integer status, String namespace, String keyword) {
+        List<UdfDefinitionEntity> rows = new ArrayList<>();
+        if (status != null && status != 1) {
+            return rows;
+        }
+        String normalizedKeyword = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        for (UdfDefinition definition : springUdfLoader.loadUdfs()) {
+            UdfDelegate<?, ?> delegate = UdfDelegate.of(definition.getUdf());
+            String implementation = delegate.type().getName();
+            String implementationKind = isFunctionType(delegate.type()) ? "function" : "bean";
+            for (UdfDelegate.MethodInfo method : delegate.methods()) {
+                List<String> parameterTypes = new ArrayList<>(method.getParameterTypes().length);
+                for (Type parameterType : method.getParameterTypes()) {
+                    parameterTypes.add(typeName(parameterType));
+                }
+                List<String> parameterNames = new ArrayList<>(method.getParameterNames().length);
+                for (String parameterName : method.getParameterNames()) {
+                    parameterNames.add(parameterName);
+                }
+                String returnType = typeName(method.getReturnType());
+                MethodView methodView = new MethodView(method.getName(), parameterTypes, parameterNames,
+                        returnType, method.isVarArgs(), method.getDescription());
+                String callableName = "apply".equals(method.getName())
+                        ? definition.getName() : definition.getName() + "." + method.getName();
+                StringBuilder searchable = new StringBuilder(
+                        fullName(definition.getGroup(), callableName))
+                        .append(' ').append(implementation)
+                        .append(' ').append(implementationKind)
+                        .append(' ').append(method.getDescription())
+                        .append(' ').append(returnType);
+                searchable.append(' ').append(method.getName())
+                        .append(' ').append(String.join(" ", parameterNames))
+                        .append(' ').append(String.join(" ", parameterTypes));
+                if (!normalizedKeyword.isEmpty()
+                        && !searchable.toString().toLowerCase(Locale.ROOT).contains(normalizedKeyword)) {
+                    continue;
+                }
+                List<MethodView> methods = new ArrayList<>(1);
+                methods.add(methodView);
+                rows.add(UdfDefinitionEntity.builder()
+                        .namespace(namespace)
+                        .group(definition.getGroup())
+                        .name(definition.getName())
+                        .description(method.getDescription())
+                        .source(implementation)
+                        .status(1)
+                        .type("java")
+                        .editable(false)
+                        .implementationKind(implementationKind)
+                        .methods(methods)
+                        .build());
+            }
+        }
+        rows.sort(Comparator.comparing(UdfDefinitionEntity::getGroup)
+                .thenComparing(UdfDefinitionEntity::getName));
+        return rows;
+    }
+
+    private static boolean isFunctionType(Class<?> type) {
+        for (Class<?> functionType : Functions.class.getDeclaredClasses()) {
+            if (functionType.isAssignableFrom(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将 Java 反射类型转为简洁的页面展示名称
+     * <p>
+     * 保留参数化类型与泛型数组结构
+     */
+    private static String typeName(Type type) {
+        if (type instanceof Class<?> clazz) {
+            return clazz.isArray() ? typeName(clazz.getComponentType()) + "[]" : clazz.getSimpleName();
+        }
+        if (type instanceof ParameterizedType parameterizedType) {
+            StringBuilder name = new StringBuilder(typeName(parameterizedType.getRawType())).append('<');
+            Type[] arguments = parameterizedType.getActualTypeArguments();
+            for (int i = 0; i < arguments.length; i++) {
+                if (i > 0) {
+                    name.append(", ");
+                }
+                name.append(typeName(arguments[i]));
+            }
+            return name.append('>').toString();
+        }
+        if (type instanceof GenericArrayType arrayType) {
+            return typeName(arrayType.getGenericComponentType()) + "[]";
+        }
+        return type.getTypeName();
     }
 }

@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.eval.context.UdfContext;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -19,6 +20,7 @@ public class SystemAdminUdf implements BiFunction<String, UdfContext, Boolean> {
     private String admin;
 
     @Override
+    @UdfMethod
     public Boolean apply(String name, UdfContext ruleContext) {
         System.out.println("@@@@" + ruleContext.getRule());
         ruleContext.put("admin", admin);

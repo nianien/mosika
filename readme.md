@@ -28,7 +28,7 @@ Mosika 使用可序列化 UI AST 保存编辑结构，并单向编译为 Core �
 
 > **`mosika-web` 只是 UI 与控制面的参考实现，不是 Mosika 的核心。**
 
-Mosika 的规则语义和执行能力全部来自 `mosika-core`；`mosika-ui` 只提供可序列化的 UI AST 及其到执行树的单向编译能力，也不包含真正的页面。可选的 `mosika-web` 使用 Spring Boot、SQLite 和静态页面演示如何把两者组合成一套可运行的规则管理与可视化编排界面，主要用于能力展示、集成验证和独立体验。
+Mosika 的规则语义和执行能力全部来自 `mosika-core`；`mosika-udf` 集中存放 Java UDF 实现；`mosika-spring-boot-starter` 负责把 Spring 容器中的 `@Udf` Bean 转换为 Core 定义；`mosika-ui` 只提供可序列化的 UI AST 及其到执行树的单向编译能力，也不包含真正的页面。可选的 `mosika-web` 使用 Spring Boot、SQLite 和静态页面演示如何把这些模块组合成一套可运行的规则管理与可视化编排界面，主要用于能力展示、集成验证和独立体验。
 
 接入 Mosika 内核不需要依赖 `mosika-web`。参考 Web 不定义新的规则语义，不替代 Core/UI 的库制品，也不代表公司内部生产级产品的完整控制面、平台集成和生态能力。
 
@@ -170,6 +170,8 @@ ANTLR4 只负责识别三引号参数块的安全边界，`ExprNode` 在构造�
 | 模块 | 职责 | 不负责 |
 | --- | --- | --- |
 | `mosika-core` | DSL、规则树、执行上下文、求值、UDF、命名原子/复合规则 | 页面、持久化、Flow 产品模型与业务场景映射 |
+| `mosika-udf` | 可由 Starter 扫描注册的 Java UDF 实现 | Spring Bean 扫描、数据库 UDF 管理、规则套件生命周期 |
+| `mosika-spring-boot-starter` | 自动发现并注册 `@Udf` Bean，提供 `SpringUdfLoader` | 规则来源、`RuleSuite` 生命周期、数据库 UDF 管理 |
 | `mosika-ui` | 可序列化 UI AST，单向编译为 `RuleNode` | 页面布局、Web 依赖、从执行树反推 UI |
 | `mosika-web` | 可选的 UI/控制面参考实现：REST、SQLite、规则管理和可视化编辑页面 | 规则语义、执行内核、替代 Core/UI 库制品、代表完整生产级平台 |
 
@@ -193,10 +195,10 @@ mvn clean test
 - 命名空间：<http://127.0.0.1:8080/namespaces>
 - 业务场景：<http://127.0.0.1:8080/scenes>
 - 原子规则库：<http://127.0.0.1:8080/rules>
-- JavaScript UDF 注册中心：<http://127.0.0.1:8080/udfs>
+- UDF 注册中心：<http://127.0.0.1:8080/udfs>
 - 规则流画布：`http://127.0.0.1:8080/flow/{id}`
 
-在 UDF 页面中可以注册带参数的 JavaScript 函数，例如把 `function bindCitations(target) { ... }` 注册为 `content.generation.bindCitations`，随后在普通规则表达式中直接调用 `content.generation.bindCitations($)`。创建、编辑和启用会经过内核编译校验，成功提交后刷新当前命名空间的 `RuleSuite`；`sys` 命名空间为内置能力保留。该页面只管理 JavaScript UDF；Java UDF 由进程内调用方构造为 `UdfDefinition` 后交给 Core。
+在 UDF 页面中可以注册带参数的 JavaScript 函数，例如把 `function bindCitations(target) { ... }` 注册为 `content.generation.bindCitations`，随后在普通规则表达式中直接调用 `content.generation.bindCitations($)`。创建、编辑和启用会经过内核编译校验，成功提交后刷新当前命名空间的 `RuleSuite`；`sys` 命名空间为内置能力保留。页面同时展示 Spring 扫描得到的 Java UDF 和数据库中的 JavaScript UDF：Java UDF 对所有命名空间可用且只读，可查看暴露的方法签名和说明；JavaScript UDF 按命名空间隔离并可编辑。
 
 UDF 是进程内可执行代码，不是面向不受信任用户的普通配置。参考 Web 默认只监听本机且不提供生产级鉴权；对外或多租户部署时，必须在平台层增加身份认证、分级授权、审核发布和操作审计。
 
@@ -218,6 +220,7 @@ UDF 是进程内可执行代码，不是面向不受信任用户的普通配置�
 
 - [文档索引](./docs/README.md)：全部有效文档及其适用边界。
 - [Core 核心设计](./docs/核心设计.md)：内核设计、运行链路与核心不变量。
+- [Spring Boot Starter](./docs/Spring-Boot-Starter.md)：`@Udf` 自动扫描、`@UdfMethod` 方法暴露、Spring 装配以及 Web 合并语义。
 - [模板参数化规则](./docs/模板参数化规则.md)：参数语法、`$args` 绑定、缓存语义、执行详情和使用边界。
 - [UI 树与 Web 编辑器](./docs/规则编辑器.md)：UI AST、画布投影、编辑与持久化契约。
 - [开发与运行](./docs/开发与运行.md)：构建、测试、服务脚本和运行配置。

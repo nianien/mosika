@@ -1,5 +1,6 @@
 package com.nianien.mosika;
 
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.engine.RuleDefinition;
 import com.nianien.mosika.engine.RuleEngine;
 import com.nianien.mosika.udf.UdfDefinition;
@@ -469,6 +470,7 @@ public class RuleEngineTest {
     public static class IncrementUdf implements Function1<Integer, Integer> {
 
         @Override
+        @UdfMethod
         public Integer apply(Integer value) {
             return value + 1;
         }
@@ -477,6 +479,7 @@ public class RuleEngineTest {
     public static class BoomUdf implements Function1<Integer, Integer> {
 
         @Override
+        @UdfMethod
         public Integer apply(Integer value) {
             throw new IllegalStateException("boom");
         }

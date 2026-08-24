@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.udf.Functions.Function2;
 import com.nianien.mosika.udf.Functions.Function3;
 
@@ -18,6 +19,7 @@ import java.util.Map.Entry;
 public class HelloWithGenericUdf implements Function2<String, Map<String, Object>, Object>, Function3<String, List<String>, Map<String, Object>, Object> {
 
     @Override
+    @UdfMethod
     public Object apply(String name, Map<String, Object> properties) {
         System.out.println("Hello " + name);
         StringBuilder result = new StringBuilder("This is " + name);
@@ -28,6 +30,7 @@ public class HelloWithGenericUdf implements Function2<String, Map<String, Object
     }
 
     @Override
+    @UdfMethod
     public Object apply(String name, List<String> people, Map<String, Object> properties) {
         System.out.println("Hello " + name);
         StringBuilder result = new StringBuilder("This is " + name);

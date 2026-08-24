@@ -1,5 +1,6 @@
 package com.nianien.mosika.udf;
 
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.eval.context.UdfContext;
 import com.nianien.mosika.udf.Functions.Function3;
 
@@ -18,6 +19,7 @@ public class AdultValidateUdf implements Function3<String, Integer, UdfContext, 
     }
 
     @Override
+    @UdfMethod
     public Boolean apply(String name, Integer age, UdfContext ruleContext) {
         System.out.println("@@@@current rule:" + ruleContext.getRule());
         ruleContext.put("minAge", minAge);

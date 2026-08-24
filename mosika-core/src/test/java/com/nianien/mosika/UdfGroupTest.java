@@ -1,6 +1,7 @@
 package com.nianien.mosika;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.bean.User;
 import com.nianien.mosika.bean.User.Contact;
 import com.nianien.mosika.engine.RuleDefinition;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -170,6 +172,7 @@ public class UdfGroupTest {
             implements Functions.Function2<Function<Object[], Object>, Object[], Object> {
 
         @Override
+        @UdfMethod
         public Object apply(Function<Object[], Object> function, Object... arguments) {
             return function.apply(arguments);
         }
@@ -178,6 +181,7 @@ public class UdfGroupTest {
     public static class SumUdf implements Functions.Function2<Integer, Integer, Integer> {
 
         @Override
+        @UdfMethod
         public Integer apply(Integer left, Integer right) {
             return left + right;
         }
@@ -189,11 +193,18 @@ public class UdfGroupTest {
                 .udfDefinition(new UdfDefinition("bean", "helper", new PlainBeanUdf()))
                 .build();
 
-        // 普通对象没有 apply，仍可注册，并支持通过成员方法调用
+        // 普通对象没有 apply，仍可通过标注的方法调用
         assertEquals("hi jack", engine.evalExpr("bean.helper.greet('jack')", null, null));
         assertEquals(5, engine.evalExpr("bean.helper.add(2, 3)", null, null));
+        assertEquals("undefined", engine.evalExpr("typeof bean.helper.hidden", null, null));
+        assertEquals(true, engine.evalExpr(
+                "bean.helper.greet === bean.helper.greet", null, null));
+        assertEquals(false, engine.evalExpr(
+                "bean.helper.greet === bean.helper.add", null, null));
+        assertThrows(RuntimeException.class,
+                () -> engine.evalExpr("bean.helper.greet.marker = 1", null, null));
 
-        // 直接以函数方式执行才因缺少兼容 apply 报错
+        // 没有标注 apply 时不能直接调用
         assertThrows(RuntimeException.class,
                 () -> engine.evalExpr("bean.helper(1)", null, null));
     }
@@ -206,8 +217,34 @@ public class UdfGroupTest {
 
         // udf(...) 进入 UdfDelegate.apply()，按 apply 签名分派
         assertEquals(5, engine.evalExpr("math.calc(2, 3)", null, null));
-        // udf.someMethod(...) 调用原始对象的成员方法
+        // udf.someMethod(...) 进入同一个代理调用具名方法
         assertEquals(6, engine.evalExpr("math.calc.multiply(2, 3)", null, null));
+    }
+
+    @Test
+    public void testDelegateExposesOnlyAnnotatedMethodsAndMetadata() {
+        UdfDelegate<?, ?> delegate = UdfDelegate.of(new PlainBeanUdf());
+
+        assertEquals(2, delegate.methods().size());
+        assertEquals("add", delegate.methods().getFirst().getName());
+        assertEquals("计算两个整数之和", delegate.methods().getFirst().getDescription());
+        assertEquals(5, delegate.invoke("add", 2, 3));
+        assertFalse(delegate.contains("hidden"));
+        assertThrows(RuntimeException.class, () -> delegate.invoke("hidden", "value"));
+    }
+
+    @Test
+    public void testDelegateRejectsSameNameAndArity() {
+        assertThrows(IllegalArgumentException.class,
+                () -> UdfDelegate.of(new AmbiguousUdf()));
+    }
+
+    @Test
+    public void testFunctionInterfaceDoesNotExposeUnannotatedApply() {
+        UdfDelegate<?, ?> delegate = UdfDelegate.of(new UnexposedUdf());
+
+        assertFalse(delegate.contains("apply"));
+        assertThrows(RuntimeException.class, () -> delegate.invoke("apply", 1));
     }
 
     @Test
@@ -220,15 +257,35 @@ public class UdfGroupTest {
         assertEquals("varargs:a,b", engine.evalExpr("mixed('a', 'b')", null, null));
     }
 
+    @Test
+    public void testNamedOverloadsShareBoundFunction() {
+        RuleEngine engine = RuleEngine.builder()
+                .udfDefinition(new UdfDefinition("bean", "formatter", new NamedOverloadUdf()))
+                .build();
+
+        assertEquals(true, engine.evalExpr(
+                "bean.formatter.format === bean.formatter.format", null, null));
+        assertEquals("one:a", engine.evalExpr(
+                "bean.formatter.format('a')", null, null));
+        assertEquals("two:a,b", engine.evalExpr(
+                "bean.formatter.format('a', 'b')", null, null));
+    }
+
     /** 没有 apply 的普通对象，仅暴露成员方法 */
     public static class PlainBeanUdf {
 
+        @UdfMethod(description = "向指定名称问候")
         public String greet(String name) {
             return "hi " + name;
         }
 
+        @UdfMethod(description = "计算两个整数之和")
         public int add(int left, int right) {
             return left + right;
+        }
+
+        public String hidden(String value) {
+            return value;
         }
     }
 
@@ -236,10 +293,12 @@ public class UdfGroupTest {
     public static class DualUdf implements Functions.Function2<Integer, Integer, Integer> {
 
         @Override
+        @UdfMethod
         public Integer apply(Integer left, Integer right) {
             return left + right;
         }
 
+        @UdfMethod(description = "计算两个整数之积")
         public int multiply(int left, int right) {
             return left * right;
         }
@@ -247,12 +306,48 @@ public class UdfGroupTest {
 
     public static class MixedArityUdf {
 
+        @UdfMethod
         public String apply(String first, String second, String third) {
             return "fixed:" + first + "," + second + "," + third;
         }
 
+        @UdfMethod
         public String apply(String first, String... values) {
             return "varargs:" + first + "," + String.join(",", values);
+        }
+    }
+
+    public static class NamedOverloadUdf {
+
+        @UdfMethod
+        public String format(String value) {
+            return "one:" + value;
+        }
+
+        @UdfMethod
+        public String format(String first, String second) {
+            return "two:" + first + "," + second;
+        }
+    }
+
+    public static class AmbiguousUdf {
+
+        @UdfMethod
+        public String choose(String value) {
+            return value;
+        }
+
+        @UdfMethod
+        public Integer choose(Integer value) {
+            return value;
+        }
+    }
+
+    public static class UnexposedUdf implements Functions.Function1<Integer, Integer> {
+
+        @Override
+        public Integer apply(Integer value) {
+            return value;
         }
     }
 

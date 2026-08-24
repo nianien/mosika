@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -758,7 +759,11 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(containsString("id=\"newRuleBtn\"")));
         mvc.perform(get("/ui/udfs.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("id=\"createBtn\"")));
+                .andExpect(content().string(containsString("id=\"createBtn\"")))
+                .andExpect(content().string(containsString("const methodSignature=")))
+                .andExpect(content().string(containsString("implementationKind")))
+                .andExpect(content().string(containsString("java-source")))
+                .andExpect(content().string(not(containsString(">版本</th>"))));
         mvc.perform(get("/ui/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"treeRoot\"")));

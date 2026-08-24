@@ -1,274 +1,404 @@
 package com.nianien.mosika.udf;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.utils.JsonUtils;
 import com.nianien.mosika.utils.Reflections;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
- * Java UDF 的统一调用接口。
+ * Java UDF 的受控调用代理
  * <p>
- * {@link Wrapper} 在注册期解析 UDF 的 {@code apply} 方法，在调用期根据实参数量选择方法，
- * 并按照方法声明的泛型参数类型完成 Rhino 值、嵌套 UDF 和普通 Java 对象之间的转换。
+ * 代理只暴露带 {@link UdfMethod} 的方法，并按方法名和实参数量完成分派
+ * {@code apply} 是直接函数调用入口，其他方法通过具名成员调用
  *
- * @param <P> 参数类型
- * @param <R> 返回值类型
+ * @param <P> 直接调用参数类型
+ * @param <R> 直接调用返回类型
  */
-@FunctionalInterface
 public interface UdfDelegate<P, R> {
 
-
     /**
-     * 调用 UDF。
+     * 以函数形式调用已暴露的 {@code apply} 方法
      *
-     * @param ps 参数列表
+     * @param ps 调用实参
      * @return UDF 执行结果
      */
     R apply(P... ps);
 
+    /**
+     * 按方法名调用已暴露的具名方法
+     *
+     * @param methodName 方法名
+     * @param ps         调用实参
+     * @return UDF 执行结果
+     */
+    Object invoke(String methodName, Object... ps);
 
     /**
-     * 创建带参数转换和重载分派能力的 UDF 代理。
+     * 判断指定方法名是否包含已暴露签名
      *
-     * @param udf 原始 Java UDF
+     * @param methodName 方法名
+     * @return 存在已暴露签名时返回 {@code true}
+     */
+    boolean contains(String methodName);
+
+    /**
+     * 获取运行时与展示层共用的暴露方法元数据
+     *
+     * @return 按方法名和形参个数排序的方法元数据
+     */
+    List<MethodInfo> methods();
+
+    /**
+     * 获取用于解析注解与方法签名的 UDF 类型
+     *
+     * @return 原始 UDF 类型或 Spring AOP 目标类型
+    */
+    Class<?> type();
+
+    /**
+     * 为普通 Java UDF 对象创建受控代理
+     * <p>
+     * 已经是 UDF 代理的对象会原样返回
+     *
+     * @param udf Java UDF 对象
      * @return UDF 代理
      */
-    static UdfDelegate of(Object udf) {
-        return new Wrapper(udf);
+    static UdfDelegate<?, ?> of(Object udf) {
+        if (udf instanceof UdfDelegate delegate) {
+            return delegate;
+        }
+        return new Wrapper(udf, udf.getClass(), Function.identity());
     }
 
     /**
-     * Java UDF 代理。
+     * 使用独立的元数据类型和调用方法映射创建受控代理
      * <p>
-     * 每个 Java UDF 在注册时创建一个代理。代理缓存按参数个数索引的方法签名，
-     * 调用时不再遍历反射方法，只进行数组查询、参数转换和反射调用。
-     * <p>
-     * 当一个 UDF 作为另一个 Java UDF 的参数时，本类还负责保留其可调用语义：
-     * Java UDF 可以还原为注册时的原始实例，也可以适配为
-     * {@link java.util.function.Function}；JavaScript UDF 则由脚本引擎适配层
-     * 预先适配为同一 Java 函数接口。
-     * <p>
-     * 只有参数声明为 {@code Function<Object[], Object>} 时才能同时接收 Java UDF
-     * 和 JavaScript UDF。参数声明为 {@code Functions.Function0} 至
-     * {@code Functions.Function22} 时只支持对应的原始 Java UDF 实例。
-     * <p>
-     * 例如下面的 Java UDF 接收待调用函数和可变参数，因此可以调用不同参数个数的
-     * Java UDF 或 JavaScript UDF：
-     * <pre>{@code
-     * public class SumUdf
-     *         implements Functions.Function2<Integer, Integer, Integer> {
+     * Spring AOP 使用目标类读取注解和泛型签名，同时将调用映射到代理 Bean
      *
-     *     @Override
-     *     public Integer apply(Integer left, Integer right) {
-     *         return left + right;
-     *     }
-     * }
-     *
-     * public class InvokeUdf
-     *         implements Functions.Function2<
-     *                 java.util.function.Function<Object[], Object>, Object[], Object> {
-     *
-     *     @Override
-     *     public Object apply(java.util.function.Function<Object[], Object> function,
-     *                         Object... arguments) {
-     *         return function.apply(arguments);
-     *     }
-     * }
-     *
-     * RuleEngine engine = RuleEngine.builder()
-     *         .udfDefinitions(java.util.List.of(
-     *                 new UdfDefinition("math", "javaSum", new SumUdf()),
-     *                 new UdfDefinition("math", "jsSum3", "(a, b, c) => a + b + c"),
-     *                 new UdfDefinition("policy", "invoke", new InvokeUdf())))
-     *         .build();
-     *
-     * engine.evalExpr("policy.invoke(math.javaSum, 1, 2)", null, null);    // 3
-     * engine.evalExpr("policy.invoke(math.jsSum3, 1, 2, 3)", null, null); // 6
-     * }</pre>
-     *
-     * Created on 2022/12/6
-     *
-     * @author skyfalling {@literal <skyfalling@live.com>}
+     * @param udf                      实际调用对象
+     * @param type                     元数据解析类型
+     * @param invocationMethodResolver 调用方法映射器
+     * @return UDF 代理
      */
+    static UdfDelegate<?, ?> of(Object udf, Class<?> type,
+                                Function<Method, Method> invocationMethodResolver) {
+        if (udf instanceof UdfDelegate delegate) {
+            return delegate;
+        }
+        return new Wrapper(udf, type, invocationMethodResolver);
+    }
 
+    /**
+     * 已暴露方法的反射元数据
+     * <p>
+     * 参数和返回类型保留声明方法中可获取的泛型信息
+     */
+    final class MethodInfo {
+
+        private final String name;
+        private final Type[] parameterTypes;
+        private final String[] parameterNames;
+        private final Type returnType;
+        private final boolean varArgs;
+        private final String description;
+
+        private MethodInfo(Method method, String description) {
+            this.name = method.getName();
+            this.parameterTypes = method.getGenericParameterTypes();
+            Parameter[] parameters = method.getParameters();
+            String[] names = new String[parameters.length];
+            for (int i = 0; i < parameters.length; i++) {
+                if (!parameters[i].isNamePresent()) {
+                    names = new String[0];
+                    break;
+                }
+                names[i] = parameters[i].getName();
+            }
+            this.parameterNames = names;
+            this.returnType = method.getGenericReturnType();
+            this.varArgs = method.isVarArgs();
+            this.description = description;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public Type[] getParameterTypes() {
+            return parameterTypes;
+        }
+
+        public String[] getParameterNames() {
+            return parameterNames;
+        }
+
+        public Type getReturnType() {
+            return returnType;
+        }
+
+        public boolean isVarArgs() {
+            return varArgs;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    /**
+     * 基于反射签名的默认 UDF 代理实现
+     * <p>
+     * 代理构造时一次性解析并索引全部暴露方法，调用时不再遍历反射方法
+     */
     class Wrapper implements UdfDelegate {
 
         /**
-         * 把 Rhino 传入的实参转换为 Java UDF 方法声明的参数类型。
+         * 参数基础转换未命中时的兜底转换器
          * <p>
-         * Java UDF 和 JavaScript UDF 是两种互斥的实参类型，两个特殊分支之间没有
-         * 顺序要求，但都必须在普通 JSON 转换之前处理：
-         * <ol>
-         *     <li>作为参数传入的 Java UDF 根据目标类型还原或适配；</li>
-         *     <li>作为参数传入的 JavaScript UDF 在目标类型为 Java Function 时适配；</li>
-         *     <li>其余值沿用 JSON 转换，转换为方法声明的普通 Java 类型。</li>
-         * </ol>
-         * {@code t} 来自目标 {@code apply} 方法的泛型参数，因此同时检查裸
-         * {@code Function} 和 {@code Function<Object[], Object>} 两种声明形式。
+         * 嵌套 UDF 保留可调用语义，其他脚本值按目标泛型通过 JSON 转换
          */
-        private static BiFunction<Object, Type, Object> converter = (s, t) -> {
-            boolean javaFunction = t == java.util.function.Function.class
-                    || t instanceof ParameterizedType parameterizedType
+        private static final BiFunction<Object, Type, Object> CONVERTER = (source, type) -> {
+            boolean javaFunction = type == java.util.function.Function.class
+                    || type instanceof ParameterizedType parameterizedType
                     && parameterizedType.getRawType() == java.util.function.Function.class;
 
-            /*
-             * Java UDF 进入 Rhino 后由 JavaUdfFunction 包装；RhinoEngine.toJava()
-             * 会将其解包为当前 Wrapper。
-             *
-             * 目标参数是 java.util.function.Function 时，以 wrapper::apply 暴露统一的
-             * Object[] 调用入口，使被调用 UDF 继续使用本类的参数转换和重载分派。
-             *
-             * 目标参数不是 java.util.function.Function 时，直接返回注册时的原始
-             * Java UDF 实例，例如实现 Functions.Function2 的对象，从而保持原来的
-             * 嵌套 Java UDF 调用方式。
-             */
-            if (s instanceof Wrapper wrapper) {
+            if (source instanceof Wrapper wrapper) {
                 if (javaFunction) {
                     return (java.util.function.Function<Object[], Object>) wrapper::apply;
                 }
                 return wrapper.udf;
             }
 
-            /*
-             * JavaScript UDF 作为参数传入时,已由脚本引擎适配层预先包装为
-             * java.util.function.Function(见 engine.rhino.JavaUdfFunction 的 RhinoFunctionAdapter),
-             * 因此这里按 Java 函数原样透传,通用代码无需感知具体脚本引擎。
-             */
-            if (javaFunction && s instanceof java.util.function.Function) {
-                return s;
+            if (javaFunction && source instanceof java.util.function.Function) {
+                return source;
             }
 
-            /*
-             * 普通参数沿用已有的 JSON 类型转换。非字符串先序列化，字符串直接交给
-             * JsonUtils，目标类型由被调用 apply 方法的反射签名决定。
-             */
-            if (!(s instanceof String)) {
-                s = JsonUtils.toJson(s);
+            if (!(source instanceof String)) {
+                source = JsonUtils.toJson(source);
             }
-            Object v = JsonUtils.toBean((String) s, new TypeReference<>() {
+            Object value = JsonUtils.toBean((String) source, new TypeReference<>() {
                 @Override
                 public Type getType() {
-                    return t;
+                    return type;
                 }
             });
-            return v != null ? v : s;
+            return value != null ? value : source;
         };
 
+        private final Object udf;
 
-        /** 被代理的原始 Java UDF 实例。 */
-        private Object udf;
+        private final Class<?> type;
 
-        /**
-         * 按参数个数索引的 {@code apply} 方法签名。
-         * 数组下标就是参数个数，没有对应重载的位置为 {@code null}。
-         */
-        private final Signature[] signatures;
+        private final Map<String, MethodGroup> methodGroups;
 
-        /** 可接收不定数量实参的 {@code apply} 方法签名。 */
-        private final Signature varArgsSignature;
+        private final MethodGroup applyGroup;
 
-        /**
-         * 创建代理并解析 UDF 支持的参数个数。
-         *
-         * @param udf 原始 Java UDF
-         */
+        private final List<MethodInfo> methodInfos;
+
         public Wrapper(Object udf) {
-            this.udf = udf;
-            this.signatures = resolve(udf);
-            Signature varArgs = null;
-            for (Signature signature : signatures) {
-                if (signature != null && signature.method.isVarArgs()) {
-                    varArgs = signature;
-                    break;
-                }
-            }
-            this.varArgsSignature = varArgs;
+            this(udf, udf.getClass(), Function.identity());
         }
 
+        private Wrapper(Object udf, Class<?> type, Function<Method, Method> invocationMethodResolver) {
+            this.udf = udf;
+            this.type = type;
+            Resolution resolution = resolve(type, invocationMethodResolver);
+            this.methodGroups = resolution.methodGroups;
+            this.applyGroup = methodGroups.get("apply");
+            this.methodInfos = resolution.methodInfos;
+        }
 
-        /**
-         * 根据实参数量调用对应的 {@code apply} 方法。
-         * <p>
-         * 方法签名在构造时已经解析完成。这里先按参数个数从数组中定位签名，
-         * 没有固定参数签名时再尝试可变参数签名。可变参数方法的尾部实参会打包成
-         * 方法声明的数组参数，再依据泛型参数类型转换每个实参并调用原始 UDF。
-         *
-         * @param params 调用参数
-         * @return 原始 UDF 的执行结果
-         * @throws RuntimeException 没有匹配的固定参数或可变参数 {@code apply} 方法时抛出
-         */
         @Override
         public Object apply(Object... params) {
-            Signature signature = params.length < signatures.length ? signatures[params.length] : null;
-            if (signature == null
-                    && varArgsSignature != null
-                    && params.length >= varArgsSignature.parameterTypes.length - 1) {
-                signature = varArgsSignature;
+            if (applyGroup == null) {
+                throw new RuntimeException("udf method is not exposed: apply");
             }
-            if (signature == null) {
-                throw new RuntimeException("no compatible method has " + params.length + " parameters!");
+            return applyGroup.invoke(udf, params);
+        }
+
+        @Override
+        public Object invoke(String methodName, Object... params) {
+            MethodGroup methodGroup = methodGroups.get(methodName);
+            if (methodGroup == null) {
+                throw new RuntimeException("udf method is not exposed: " + methodName);
             }
-            if (signature.method.isVarArgs()) {
-                int fixedCount = signature.parameterTypes.length - 1;
-                Object[] invocationParams = new Object[signature.parameterTypes.length];
-                System.arraycopy(params, 0, invocationParams, 0, fixedCount);
-                Object[] variableParams = new Object[params.length - fixedCount];
-                System.arraycopy(params, fixedCount, variableParams, 0, variableParams.length);
-                invocationParams[fixedCount] = variableParams;
-                params = invocationParams;
-            }
-            Object[] casts = Reflections.convert(params, signature.parameterTypes, converter);
-            return Reflections.invoke(signature.method, udf, casts);
+            return methodGroup.invoke(udf, params);
+        }
+
+        @Override
+        public boolean contains(String methodName) {
+            return methodGroups.containsKey(methodName);
+        }
+
+        @Override
+        public List<MethodInfo> methods() {
+            return methodInfos;
+        }
+
+        @Override
+        public Class<?> type() {
+            return type;
         }
 
         /**
-         * 解析非桥接的 {@code apply} 方法，并建立参数个数到方法签名的直接索引。
+         * 收集已标注方法并构建方法名与形参个数索引
          * <p>
-         * 泛型接口生成的桥接方法不代表额外重载，必须排除，否则会覆盖真实方法签名。
+         * 元数据始终来自 {@code type}，实际调用方法由映射器决定
          *
-         * @param udf 原始 Java UDF
-         * @return 按参数个数索引的方法签名数组
+         * @param type                     元数据解析类型
+         * @param invocationMethodResolver 调用方法映射器
+         * @return 已建立索引的方法解析结果
          */
-        private static Signature[] resolve(Object udf) {
-            Collection<Method> methods = Reflections.methods(udf.getClass(),
-                    method -> method.getName().equals("apply") && !method.isBridge());
-            int max = -1;
-            for (Method method : methods) {
-                max = Math.max(max, method.getParameterCount());
+        private static Resolution resolve(Class<?> type, Function<Method, Method> invocationMethodResolver) {
+            Collection<Method> discovered = Reflections.methods(type, method ->
+                    method.isAnnotationPresent(UdfMethod.class)
+                            && Modifier.isPublic(method.getModifiers())
+                            && !Modifier.isStatic(method.getModifiers())
+                            && !method.isBridge()
+                            && !method.isSynthetic());
+            List<Method> exposed = new ArrayList<>(discovered);
+            exposed.sort(Comparator.comparing(Method::getName)
+                    .thenComparingInt(Method::getParameterCount)
+                    .thenComparing(Method::toGenericString));
+
+            Map<String, List<Signature>> signatures = new LinkedHashMap<>();
+            List<MethodInfo> methodInfos = new ArrayList<>(exposed.size());
+            for (Method method : exposed) {
+                UdfMethod annotation = method.getAnnotation(UdfMethod.class);
+                MethodInfo methodInfo = new MethodInfo(method, annotation.description());
+                Method invocationMethod = invocationMethodResolver.apply(method);
+                signatures.computeIfAbsent(method.getName(), name -> new ArrayList<>())
+                        .add(new Signature(invocationMethod, methodInfo));
+                methodInfos.add(methodInfo);
             }
-            Signature[] result = new Signature[max + 1];
-            for (Method method : methods) {
-                int arity = method.getParameterCount();
-                result[arity] = new Signature(method);
+
+            Map<String, MethodGroup> methodGroups = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Signature>> entry : signatures.entrySet()) {
+                methodGroups.put(entry.getKey(), new MethodGroup(type, entry.getKey(), entry.getValue()));
             }
-            return result;
+            return new Resolution(methodGroups, methodInfos);
+        }
+
+        private static final class Resolution {
+
+            private final Map<String, MethodGroup> methodGroups;
+            private final List<MethodInfo> methodInfos;
+
+            private Resolution(Map<String, MethodGroup> methodGroups, List<MethodInfo> methodInfos) {
+                this.methodGroups = methodGroups;
+                this.methodInfos = methodInfos;
+            }
         }
 
         /**
-         * 一次 UDF 调用所需的反射信息。
-         * <p>
-         * 使用 {@link Type} 而不是 {@link Class}，以保留反射方法声明中可获得的
-         * {@link ParameterizedType} 信息，例如 {@code Function<Object[], Object>}
-         * 和带元素类型的集合。未解析的 {@link java.lang.reflect.TypeVariable}
-         * 仍然只是类型变量，不在这里推导其具体类型。
+         * 同一方法名下的定长和可变参数签名索引
+         */
+        private static final class MethodGroup {
+
+            private final String name;
+            private final Signature[] signatures;
+            private final Signature varArgsSignature;
+
+            private MethodGroup(Class<?> type, String name, List<Signature> methods) {
+                this.name = name;
+                int maxArity = -1;
+                int maxFixedArity = -1;
+                for (Signature signature : methods) {
+                    int arity = signature.parameterTypes.length;
+                    maxArity = Math.max(maxArity, arity);
+                    if (!signature.methodInfo.isVarArgs()) {
+                        maxFixedArity = Math.max(maxFixedArity, arity);
+                    }
+                }
+
+                // 声明签名数组用于检查同形参个数冲突，定长签名数组用于运行时精确分派
+                Signature[] declaredSignatures = new Signature[maxArity + 1];
+                Signature[] fixedSignatures = new Signature[maxFixedArity + 1];
+                Signature varArgs = null;
+                for (Signature signature : methods) {
+                    int arity = signature.parameterTypes.length;
+                    if (declaredSignatures[arity] != null) {
+                        throw new IllegalArgumentException("ambiguous udf method "
+                                + type.getName() + "." + name + " with " + arity + " parameters");
+                    }
+                    declaredSignatures[arity] = signature;
+                    if (signature.methodInfo.isVarArgs()) {
+                        if (varArgs != null) {
+                            throw new IllegalArgumentException("multiple varargs udf methods "
+                                    + type.getName() + "." + name);
+                        }
+                        varArgs = signature;
+                    } else {
+                        fixedSignatures[arity] = signature;
+                    }
+                }
+                this.signatures = fixedSignatures;
+                this.varArgsSignature = varArgs;
+            }
+
+            /**
+             * 先匹配精确定长签名，未命中时再回退可变参数签名
+             * <p>
+             * 可变参数尾部会先打包为数组，再统一执行参数类型转换
+             *
+             * @param target 实际调用对象
+             * @param params 调用实参
+             * @return UDF 执行结果
+             */
+            private Object invoke(Object target, Object[] params) {
+                Signature signature = params.length < signatures.length ? signatures[params.length] : null;
+                if (signature == null
+                        && varArgsSignature != null
+                        && params.length >= varArgsSignature.parameterTypes.length - 1) {
+                    signature = varArgsSignature;
+                }
+                if (signature == null) {
+                    throw new RuntimeException("no exposed udf method " + name
+                            + " has " + params.length + " parameters");
+                }
+                if (signature.methodInfo.isVarArgs()) {
+                    int fixedCount = signature.parameterTypes.length - 1;
+                    Object[] invocationParams = new Object[signature.parameterTypes.length];
+                    System.arraycopy(params, 0, invocationParams, 0, fixedCount);
+                    Object[] variableParams = new Object[params.length - fixedCount];
+                    System.arraycopy(params, fixedCount, variableParams, 0, variableParams.length);
+                    invocationParams[fixedCount] = variableParams;
+                    params = invocationParams;
+                }
+                Object[] casts = Reflections.convert(params, signature.parameterTypes, CONVERTER);
+                return Reflections.invoke(signature.invocationMethod, target, casts);
+            }
+        }
+
+        /**
+         * 将元数据签名与实际反射调用方法关联
          */
         private static final class Signature {
 
-            private final Method method;
+            private final Method invocationMethod;
             private final Type[] parameterTypes;
+            private final MethodInfo methodInfo;
 
-            private Signature(Method method) {
-                // 注册时一次性放开可达性，避免每次调用重复设置，并让不可访问的方法尽早暴露
-                method.setAccessible(true);
-                this.method = method;
-                this.parameterTypes = method.getGenericParameterTypes();
+            private Signature(Method invocationMethod, MethodInfo methodInfo) {
+                invocationMethod.setAccessible(true);
+                this.invocationMethod = invocationMethod;
+                this.parameterTypes = methodInfo.getParameterTypes();
+                this.methodInfo = methodInfo;
             }
         }
-
     }
 }

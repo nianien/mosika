@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.eval.context.RuleContext;
 import lombok.NoArgsConstructor;
 
@@ -15,6 +16,7 @@ public class GetUserTypeUdf implements BiFunction<String, RuleContext, Integer> 
 
 
     @Override
+    @UdfMethod
     public Integer apply(String name, RuleContext context) {
         int type = findUserType(name, context);
         context.put("user_type", type);

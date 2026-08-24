@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.udf.Functions.Function3;
 import com.nianien.mosika.udf.Functions.Function4;
 
@@ -19,6 +20,7 @@ public class CallAnotherUdfUdf implements
                 Object>, Object> {
 
     @Override
+    @UdfMethod
     public Object apply(String name, List<String> strings, Map<String, Object> stringObjectMap,
                         Function3<String, List<String>, Map<String, Object>, Object> function3) {
         System.out.println("udf invoked: " + function3.getClass() + ",args:" + name);

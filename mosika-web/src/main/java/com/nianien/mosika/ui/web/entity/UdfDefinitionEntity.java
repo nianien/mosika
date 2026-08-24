@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * {@code udf_definition} 表的实体映射
  * <p>
@@ -51,4 +53,36 @@ public class UdfDefinitionEntity {
 
     /** SQLite 记录最后更新时间字符串 */
     private String updatedAt;
+
+    /** UDF 实现类型，当前为 {@code javascript} 或 {@code java} */
+    @Builder.Default
+    private String type = "javascript";
+
+    /** 是否允许通过 Web 修改和启停 */
+    @Builder.Default
+    private boolean editable = true;
+
+    /** Java UDF 实现形态，当前为 {@code function} 或 {@code bean} */
+    private String implementationKind;
+
+    /** Java UDF 暴露方法元数据，JavaScript UDF 为 {@code null} */
+    private List<MethodView> methods;
+
+    /**
+     * Java UDF 方法的只读展示模型
+     *
+     * @param name           方法名
+     * @param parameterTypes 参数类型名列表
+     * @param parameterNames 参数名称列表，编译产物未保留参数名时为空
+     * @param returnType     返回类型名
+     * @param varArgs        是否是可变参数方法
+     * @param description    方法说明
+     */
+    public record MethodView(String name,
+                             List<String> parameterTypes,
+                             List<String> parameterNames,
+                             String returnType,
+                             boolean varArgs,
+                             String description) {
+    }
 }

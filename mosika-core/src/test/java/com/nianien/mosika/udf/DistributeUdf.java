@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 import com.nianien.mosika.annotation.Udf;
+import com.nianien.mosika.annotation.UdfMethod;
 import lombok.NoArgsConstructor;
 
 import java.util.function.BiFunction;
@@ -13,6 +14,7 @@ import java.util.function.BiFunction;
 public class DistributeUdf implements BiFunction<String, String, Boolean> {
 
     @Override
+    @UdfMethod
     public Boolean apply(String user, String owner) {
         System.out.println("账号[" + user + "]分配角色[" + owner + "]!");
         return true;

@@ -13,6 +13,8 @@
     <url>https://github.com/nianien/mosika</url>
     <modules>
         <module>mosika-core</module>
+        <module>mosika-udf</module>
+        <module>mosika-spring-boot-starter</module>
         <module>mosika-ui</module>
         <module>mosika-web</module>
     </modules>
@@ -166,6 +168,7 @@
                     <version>3.11.0</version>
                     <configuration>
                         <release>${java.version}</release>
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>

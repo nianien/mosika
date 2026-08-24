@@ -7,6 +7,7 @@ import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.result.NodeResult;
 import com.nianien.mosika.eval.result.RuleResult;
 import com.nianien.mosika.suite.RuleSuite;
+import com.nianien.mosika.spring.boot.SpringUdfLoader;
 import com.nianien.mosika.ui.tree.node.TreeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
 import com.nianien.mosika.ui.tree.node.flow.ANode;
@@ -74,6 +75,8 @@ public class RuleSuiteManager {
 
     /** 用户 JavaScript UDF 持久化访问对象 */
     private final UdfDefinitionDao udfDao;
+
+    private final SpringUdfLoader springUdfLoader;
 
     /** 命名空间持久化访问对象 */
     private final RuleNamespaceDao namespaceDao;
@@ -235,9 +238,9 @@ public class RuleSuiteManager {
         }
     }
 
-    /** 把已启用数据库 UDF 转换为 Core UDF 定义 */
+    /** 合并 Spring Java UDF 与当前命名空间启用的数据库 UDF */
     private List<UdfDefinition> runtimeUdfs(String namespace) {
-        List<UdfDefinition> definitions = new ArrayList<>();
+        List<UdfDefinition> definitions = springUdfLoader.loadUdfs();
         for (UdfDefinitionEntity entity : udfDao.listActive(namespace)) {
             if ("__proto__".equals(entity.getName())) {
                 throw new IllegalArgumentException("udf name is reserved: " + entity.getName());

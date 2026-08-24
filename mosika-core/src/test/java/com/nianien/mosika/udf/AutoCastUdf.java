@@ -1,6 +1,7 @@
 package com.nianien.mosika.udf;
 
 
+import com.nianien.mosika.annotation.UdfMethod;
 import com.nianien.mosika.bean.User;
 import com.nianien.mosika.udf.Functions.Function1;
 import com.nianien.mosika.udf.Functions.Function2;
@@ -12,12 +13,14 @@ import com.nianien.mosika.udf.Functions.Function2;
  */
 public class AutoCastUdf implements Function1<User, Object>, Function2<User, String, Object> {
     @Override
+    @UdfMethod
     public Object apply(User user) {
         System.out.println("user:" + user);
         return user.getName();
     }
 
     @Override
+    @UdfMethod
     public Object apply(User user, String name) {
         System.out.println("user:" + user + ",new name:" + name);
         return name;

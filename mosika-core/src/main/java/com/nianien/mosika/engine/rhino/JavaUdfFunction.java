@@ -2,34 +2,56 @@ package com.nianien.mosika.engine.rhino;
 
 import com.nianien.mosika.udf.UdfDelegate;
 import org.mozilla.javascript.BaseFunction;
-import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Wrapper;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static com.nianien.mosika.engine.rhino.RhinoEngine.nativeFunction;
 import static com.nianien.mosika.engine.rhino.RhinoEngine.toJava;
 
 /**
- * 把 Java UDF 绑定为兼具"可调用函数"和"对象成员访问"双重语义的脚本对象。
+ * 把 Java UDF 绑定为兼具直接调用和受控成员调用语义的脚本对象
  * <p>
- * {@code udf(...)} 走 {@link #call} 进入 {@link UdfDelegate#apply};
- * {@code udf.someMethod(...)} 通过 {@link #get} 回退到原始对象的成员方法。
+ * {@code udf(...)} 进入 {@link UdfDelegate#apply}
+ * {@code udf.someMethod(...)} 只访问代理明确暴露的具名方法
  */
 public class JavaUdfFunction extends BaseFunction implements Wrapper {
 
     private final UdfDelegate<Object, Object> delegate;
 
-    /** 原始 Java 对象的 Rhino 包装,用于成员方法查找并作为其调用目标 */
-    private final Scriptable members;
+    /** 构造期按方法名创建并封闭的具名 UDF 函数 */
+    private final Map<String, BaseFunction> boundMethods = new HashMap<>();
 
+    /**
+     * 创建一个绑定到指定 Rhino 作用域的 Java UDF 函数对象
+     * <p>
+     * 具名 UDF 方法不能覆盖 JavaScript 函数对象已有属性
+     *
+     * @param udf   Java UDF 对象或已准备的 UDF 代理
+     * @param scope Rhino 作用域
+     */
     @SuppressWarnings("unchecked")
     public JavaUdfFunction(Object udf, Scriptable scope) {
         super(scope, ScriptableObject.getFunctionPrototype(scope));
         this.delegate = (UdfDelegate<Object, Object>) UdfDelegate.of(udf);
-        this.members = (Scriptable) Context.javaToJS(udf, scope);
+        for (UdfDelegate.MethodInfo method : delegate.methods()) {
+            String methodName = method.getName();
+            if ("apply".equals(methodName) || boundMethods.containsKey(methodName)) {
+                continue;
+            }
+            if (super.get(methodName, this) != Scriptable.NOT_FOUND) {
+                throw new IllegalArgumentException(
+                        "udf method conflicts with JavaScript function property: " + methodName);
+            }
+            BaseFunction function = bind(methodName);
+            function.sealObject();
+            boundMethods.put(methodName, function);
+        }
     }
 
     @Override
@@ -37,21 +59,11 @@ public class JavaUdfFunction extends BaseFunction implements Wrapper {
                        Scriptable scope,
                        Scriptable thisObject,
                        Object[] arguments) {
-        Object[] parameters = new Object[arguments.length];
-        for (int i = 0; i < arguments.length; i++) {
-            Object value = toJava(arguments[i]);
-            // JS UDF 作为参数传入时适配为 java Function,使通用 UdfDelegate 无需感知 Rhino
-            parameters[i] = value instanceof Function fn ? new RhinoFunctionAdapter(fn) : value;
-        }
-        return Context.javaToJS(delegate.apply(parameters), scope);
+        return Context.javaToJS(delegate.apply(parameters(arguments)), scope);
     }
 
     /**
-     * 先解析函数自身属性(prototype/length 及原型链上的 call/apply 等),未命中再回退到
-     * 原始 Java 对象的成员,使 {@code udf.someMethod(...)} 可用。
-     * <p>
-     * 成员方法被绑定到 {@link #members} 调用,而不依赖 Rhino 的 thisObj 解包,
-     * 因为 {@link #unwrap()} 必须返回 delegate 以支撑嵌套 UDF 的参数转换。
+     * 先解析函数自身属性，未命中再返回构造期绑定的具名方法
      */
     @Override
     public Object get(String name, Scriptable start) {
@@ -59,17 +71,28 @@ public class JavaUdfFunction extends BaseFunction implements Wrapper {
         if (own != Scriptable.NOT_FOUND) {
             return own;
         }
-        Object member = members.get(name, members);
-        if (member == Scriptable.NOT_FOUND) {
-            return Scriptable.NOT_FOUND;
-        }
-        return member instanceof Callable callable ? bindToOriginal(callable) : member;
+        BaseFunction method = boundMethods.get(name);
+        return method != null ? method : Scriptable.NOT_FOUND;
     }
 
-    /** 把成员方法包成绑定原始对象的可调用函数,屏蔽 thisObj 解包差异 */
-    private BaseFunction bindToOriginal(Callable callable) {
+    /**
+     * 将具名 UDF 方法绑定为 Rhino 可调用函数
+     */
+    private BaseFunction bind(String name) {
         return nativeFunction(getParentScope(), (context, callScope, thisObject, arguments) ->
-                callable.call(context, callScope, members, arguments));
+                Context.javaToJS(delegate.invoke(name, parameters(arguments)), callScope));
+    }
+
+    /**
+     * 将 Rhino 实参转为 Java 值，并为作为参数传入的 JavaScript 函数建立适配器
+     */
+    private static Object[] parameters(Object[] arguments) {
+        Object[] parameters = new Object[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            Object value = toJava(arguments[i]);
+            parameters[i] = value instanceof Function fn ? new RhinoFunctionAdapter(fn) : value;
+        }
+        return parameters;
     }
 
     @Override
@@ -78,9 +101,9 @@ public class JavaUdfFunction extends BaseFunction implements Wrapper {
     }
 
     /**
-     * 把 Rhino JavaScript 函数适配为 Java UDF 可接收的 {@code Function<Object[], Object>}。
+     * 把 Rhino JavaScript 函数适配为 Java UDF 可接收的 {@code Function<Object[], Object>}
      * <p>
-     * 适配器不创建 Context,也不切换线程;只能在当前规则求值仍处于 Rhino Context 内时同步调用。
+     * 适配器不创建 Context 也不切换线程，只能在当前规则求值仍处于 Rhino Context 内时同步调用
      */
     private static final class RhinoFunctionAdapter implements java.util.function.Function<Object[], Object> {
 
