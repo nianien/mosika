@@ -32,7 +32,6 @@
 .tabs{display:flex;gap:6px;margin-left:26px}
 .tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
 .tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
-.top-right{display:flex;align-items:center;gap:12px}
 .search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
 .search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
 .btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
@@ -42,10 +41,8 @@
 .btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;cursor:pointer}
 .btn.link.danger{color:#c9504f}
 .main{overflow:auto;padding:22px 26px}
-.page-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.page-head>div:first-child{display:flex;align-items:baseline}
-.page-head h1{font-size:var(--fs-page)}
-.page-head .sub{color:#6f8b86;font-size:var(--fs-base);margin-left:10px;font-weight:400}
+.page-head{display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px}
+.filter-groups{display:flex;align-items:center;gap:18px}
 .filters{display:flex;gap:8px}
 .chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:var(--fs-meta);display:flex;align-items:center;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
@@ -78,7 +75,6 @@ tbody tr:hover{background:#f7fcfb}
 .status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
 .status-toggle-label{font-size:var(--fs-meta);line-height:1;min-width:42px}
 .empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
-.pager{min-height:52px;padding:10px 16px;border-top:1px solid #eef4f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#71887f;font-size:var(--fs-meta)}.pager button{height:30px;padding:0 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#355d55;cursor:pointer;font-size:var(--fs-meta)}.pager button:disabled{opacity:.45;cursor:not-allowed}
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
 .toast.show{opacity:.95}
 dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(1280px,96vw)}
@@ -281,9 +277,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   #ruleDlg .param-card .param-remove{grid-column:4}
   .dlg-body{grid-template-columns:1fr}.dlg-body>.field.span-2{grid-column:1}
 }
-@media(max-width:800px){.app-shell{height:auto;min-height:100vh;grid-template-rows:auto minmax(0,1fr)}.topbar{padding:12px 14px;flex-wrap:wrap}.brandwrap{width:100%;justify-content:space-between;gap:10px}.tabs{margin-left:0}.top-right{width:100%}.search{flex:1}.search input{width:100%}.main{padding:16px 12px}.page-head{align-items:flex-start;flex-direction:column;gap:12px}.filters{max-width:100%;overflow-x:auto;padding-bottom:2px}.pager{justify-content:space-between}}
+@media(max-width:800px){.app-shell{height:auto;min-height:100vh}.main{padding:16px 12px}.page-head{align-items:flex-end;flex-direction:column;gap:12px}.filter-groups{max-width:100%;overflow-x:auto;padding-bottom:2px}.filters{flex:none}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260824-3">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -293,19 +289,19 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       <div id="nsSlot"></div>
       <div class="tabs"><a class="tab" href="/scenes">业务场景</a><a class="tab on" href="/rules">业务规则</a><a class="tab" href="/udfs">自定义函数</a></div>
     </div>
-    <div class="top-right">
+    <div class="top-actions">
       <div class="search">🔍 <input id="searchInput" placeholder="搜索规则 / 表达式"></div>
       <button class="btn primary" id="newRuleBtn">＋ 新建规则</button>
     </div>
   </div>
   <div class="main">
     <div class="page-head">
-      <div><h1>业务规则</h1><span class="sub" id="subCount">加载中…</span></div>
-      <div class="filters" id="filters">
-        <button type="button" class="chip on" data-f="">全部</button>
-        <button type="button" class="chip" data-f="condition">判断条件</button>
-        <button type="button" class="chip" data-f="action">执行动作</button>
-        <button type="button" class="chip" data-f="off">已停用</button>
+      <div class="filter-groups">
+        <div class="filters" id="kindFilters" aria-label="规则类型">
+          <button type="button" class="chip on" data-kind="">全部</button>
+          <button type="button" class="chip" data-kind="condition">判断条件</button>
+          <button type="button" class="chip" data-kind="action">执行动作</button>
+        </div>
       </div>
     </div>
     <div class="panel">
@@ -313,7 +309,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         <thead><tr><th style="width:26%">规则名称 / 描述</th><th style="width:30%">表达式</th><th>类型</th><th>被引用</th><th style="text-align:right">状态 / 操作</th></tr></thead>
         <tbody id="rows"><tr><td colspan="5"><div class="loading">加载中…</div></td></tr></tbody>
       </table></div>
-      <div class="pager" id="pager" hidden><span id="pageSummary"></span><span><button type="button" id="prevPage">上一页</button> <button type="button" id="nextPage">下一页</button></span></div>
+      <div class="pager" id="pager"></div>
     </div>
   </div>
 </div>
@@ -403,7 +399,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/ui-common.js?v=20260813-1"></script>
+<script src="/ui/ui-common.js?v=20260824-1"></script>
 <script src="/ui/code-editor.js?v=20260813-1"></script>
 <script src="/ui/api.js?v=20260813-1"></script>
 <script src="/ui/ns.js?v=20260813-1"></script>
@@ -415,11 +411,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   const Ui = window.MosikaUi;
   const Code = window.MosikaCode;
   const $ = Ui.$;
-  let filter = "";  // "" | atom | table | off
+  let kindFilter = "";
   let keyword = "";
-  let pageNumber = 1;
-  const pageSize = 20;
-  let total = 0;
   let loadSequence = 0;
   let rules = [];
   let refCount = new Map(); // ruleId(String) -> 引用场景数
@@ -427,6 +420,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   const toast = Ui.createToast("#toast", { duration: 2000 });
   const esc = Ui.escapeHtml;
+  const pager = Ui.createPager("#pager", loadRules);
 
   // 参数模板编辑：参数名由表达式里的 $args.xxx 自动提取，其余字段手工补全。
   const PARAM_TYPES = [["string", "文本"], ["number", "数字"], ["boolean", "布尔"], ["enum", "枚举"]];
@@ -582,36 +576,24 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   async function loadRules() {
     const sequence = ++loadSequence;
     $("#rows").innerHTML = `<tr><td colspan="5"><div class="loading">加载中…</div></td></tr>`;
-    const params = { keyword, pageNumber, pageSize, namespace: Ns.code() };
-    if (filter === "condition") { params.kind = "condition"; params.status = 1; }
-    else if (filter === "action") { params.kind = "action"; params.status = 1; }
-    else if (filter === "off") params.status = 0;
-    else params.status = 1;
+    const params = {
+      keyword,
+      pageNumber: pager.pageNumber,
+      pageSize: pager.pageSize,
+      namespace: Ns.code()
+    };
+    if (kindFilter) params.kind = kindFilter;
     try {
       const page = await Api.listRules(params);
       if (sequence !== loadSequence) return;
       rules = page.items || [];
-      total = page.total || 0;
-      if (!rules.length && total > 0 && pageNumber > 1) {
-        pageNumber -= 1;
-        return loadRules();
-      }
-      $("#subCount").textContent = `共 ${page.total} 条规则`;
+      if (pager.update(page.total || 0)) return loadRules();
       renderRows();
-      renderPager();
     } catch (e) {
       if (sequence !== loadSequence) return;
       $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
-      $("#pager").hidden = true;
+      pager.hide();
     }
-  }
-
-  function renderPager() {
-    const pages = Math.max(1, Math.ceil(total / pageSize));
-    $("#pager").hidden = total <= pageSize;
-    $("#pageSummary").textContent = `第 ${pageNumber} / ${pages} 页 · 共 ${total} 条`;
-    $("#prevPage").disabled = pageNumber <= 1;
-    $("#nextPage").disabled = pageNumber >= pages;
   }
 
   function renderRows() {
@@ -1030,14 +1012,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const ed = e.target.closest("[data-edit]"); if (ed) { const r = rules.find((x) => x.ruleId === ed.dataset.edit); return openDialog(r); }
     const t = e.target.closest("[data-toggle]"); if (t) return toggleRule(t.dataset.toggle, Number(t.dataset.to));
   });
-  $("#filters").addEventListener("click", (e) => {
+  $("#kindFilters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
-    document.querySelectorAll("#filters .chip").forEach((c) => c.classList.remove("on"));
-    chip.classList.add("on"); filter = chip.dataset.f; pageNumber = 1; loadRules();
+    document.querySelectorAll("#kindFilters .chip").forEach((c) => c.classList.remove("on"));
+    chip.classList.add("on"); kindFilter = chip.dataset.kind; pager.reset(); loadRules();
   });
-  $("#searchInput").addEventListener("input", Ui.debounce((e) => { keyword = e.target.value.trim(); pageNumber = 1; loadRules(); }, 250));
-  $("#prevPage").addEventListener("click", () => { if (pageNumber > 1) { pageNumber -= 1; loadRules(); } });
-  $("#nextPage").addEventListener("click", () => { if (pageNumber * pageSize < total) { pageNumber += 1; loadRules(); } });
+  $("#searchInput").addEventListener("input", Ui.debounce((e) => { keyword = e.target.value.trim(); pager.reset(); loadRules(); }, 250));
   $("#newRuleBtn").addEventListener("click", () => openDialog(null));
   $("#dlgCancel").addEventListener("click", () => $("#ruleDlg").close());
   $("#dlgSave").addEventListener("click", saveRule);

@@ -69,11 +69,71 @@
         button.removeAttribute("aria-busy");
     }
 
+    function createPager(selector, onChange, pageSize) {
+        const element = typeof selector === "string" ? query(selector) : selector;
+        element.innerHTML = '<span data-page-summary></span><span><button type="button" data-page-previous>上一页</button> <button type="button" data-page-next>下一页</button></span>';
+        const summary = query("[data-page-summary]", element);
+        const previous = query("[data-page-previous]", element);
+        const next = query("[data-page-next]", element);
+        const size = pageSize ?? 20;
+        let pageNumber = 1;
+        let total = 0;
+
+        function pageCount() {
+            return Math.max(1, Math.ceil(total / size));
+        }
+
+        function render() {
+            const pages = pageCount();
+            element.hidden = false;
+            summary.textContent = `第 ${pageNumber} / ${pages} 页 · 共 ${total} 条`;
+            previous.disabled = pageNumber <= 1;
+            next.disabled = pageNumber >= pages;
+        }
+
+        function change(page) {
+            if (page < 1 || page > pageCount() || page === pageNumber) {
+                return;
+            }
+            pageNumber = page;
+            render();
+            onChange();
+        }
+
+        previous.addEventListener("click", () => change(pageNumber - 1));
+        next.addEventListener("click", () => change(pageNumber + 1));
+        render();
+
+        return {
+            get pageNumber() {
+                return pageNumber;
+            },
+            get pageSize() {
+                return size;
+            },
+            reset() {
+                pageNumber = 1;
+                render();
+            },
+            update(nextTotal) {
+                const previousPage = pageNumber;
+                total = nextTotal;
+                pageNumber = Math.min(pageNumber, pageCount());
+                render();
+                return pageNumber !== previousPage;
+            },
+            hide() {
+                element.hidden = true;
+            }
+        };
+    }
+
     root.MosikaUi = {
         $: query,
         escapeHtml,
         debounce,
         createToast,
-        setBusy
+        setBusy,
+        createPager
     };
 })(window);
