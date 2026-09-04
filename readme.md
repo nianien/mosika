@@ -12,6 +12,7 @@
   <a href="#模板参数化规则">模板参数</a> ·
   <a href="./docs/规则编辑器.md">参考 Web UI</a> ·
   <a href="./docs/核心设计.md">内核设计</a> ·
+  <a href="./CHANGELOG.md">更新日志</a> ·
   <a href="./docs/README.md">完整文档</a> ·
   <a href="./mosika-web/src/main/resources/static/ui/index.html">参考 UI 源码</a>
 </p>
@@ -105,7 +106,13 @@ Mosika 不试图替代 BPM、通用 DAG 或企业平台基础设施。它专注�
   </tr>
 </table>
 
-串行、并行、条件和决策都是显式结构节点，可以递归嵌套；布局方向只负责展示，不参与执行语义。
+串行、并行、条件、决策和有界循环都是显式结构节点，可以递归嵌套；布局方向只负责展示，不参与执行语义。
+
+有界循环使用 `loop(max, condition, action)`：每轮先判断条件，命中后执行动作，条件未命中或达到最大轮数时退出。条件和动作在同一轮共享求值缓存，下一轮重新计算，循环也可以嵌套。
+
+```text
+loop(3,shouldRetry,rebuildContent->qualityCheck)
+```
 
 ## 模板参数化规则
 
@@ -161,7 +168,7 @@ ANTLR4 只负责识别三引号参数块的安全边界，`ExprNode` 在构造�
 - `RuleSuite` 只装配规则和 Java/JS UDF；产品层规则流在边界处编译为复合规则。
 - `RuleEngine` 注册全部规则并预编译原子 JavaScript，是规则注册状态的唯一事实来源；`NodeGenerator` 只接收复合规则表，不维护第二份规则 ID 集合。
 - 裸 `ruleId` 在命中复合规则定义时递归编译为 `CompositeNode`，保留完整执行详情并统一检测循环引用；复合规则只按唯一 `ruleId` 识别和复用，不存在 `f1("""...""")` 形式的参数化复合规则变体，参数只属于其内部原子规则调用。
-- 规则 ID DSL 使用 `&&`、`||` 表达有序短路；`AllNode` 继承 `AndNode`，`AnyNode` 继承 `OrNode`，使 `all(...)`、`any(...)` 复用当前求值实现并保留独立语法身份；`some(min,max,...)` 表达命中数量约束。
+- 规则 ID DSL 使用 `&&`、`||` 表达有序短路；`AllNode` 继承 `AndNode`，`AnyNode` 继承 `OrNode`，使 `all(...)`、`any(...)` 复用当前求值实现并保留独立语法身份；`some(min,max,...)` 表达命中数量约束；`loop(max,condition,action)` 表达有界循环。
 - `matched` 表达匹配或控制状态，`result` 只传递节点具有明确语义的业务返回值。
 - 原子规则可以使用 `$args` 声明模板参数，并通过 `ruleId("""{...}""")` 在 DSL 节点上绑定 JSON 对象；不同参数组合独立求值，结构相同的参数复用结果。
 

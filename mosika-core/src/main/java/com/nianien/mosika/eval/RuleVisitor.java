@@ -18,7 +18,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -54,12 +53,12 @@ public class RuleVisitor extends AbstractMap<String, Object> implements RuleCont
     /**
      * 当前执行中的叶子评估结果缓存
      */
-    private Map<String, EvalResult> evalCache = new ConcurrentHashMap<>();
+    private EvalCacheScope evalCache = new EvalCacheScope();
 
     /**
      * 当前执行树的虚拟根节点
      */
-    private EvalNode rootEval = new EvalNode(null);
+    private EvalNode rootEval = new EvalNode(null, evalCache);
     /**
      * 当前线程正在访问的执行节点
      */
@@ -98,6 +97,18 @@ public class RuleVisitor extends AbstractMap<String, Object> implements RuleCont
      */
     @Override
     public EvalResult visit(RuleNode node) {
+        return visit(node, currentEval.get().getCacheScope());
+    }
+
+    /**
+     * 使用指定缓存作用域访问规则节点
+     *
+     * @param node 规则节点
+     * @param cacheScope 缓存作用域
+     * @return 节点评估结果
+     */
+    @Override
+    public EvalResult visit(RuleNode node, EvalCacheScope cacheScope) {
         boolean updatesCurrentRule = node instanceof ExprNode;
         String previousRule = null;
         if (updatesCurrentRule) {
@@ -105,7 +116,7 @@ public class RuleVisitor extends AbstractMap<String, Object> implements RuleCont
             previousRule = currentRule.get();
             this.currentRule.set(exprNode.getRuleId());
         }
-        EvalNode evalNode = new EvalNode(node);
+        EvalNode evalNode = new EvalNode(node, cacheScope);
         boolean isExprNode = node.getClass() == ExprNode.class;
         EvalNode parent = currentEval.get();
         parent.add(evalNode);
@@ -113,7 +124,9 @@ public class RuleVisitor extends AbstractMap<String, Object> implements RuleCont
             currentEval.set(evalNode);
         }
         try {
-            EvalResult result = node.eval(this);
+            EvalResult result = isExprNode
+                    ? eval((ExprNode) node, cacheScope)
+                    : node.eval(this);
             evalNode.setResult(result);
             return result;
         } finally {
@@ -141,8 +154,21 @@ public class RuleVisitor extends AbstractMap<String, Object> implements RuleCont
      */
     @Override
     public EvalResult eval(ExprNode node) {
+        return eval(node, currentEval.get().getCacheScope());
+    }
+
+    /**
+     * 返回当前根求值阶段的叶子缓存
+     *
+     * @return 当前叶子结果缓存
+     */
+    public Map<String, EvalResult> getEvalCache() {
+        return evalCache.currentResults();
+    }
+
+    private EvalResult eval(ExprNode node, EvalCacheScope cacheScope) {
         String expression = node.expr();
-        return evalCache.computeIfAbsent(expression,
+        return cacheScope.computeIfAbsent(expression,
                 ignored -> doEval(node.getRuleId(),
                         expression, node.getArguments()));
     }

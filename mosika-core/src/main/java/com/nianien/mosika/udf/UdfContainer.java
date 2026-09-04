@@ -46,7 +46,7 @@ public class UdfContainer {
 
         /**
          * 把单个叶子 UDF 编译为引擎可调用值;JS 源码与 Java 对象的区分由实现依
-         * {@link UdfDefinition#getUdf()} 判断。
+         * {@link UdfDefinition} 的定义值判断
          *
          * @param definition 叶子 UDF 定义
          * @return 引擎相关的可调用值

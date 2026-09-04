@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RuleSuiteTest {
@@ -145,6 +146,23 @@ class RuleSuiteTest {
 
         assertEquals(1, context.get("count"));
         assertEquals(2, detailedResult.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    void loopReevaluatesConditionAfterActionUpdatesContext() {
+        RuleSuite suite = new RuleSuite(
+                List.of(
+                        new RuleDefinition("condition",
+                                "($$.get('count') || 0) < 3", "condition"),
+                        new RuleDefinition("action",
+                                "$$.put('count', ($$.get('count') || 0) + 1)", "action")),
+                List.of());
+        Map<String, Object> context = new HashMap<>();
+
+        NodeResult result = suite.eval("loop(10,condition,action)", null, context);
+
+        assertNull(result.getResult());
+        assertEquals(3, context.get("count"));
     }
 
     @Test

@@ -82,6 +82,20 @@ public class DefaultRuleVisitor extends RuleBaseVisitor<RuleNode> {
         return new SomeNode(minHits, maxHits, nodes.toArray(RuleNode[]::new));
     }
 
+    /**
+     * 构建有界循环节点
+     *
+     * @param ctx 循环语法上下文
+     * @return 循环节点
+     */
+    @Override
+    public RuleNode visitLOOP(RuleParser.LOOPContext ctx) {
+        int max = Integer.parseInt(ctx.NUMBER().getText());
+        RuleNode condition = ctx.expr(0).accept(this);
+        RuleNode action = ctx.expr(1).accept(this);
+        return new LoopNode(max, condition, action);
+    }
+
     private Integer parseBound(RuleParser.BoundContext ctx) {
         return ctx.NUMBER() == null ? null : Integer.parseInt(ctx.NUMBER().getText());
     }

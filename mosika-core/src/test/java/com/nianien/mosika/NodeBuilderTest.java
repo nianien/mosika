@@ -7,6 +7,7 @@ import com.nianien.mosika.eval.node.AnyNode;
 import com.nianien.mosika.eval.node.CaseNode;
 import com.nianien.mosika.eval.node.CompositeNode;
 import com.nianien.mosika.eval.node.ExprNode;
+import com.nianien.mosika.eval.node.LoopNode;
 import com.nianien.mosika.eval.node.OrNode;
 import com.nianien.mosika.eval.node.ParNode;
 import com.nianien.mosika.eval.node.RuleNode;
@@ -174,6 +175,29 @@ public class NodeBuilderTest {
 
         assertEquals("all(a,any(b,c,d),some(1,2,e,f))",
                 build("all(a,any(b,c,d),some(1,2,e,f))").expr());
+    }
+
+    @Test
+    public void testLoop() {
+        LoopNode loop = assertInstanceOf(LoopNode.class,
+                build("loop(3,condition,action)"));
+
+        assertEquals(3, loop.getMax());
+        assertEquals("condition", loop.getCondition().expr());
+        assertEquals("action", loop.getAction().expr());
+        assertEquals("loop(3,condition,action)", loop.expr());
+        assertEquals("loop(2,loop(1,condition,action),action)",
+                build("loop(2,loop(1,condition,action),action)").expr());
+
+        assertThrows(IllegalStateException.class,
+                () -> build("loop(condition,action)"));
+        assertThrows(IllegalStateException.class,
+                () -> build("loop(1,condition)"));
+        assertThrows(IllegalStateException.class,
+                () -> build("loop(1,condition,action,extra)"));
+
+        ExprNode keywordRule = assertInstanceOf(ExprNode.class, build("loop"));
+        assertEquals("loop", keywordRule.getRuleId());
     }
 
     @Test

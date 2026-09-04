@@ -747,7 +747,7 @@ class MosikaWebIntegrationTest {
     void webRoutesUseSpringBootStaticResources() throws Exception {
         mvc.perform(get("/ui/console.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("id=\"capabilities\"")));
+                .andExpect(content().string(containsString("<main id=\"main\">")));
         mvc.perform(get("/ui/namespaces.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"newBtn\"")));

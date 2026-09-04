@@ -14,7 +14,8 @@ expr
  | ANY LP arguments RP #ANY
  | ALL LP arguments RP #ALL
  | SOME LP bound ',' bound ',' arguments RP #SOME
- | (ID | NUMBER | ANY | ALL | SOME) ruleArguments? #ID
+ | LOOP LP NUMBER ',' expr ',' expr RP #LOOP
+ | (ID | NUMBER | ANY | ALL | SOME | LOOP) ruleArguments? #ID
  ;
 
 ruleArguments
@@ -37,6 +38,7 @@ PAR_OP: '=>';
 ANY: 'any';
 ALL: 'all';
 SOME: 'some';
+LOOP: 'loop';
 RULE_ARGUMENT: '"""' .*? '"""';
 
 UNBOUNDED: '_';
@@ -47,6 +49,5 @@ fragment ID_LETTER:'a'..'z'|'A'..'Z'|'_';
 fragment DIGIT:'0'..'9';
 
 WS: [ \t\r\n]+ -> skip;
-
 
 

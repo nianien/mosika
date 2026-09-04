@@ -10,6 +10,7 @@ import com.nianien.mosika.eval.node.AllNode;
 import com.nianien.mosika.eval.node.AndNode;
 import com.nianien.mosika.eval.node.AnyNode;
 import com.nianien.mosika.eval.node.ExprNode;
+import com.nianien.mosika.eval.node.LoopNode;
 import com.nianien.mosika.eval.node.OrNode;
 import com.nianien.mosika.eval.node.ParNode;
 import com.nianien.mosika.eval.node.RuleNode;
@@ -437,6 +438,139 @@ public class RuleNodeExecutionTest {
         NodeResult minUnreachable = ruleSuite.eval(nodeBuilder.build("some(3,3,f1,t1,f1)"), root);
         assertEquals(false, minUnreachable.getResult());
         assertEquals(1, minUnreachable.getDetails().get(0).getSubRules().size());
+    }
+
+    @Test
+    public void testLoopStopsWhenConditionDoesNotMatch() {
+        AtomicInteger conditionCalls = new AtomicInteger();
+        AtomicInteger actionCalls = new AtomicInteger();
+        RuleEngine engine = countingEngine(conditionCalls, actionCalls, false);
+
+        EvalResult result = new RuleVisitor(engine, null).visit(
+                new LoopNode(3, new ExprNode("condition"), new ExprNode("action")));
+
+        assertTrue(result.isMatched());
+        assertNull(result.getResult());
+        assertEquals(1, conditionCalls.get());
+        assertEquals(0, actionCalls.get());
+    }
+
+    @Test
+    public void testLoopStopsAtMaximumIterations() {
+        AtomicInteger conditionCalls = new AtomicInteger();
+        AtomicInteger actionCalls = new AtomicInteger();
+        RuleEngine engine = countingEngine(conditionCalls, actionCalls, true);
+
+        new RuleVisitor(engine, null).visit(
+                new LoopNode(3, new ExprNode("condition"), new ExprNode("action")));
+
+        assertEquals(3, conditionCalls.get());
+        assertEquals(3, actionCalls.get());
+    }
+
+    @Test
+    public void testZeroIterationLoopKeepsParentCache() {
+        AtomicInteger executions = new AtomicInteger();
+        RuleEngine engine = ruleEngine(executions);
+        RuleVisitor context = new RuleVisitor(engine, null);
+        ExprNode shared = new ExprNode("shared");
+
+        context.visit(shared);
+        context.visit(new LoopNode(0, shared, shared));
+        context.visit(shared);
+
+        assertEquals(1, executions.get());
+    }
+
+    @Test
+    public void testLoopConditionAndActionShareIterationCache() {
+        AtomicInteger executions = new AtomicInteger();
+        RuleEngine engine = ruleEngine(executions);
+        ExprNode shared = new ExprNode("shared");
+
+        new RuleVisitor(engine, null).visit(new LoopNode(3, shared, shared));
+
+        assertEquals(3, executions.get());
+    }
+
+    @Test
+    public void testLoopInvalidatesParentCacheAfterEvaluation() {
+        AtomicInteger executions = new AtomicInteger();
+        RuleEngine engine = ruleEngine(executions);
+        RuleVisitor context = new RuleVisitor(engine, null);
+        ExprNode shared = new ExprNode("shared");
+
+        context.visit(shared);
+        context.visit(new LoopNode(1, new ExprNode("condition"), new ExprNode("action")));
+        context.visit(shared);
+
+        assertEquals(4, executions.get());
+    }
+
+    @Test
+    public void testNestedLoopsUseIndependentIterationScopes() {
+        AtomicInteger executions = new AtomicInteger();
+        RuleEngine engine = ruleEngine(executions);
+        ExprNode shared = new ExprNode("shared");
+        LoopNode inner = new LoopNode(2, shared, shared);
+        LoopNode outer = new LoopNode(2, shared, inner);
+
+        new RuleVisitor(engine, null).visit(outer);
+
+        assertEquals(6, executions.get());
+    }
+
+    @Test
+    public void testParallelBranchesShareCurrentLoopIterationCache() {
+        AtomicInteger conditionCalls = new AtomicInteger();
+        AtomicInteger sharedCalls = new AtomicInteger();
+        RuleEngine engine = new RuleEngine(List.of(), List.of()) {
+            @Override
+            public Object evalRule(String ruleId, Object root, Object context,
+                                   Map<String, Object> arguments) {
+                if ("condition".equals(ruleId)) {
+                    conditionCalls.incrementAndGet();
+                } else {
+                    sharedCalls.incrementAndGet();
+                }
+                return true;
+            }
+        };
+        ExprNode shared = new ExprNode("shared");
+
+        new RuleVisitor(engine, null).visit(new LoopNode(2,
+                new ExprNode("condition"), new ParNode(shared, shared)));
+
+        assertEquals(2, conditionCalls.get());
+        assertEquals(2, sharedCalls.get());
+    }
+
+    private RuleEngine countingEngine(AtomicInteger conditionCalls,
+                                      AtomicInteger actionCalls,
+                                      boolean conditionResult) {
+        return new RuleEngine(List.of(), List.of()) {
+            @Override
+            public Object evalRule(String ruleId, Object root, Object context,
+                                   Map<String, Object> arguments) {
+                if ("condition".equals(ruleId)) {
+                    conditionCalls.incrementAndGet();
+                    return conditionResult;
+                }
+                actionCalls.incrementAndGet();
+                return true;
+            }
+        };
+    }
+
+    private RuleEngine ruleEngine(AtomicInteger executions) {
+        return new RuleEngine(List.of(), List.of()) {
+            @Override
+            public Object evalRule(String ruleId, Object root, Object context,
+                                   Map<String, Object> arguments) {
+                executions.incrementAndGet();
+                return true;
+            }
+        };
     }
 
     @Test

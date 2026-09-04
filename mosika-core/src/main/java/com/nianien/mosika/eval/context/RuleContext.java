@@ -1,6 +1,7 @@
 package com.nianien.mosika.eval.context;
 
 import com.nianien.mosika.eval.EvalNode;
+import com.nianien.mosika.eval.EvalCacheScope;
 import com.nianien.mosika.eval.node.ExprNode;
 import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.result.EvalResult;
@@ -30,6 +31,15 @@ public interface RuleContext extends UdfContext {
      * @return 节点评估结果
      */
     EvalResult visit(RuleNode node);
+
+    /**
+     * 使用指定缓存作用域执行规则节点
+     *
+     * @param node 规则节点
+     * @param cacheScope 缓存作用域
+     * @return 节点评估结果
+     */
+    EvalResult visit(RuleNode node, EvalCacheScope cacheScope);
 
     /**
      * 获取本次执行的递归规则详情
