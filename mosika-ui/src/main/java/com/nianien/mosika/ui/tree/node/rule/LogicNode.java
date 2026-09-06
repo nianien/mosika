@@ -26,10 +26,10 @@ import java.util.stream.Collectors;
  * Created on 2022-07-19
  */
 @Data
-public class LNode extends BNode {
+public class LogicNode extends BooleanNode {
 
     /** 按逻辑表达式顺序保存的直接子规则 */
-    private final List<RNode> rules = new ArrayList<>();
+    private final List<AtomicNode> rules = new ArrayList<>();
 
 
     /**
@@ -38,7 +38,7 @@ public class LNode extends BNode {
      * @param expr 逻辑运算符，只能是{@code &&}或{@code ||}
      */
     @JsonCreator(mode = Mode.PROPERTIES)
-    public LNode(@JsonProperty("expr") String expr) {
+    public LogicNode(@JsonProperty("expr") String expr) {
         super(expr);
     }
 
@@ -48,7 +48,7 @@ public class LNode extends BNode {
      * @param rule 待追加的规则子树
      * @return 当前逻辑组合节点
      */
-    public LNode addRule(RNode rule) {
+    public LogicNode addRule(AtomicNode rule) {
         rules.add(rule);
         return this;
     }
@@ -58,8 +58,8 @@ public class LNode extends BNode {
      *
      * @return 使用 {@code &&} 运算符的逻辑组合节点
      */
-    public static LNode and() {
-        return new LNode("&&");
+    public static LogicNode and() {
+        return new LogicNode("&&");
     }
 
     /**
@@ -67,8 +67,8 @@ public class LNode extends BNode {
      *
      * @return 使用 {@code ||} 运算符的逻辑组合节点
      */
-    public static LNode or() {
-        return new LNode("||");
+    public static LogicNode or() {
+        return new LogicNode("||");
     }
 
 
@@ -80,7 +80,7 @@ public class LNode extends BNode {
     @Override
     public String ruleExpr() {
         String ruleExpr = String.join(getExpr(), this.rules.stream()
-                .map(RNode::ruleExpr)
+                .map(AtomicNode::ruleExpr)
                 .collect(Collectors.toList()));
         return (isNegative() ? "!" : "") + (this.rules.size() > 1 ? "(" + ruleExpr + ")" : ruleExpr);
     }

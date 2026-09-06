@@ -465,8 +465,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const created = await Api.createFlow({
         name, namespace: Ns.code(), description: $("#newDesc").value.trim(),
         ruleTree: JSON.stringify({
-          type: "T", name: "",
-          next: { type: "A", name: "", rule: { type: "R", name: "", expr: "∅" } }
+          type: "TreeNode", name: "",
+          next: { type: "ActionNode", name: "", rule: { type: "AtomicNode", name: "", expr: "∅" } }
         })
       });
       $("#newDlg").close();

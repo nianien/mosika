@@ -16,7 +16,7 @@ import lombok.Data;
  * Created on 2022-07-19
  */
 @Data
-public class RNode extends RuleNode {
+public class AtomicNode extends RuleNode {
 
     /** 规则表达式或规则定义标识 */
     private String expr;
@@ -30,7 +30,7 @@ public class RNode extends RuleNode {
      * @param expr 规则表达式或规则定义ID
      */
     @JsonCreator(mode = Mode.PROPERTIES)
-    public RNode(@JsonProperty("expr") String expr) {
+    public AtomicNode(@JsonProperty("expr") String expr) {
         this.expr = expr;
     }
 

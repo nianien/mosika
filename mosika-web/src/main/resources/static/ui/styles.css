@@ -202,6 +202,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .tree-children > .tree-branch:last-of-type::before { border-right: 1.5px solid var(--line); border-radius: 0 8px 0 0; }
 .tree-children > .tree-branch:only-of-type::before { border: 0; }
 .tree-children > .tree-branch:only-of-type::after { border-top: 0; border-left: 1.5px solid var(--line); border-radius: 0; }
+.tree-add-button {
+    min-width: 102px; height: 30px; padding: 0 12px; border: 1px dashed #aeb8c8; border-radius: 8px;
+    color: #66738a; background: #fff; font-size: var(--fs-label); font-weight: 600; cursor: pointer; touch-action: manipulation;
+}
+.tree-add-button:hover, .tree-add-button:focus-visible {
+    color: var(--primary); border-color: var(--primary); background: var(--primary-soft); outline: none;
+}
 .node-shell { position: relative; z-index: 2; display: grid; justify-items: center; cursor: pointer; outline: none; }
 .node-shell.has-fold-toggle { padding-bottom: 16px; }
 .node-shell.has-fold-toggle::before {
@@ -239,18 +246,20 @@ button:disabled { opacity: .45; cursor: not-allowed; }
     color: #415b9d; background: linear-gradient(145deg, #f4f7ff, #e5ecff);
     box-shadow: inset 0 0 0 1.5px #91a8eb, 0 3px 8px rgba(69,90,143,.11);
 }
-.node-card.structure.node-type-s,
-.node-card.structure.node-type-p,
-.node-card.structure.node-type-d,
-.node-card.structure.node-type-l {
+.node-card.structure.node-type-serialnode,
+.node-card.structure.node-type-parallelnode,
+.node-card.structure.node-type-decisionnode,
+.node-card.structure.node-type-loopnode,
+.node-card.structure.node-type-logicnode {
     width: 28px; height: 28px; padding: 0;
     color: #5872b7; background: #f4f7ff;
     box-shadow: inset 0 0 0 1px #a4b6e9, 0 2px 5px rgba(69,90,143,.07);
 }
-.node-card.structure.node-type-s .node-title,
-.node-card.structure.node-type-p .node-title,
-.node-card.structure.node-type-d .node-title,
-.node-card.structure.node-type-l .node-title {
+.node-card.structure.node-type-serialnode .node-title,
+.node-card.structure.node-type-parallelnode .node-title,
+.node-card.structure.node-type-decisionnode .node-title,
+.node-card.structure.node-type-loopnode .node-title,
+.node-card.structure.node-type-logicnode .node-title {
     max-width: 24px; font-size: var(--fs-minor); line-height: 1;
 }
 .node-card.root {
@@ -578,6 +587,8 @@ dialog form { display: grid; gap: 15px; padding: 19px; }
 .node-config-form input:hover, .node-config-form select:hover { border-color: #c3cedd; }
 .node-config-form .rule-picker::after { top: 15px; }
 .node-config-form .form-note { font-size: var(--fs-label); color: #8a94a6; }
+.node-config-form #actionConfigFields { display: grid; gap: 14px; }
+.node-config-form #actionConfigParams .args-section { margin-top: 0; }
 .node-config-form .dialog-actions { margin-top: 4px; padding-top: 16px; border-top: 1px solid #eef1f6; gap: 10px; }
 .node-config-form .dialog-actions button { min-width: 74px; height: 38px; border-radius: 9px; font-size: var(--fs-base); }
 
@@ -693,12 +704,14 @@ dialog.rule-dialog {
 #ruleAddDialog { width: min(380px, calc(100vw - 40px)); }
 .rule-add-form { display: grid; gap: 12px; padding: 19px; }
 .rule-dialog-header-actions { display: flex; align-items: center; gap: 8px; }
+.loop-max-field { display: flex; align-items: center; gap: 8px; margin-left: auto; color: #68758a; font-size: var(--fs-label); }
+.loop-max-field input { width: 88px; height: 34px; padding: 0 9px; border: 1px solid #dbe2ee; border-radius: 8px; color: #263550; }
 .rule-add-row.rule-row-active { background: #eef3ff; border-radius: 8px; box-shadow: 0 0 0 4px #eef3ff; }
 
 /* ===== 正式配色：柑橘薄荷（青碧结构 / 柠黄规则 / 苹果绿动作）===== */
 :root { --line: #9dd6db; }
 .node-card.structure, .node-card.root { color:#0e7f96; background:#d6f6fb; box-shadow: inset 0 0 0 1.6px #3fd8ee, 0 2px 6px rgba(30,60,110,.10); }
-.node-card.structure.node-type-s,.node-card.structure.node-type-p,.node-card.structure.node-type-d,.node-card.structure.node-type-l { color:#0e7f96; background:#e3fafd; box-shadow: inset 0 0 0 1.2px #6ee2f0, 0 1px 4px rgba(30,60,110,.08); }
+.node-card.structure.node-type-serialnode,.node-card.structure.node-type-parallelnode,.node-card.structure.node-type-decisionnode,.node-card.structure.node-type-loopnode,.node-card.structure.node-type-logicnode { color:#0e7f96; background:#e3fafd; box-shadow: inset 0 0 0 1.2px #6ee2f0, 0 1px 4px rgba(30,60,110,.08); }
 .node-card.root { color:#0b6274; background:#c5f0f8; box-shadow: inset 0 0 0 1.6px #22d3ee, 0 3px 8px rgba(30,60,110,.14); }
 .node-card.condition { color:#8a6d0e; background:#f2d34e; filter: drop-shadow(0 3px 5px rgba(150,120,20,.14)); }
 .node-card.condition::before { background: linear-gradient(180deg,#fffdf0,#fdf6d5); }
@@ -707,7 +720,7 @@ dialog.rule-dialog {
 
 /* ===== 统一焦点/选中效果：只加粗自身同色描边（对齐判断节点，去蓝色/矩形框）===== */
 .node-shell:has(.node-card.action)::after { content: none; }
-/* 结构（串/并/分）*/
+/* 结构（串/并/分/循）*/
 .node-shell:has(.node-card.structure):hover .node-card,
 .node-shell:has(.node-card.structure):focus-visible .node-card,
 .node-shell[aria-selected="true"]:has(.node-card.structure) .node-card { box-shadow: inset 0 0 0 2.6px #22d3ee, 0 2px 6px rgba(30,60,110,.12); }
@@ -846,30 +859,3 @@ dialog.rule-dialog {
 }
 .switch input:checked ~ .switch-track { background: #e0575f; }
 .switch input:checked ~ .switch-track::after { left: 18px; }
-
-/* ===== 待配置占位节点（编辑期空槽，灰色虚线，点击就地配置）===== */
-/* 圆角与六边形占位统一用内联 SVG 描边（同一 stroke-width / dasharray + non-scaling-stroke），保证虚线完全一致 */
-.node-card.placeholder {
-    min-width: 128px; height: 40px; padding: 6px 16px; overflow: visible;
-    border: 0; border-radius: 0; box-shadow: none;
-    color: #667085; font-weight: 600;
-    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%2040'%20preserveAspectRatio='none'%3E%3Crect%20x='2'%20y='2'%20width='124'%20height='36'%20rx='9'%20ry='9'%20fill='%23f6f7f9'%20stroke='%23b7bfcc'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
-}
-.node-shell:has(.node-card.placeholder):hover .node-card.placeholder,
-.node-shell[aria-selected="true"] .node-card.placeholder {
-    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20128%2040'%20preserveAspectRatio='none'%3E%3Crect%20x='2'%20y='2'%20width='124'%20height='36'%20rx='9'%20ry='9'%20fill='%23eef0f4'%20stroke='%2397a1b1'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
-}
-.node-shell:has(.node-card.placeholder)::after { content: none; }
-
-/* 决策条件占位：六边形（虚线描边，与圆角占位完全一致），暗示该槽固定为“条件” */
-.node-card.placeholder.placeholder-hex {
-    min-width: 132px; height: 44px; padding: 6px 22px; overflow: visible;
-    border: 0; border-radius: 0; box-shadow: none; color: #667085;
-    clip-path: none;
-    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20132%2044'%20preserveAspectRatio='none'%3E%3Cpolygon%20points='14.5,2%20117.5,2%20130,22%20117.5,42%2014.5,42%202,22'%20fill='%23f6f7f9'%20stroke='%23b7bfcc'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20stroke-linejoin='round'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
-}
-.node-card.placeholder.placeholder-hex::before { content: none; }
-.node-shell:has(.node-card.placeholder.placeholder-hex):hover .node-card.placeholder.placeholder-hex,
-.node-shell[aria-selected="true"] .node-card.placeholder.placeholder-hex {
-    background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20132%2044'%20preserveAspectRatio='none'%3E%3Cpolygon%20points='14.5,2%20117.5,2%20130,22%20117.5,42%2014.5,42%202,22'%20fill='%23eef0f4'%20stroke='%2397a1b1'%20stroke-width='1.6'%20stroke-dasharray='5%204'%20stroke-linejoin='round'%20vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
-}

@@ -2,11 +2,11 @@ package com.nianien.mosika.ui.tree;
 
 import com.nianien.mosika.ui.tree.node.TreeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
-import com.nianien.mosika.ui.tree.node.flow.ANode;
-import com.nianien.mosika.ui.tree.node.flow.CNode;
-import com.nianien.mosika.ui.tree.node.flow.SNode;
-import com.nianien.mosika.ui.tree.node.rule.BNode;
-import com.nianien.mosika.ui.tree.node.rule.RNode;
+import com.nianien.mosika.ui.tree.node.flow.ActionNode;
+import com.nianien.mosika.ui.tree.node.flow.ConditionNode;
+import com.nianien.mosika.ui.tree.node.flow.SerialNode;
+import com.nianien.mosika.ui.tree.node.rule.BooleanNode;
+import com.nianien.mosika.ui.tree.node.rule.AtomicNode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,7 +15,7 @@ public class RuleArgsTemplateTest {
 
     @Test
     public void testAtomicRuleExprWithoutArgsUnchanged() {
-        RNode rule = new RNode("r1");
+        AtomicNode rule = new AtomicNode("r1");
         assertEquals("r1", rule.ruleExpr());
 
         rule.setArgs("   ");
@@ -24,7 +24,7 @@ public class RuleArgsTemplateTest {
 
     @Test
     public void testAtomicRuleExprWithArgs() {
-        RNode rule = new RNode("r1");
+        AtomicNode rule = new AtomicNode("r1");
         rule.setArgs("{\"limit\":100}");
 
         assertEquals("r1(\"\"\"{\"limit\":100}\"\"\")", rule.ruleExpr());
@@ -32,7 +32,7 @@ public class RuleArgsTemplateTest {
 
     @Test
     public void testBooleanRuleAppliesNegationToArguments() {
-        BNode rule = new BNode("c1");
+        BooleanNode rule = new BooleanNode("c1");
         rule.setArgs("{\"limit\":100}");
         rule.setNegative(true);
 
@@ -41,14 +41,14 @@ public class RuleArgsTemplateTest {
 
     @Test
     public void testActionAndConditionCompileBoundRuleArguments() {
-        RNode actionRule = new RNode("a1");
+        AtomicNode actionRule = new AtomicNode("a1");
         actionRule.setArgs("{\"step\":1}");
-        ANode action = new ANode();
+        ActionNode action = new ActionNode();
         action.setRule(actionRule);
 
-        BNode conditionRule = new BNode("c1");
+        BooleanNode conditionRule = new BooleanNode("c1");
         conditionRule.setArgs("{\"limit\":100}");
-        CNode condition = new CNode();
+        ConditionNode condition = new ConditionNode();
         condition.setRule(conditionRule);
         condition.setNext(action);
 
@@ -58,12 +58,12 @@ public class RuleArgsTemplateTest {
 
     @Test
     public void testArgsAndNamesSurviveJsonRoundTrip() {
-        ANode first = action("a1", "{\"step\":1}");
+        ActionNode first = action("a1", "{\"step\":1}");
         first.setName("第一步");
-        ANode second = action("a2", "{\"step\":2}");
+        ActionNode second = action("a2", "{\"step\":2}");
         second.setName("第二步");
 
-        SNode serial = new SNode();
+        SerialNode serial = new SerialNode();
         serial.setName("串行动作");
         serial.addBranch(first).addBranch(second);
         TreeNode tree = tree(serial);
@@ -73,10 +73,10 @@ public class RuleArgsTemplateTest {
         assertEquals(tree.toRule().expr(), restored.toRule().expr());
     }
 
-    private ANode action(String expression, String args) {
-        RNode rule = new RNode(expression);
+    private ActionNode action(String expression, String args) {
+        AtomicNode rule = new AtomicNode(expression);
         rule.setArgs(args);
-        ANode action = new ANode();
+        ActionNode action = new ActionNode();
         action.setRule(rule);
         return action;
     }

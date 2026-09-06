@@ -7,10 +7,11 @@ import com.nianien.mosika.ui.tree.node.define.FlowNode;
 import com.nianien.mosika.ui.tree.node.define.NameNode;
 import com.nianien.mosika.ui.tree.node.define.TypeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
-import com.nianien.mosika.ui.tree.node.flow.ANode;
-import com.nianien.mosika.ui.tree.node.flow.DNode;
-import com.nianien.mosika.ui.tree.node.rule.LNode;
-import com.nianien.mosika.ui.tree.node.rule.RNode;
+import com.nianien.mosika.ui.tree.node.flow.ActionNode;
+import com.nianien.mosika.ui.tree.node.flow.DecisionNode;
+import com.nianien.mosika.ui.tree.node.flow.LoopNode;
+import com.nianien.mosika.ui.tree.node.rule.LogicNode;
+import com.nianien.mosika.ui.tree.node.rule.AtomicNode;
 import com.nianien.mosika.ui.tree.visitor.TreeVisitor;
 import com.nianien.mosika.utils.Constants;
 import com.nianien.mosika.utils.JsonUtils;
@@ -45,8 +46,8 @@ public class TreeNode extends NameNode {
      * 创建带空操作入口的 UITree
      */
     public TreeNode() {
-        ANode action = new ANode();
-        action.setRule(new RNode(Constants.NOP));
+        ActionNode action = new ActionNode();
+        action.setRule(new AtomicNode(Constants.NOP));
         next = action;
     }
 
@@ -158,14 +159,21 @@ public class TreeNode extends NameNode {
             if (flow.getRule() != null) {
                 stack.push(new VisitFrame(flow.getRule(), childDepth));
             }
-        } else if (node instanceof DNode decision) {
+        } else if (node instanceof DecisionNode decision) {
             if (decision.getDefaultBranch() != null) {
                 stack.push(new VisitFrame(decision.getDefaultBranch(), childDepth));
             }
             pushChildren(stack, decision.getBranches(), childDepth);
+        } else if (node instanceof LoopNode loop) {
+            if (loop.getAction() != null) {
+                stack.push(new VisitFrame(loop.getAction(), childDepth));
+            }
+            if (loop.getCondition() != null) {
+                stack.push(new VisitFrame(loop.getCondition(), childDepth));
+            }
         } else if (node instanceof BranchNode<?> branch) {
             pushChildren(stack, branch.getBranches(), childDepth);
-        } else if (node instanceof LNode logic) {
+        } else if (node instanceof LogicNode logic) {
             pushChildren(stack, logic.getRules(), childDepth);
         }
     }
@@ -207,17 +215,20 @@ public class TreeNode extends NameNode {
         } else if (node instanceof FlowNode<?> flow) {
             visitNode(flow.getRule(), consumer, result);
             visitNode(flow.getNext(), consumer, result);
-        } else if (node instanceof DNode decision) {
+        } else if (node instanceof DecisionNode decision) {
             for (TypeNode child : decision.getBranches()) {
                 visitNode(child, consumer, result);
             }
             visitNode(decision.getDefaultBranch(), consumer, result);
+        } else if (node instanceof LoopNode loop) {
+            visitNode(loop.getCondition(), consumer, result);
+            visitNode(loop.getAction(), consumer, result);
         } else if (node instanceof BranchNode<?> branch) {
             for (TypeNode child : branch.getBranches()) {
                 visitNode(child, consumer, result);
             }
-        } else if (node instanceof LNode logic) {
-            for (RNode rule : logic.getRules()) {
+        } else if (node instanceof LogicNode logic) {
+            for (AtomicNode rule : logic.getRules()) {
                 visitNode(rule, consumer, result);
             }
         }

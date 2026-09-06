@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * @author skyfalling {@literal <skyfalling@live.com>}
  */
 @Getter
-public class HNode extends LNode {
+public class MatchNode extends LogicNode {
 
     /** 最小命中数，{@code null} 表示不设置下界 */
     private final Integer minHits;
@@ -37,7 +37,7 @@ public class HNode extends LNode {
      * @param maxHits 最大命中数，{@code null}表示无上界
      */
     @JsonCreator(mode = Mode.PROPERTIES)
-    public HNode(@JsonProperty("minHits") Integer minHits,
+    public MatchNode(@JsonProperty("minHits") Integer minHits,
                  @JsonProperty("maxHits") Integer maxHits) {
         super("some");
         this.minHits = minHits;
@@ -52,7 +52,7 @@ public class HNode extends LNode {
     @Override
     public String ruleExpr() {
         String rules = getRules().stream()
-                .map(RNode::ruleExpr)
+                .map(AtomicNode::ruleExpr)
                 .collect(Collectors.joining(","));
         String expression = "some(" + boundExpr(minHits) + "," + boundExpr(maxHits) + "," + rules + ")";
         return (isNegative() ? "!" : "") + expression;

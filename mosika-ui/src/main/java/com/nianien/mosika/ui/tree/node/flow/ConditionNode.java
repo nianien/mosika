@@ -1,7 +1,7 @@
 package com.nianien.mosika.ui.tree.node.flow;
 
 import com.nianien.mosika.ui.tree.node.define.FlowNode;
-import com.nianien.mosika.ui.tree.node.rule.BNode;
+import com.nianien.mosika.ui.tree.node.rule.BooleanNode;
 
 /**
  * 条件原子节点
@@ -16,5 +16,5 @@ import com.nianien.mosika.ui.tree.node.rule.BNode;
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
  */
-public class CNode extends FlowNode<BNode> {
+public class ConditionNode extends FlowNode<BooleanNode> {
 }

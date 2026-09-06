@@ -8,13 +8,13 @@ import lombok.Data;
 /**
  * 可整体取反的布尔规则节点
  * <p>
- * 该节点在 {@link RNode} 的规则调用能力上增加 {@code negative}
+ * 该节点在 {@link AtomicNode} 的规则调用能力上增加 {@code negative}
  *
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
  */
 @Data
-public class BNode extends RNode {
+public class BooleanNode extends AtomicNode {
 
     /** 是否对整个规则表达式取反 */
     private boolean negative;
@@ -25,7 +25,7 @@ public class BNode extends RNode {
      * @param expr 规则表达式或规则定义ID
      */
     @JsonCreator(mode = Mode.PROPERTIES)
-    public BNode(@JsonProperty("expr") String expr) {
+    public BooleanNode(@JsonProperty("expr") String expr) {
         super(expr);
     }
 

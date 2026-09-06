@@ -22,5 +22,5 @@ import lombok.Getter;
  * Created on 2022-07-19
  */
 @Getter
-public class PNode extends BranchNode<UINode> {
+public class ParallelNode extends BranchNode<UINode> {
 }

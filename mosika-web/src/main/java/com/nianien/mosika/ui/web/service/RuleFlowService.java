@@ -77,7 +77,7 @@ public class RuleFlowService {
         RuleNamespaceEntity namespace = requireNamespace(request.getNamespace());
         request.setNamespaceId(namespace.getId());
         request.setNamespace(namespace.getCode());
-        request.setRuleTree(RuleTreeCompiler.canonicalizeLenient(request.getRuleTree()));
+        request.setRuleTree(RuleTreeCompiler.compile(request.getRuleTree()).getCanonicalJson());
         request.setStatus(DRAFT);
         request.setVersion(1L);
         long id = flowDao.insertInitial(request);
@@ -112,7 +112,7 @@ public class RuleFlowService {
         basicCheck(request);
         assertNamespaceUnchanged(request.getNamespace(), existing.getNamespace());
         copyIdentity(request, existing);
-        request.setRuleTree(RuleTreeCompiler.canonicalizeLenient(request.getRuleTree()));
+        request.setRuleTree(RuleTreeCompiler.compile(request.getRuleTree()).getCanonicalJson());
         if (flowDao.updateDraft(flowId, request) == 0) {
             throw immutableVersion(existing);
         }

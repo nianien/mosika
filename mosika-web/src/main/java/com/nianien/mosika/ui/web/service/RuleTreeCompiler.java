@@ -92,34 +92,4 @@ public final class RuleTreeCompiler {
                 conditionReferenced, actionReferenced);
     }
 
-    /**
-     * 对草稿 UI 树执行宽松规范化
-     * <p>
-     * 只要求 JSON 能反序列化为 {@link TreeNode} 且规模不超过限制，不执行完整结构校验
-     * 和执行树编译，因此允许保存尚未完成的编辑状态
-     *
-     * @param treeJson 客户端提交的草稿 UI 树 JSON
-     * @return 由 {@link TreeNode#toJson()} 生成的规范 JSON
-     * @throws IllegalArgumentException JSON 无效、结果为空或树规模超过限制时抛出
-     */
-    public static String canonicalizeLenient(String treeJson) {
-        if (treeJson == null || treeJson.isBlank()) {
-            throw new IllegalArgumentException("ruleTree cannot be blank");
-        }
-        TreeNode tree;
-        try {
-            tree = TreeNode.fromJson(treeJson);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("ruleTree is not a valid TreeNode JSON: " + e.getMessage(), e);
-        }
-        if (tree == null) {
-            throw new IllegalArgumentException("ruleTree deserialized to null");
-        }
-        try {
-            tree.validateSize(MAX_TREE_DEPTH, MAX_TOTAL_NODES);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("ruleTree size validation failed: " + e.getMessage(), e);
-        }
-        return tree.toJson();
-    }
 }

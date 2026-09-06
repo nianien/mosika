@@ -7,11 +7,12 @@ import com.nianien.mosika.eval.node.RuleNode;
 import com.nianien.mosika.eval.node.SerNode;
 import com.nianien.mosika.eval.parser.NodeBuilder;
 import com.nianien.mosika.ui.tree.node.define.UINode;
-import com.nianien.mosika.ui.tree.node.flow.ANode;
-import com.nianien.mosika.ui.tree.node.flow.CNode;
-import com.nianien.mosika.ui.tree.node.flow.DNode;
-import com.nianien.mosika.ui.tree.node.flow.PNode;
-import com.nianien.mosika.ui.tree.node.flow.SNode;
+import com.nianien.mosika.ui.tree.node.flow.ActionNode;
+import com.nianien.mosika.ui.tree.node.flow.ConditionNode;
+import com.nianien.mosika.ui.tree.node.flow.DecisionNode;
+import com.nianien.mosika.ui.tree.node.flow.LoopNode;
+import com.nianien.mosika.ui.tree.node.flow.ParallelNode;
+import com.nianien.mosika.ui.tree.node.flow.SerialNode;
 import com.nianien.mosika.utils.Constants;
 
 import java.util.ArrayList;
@@ -36,26 +37,29 @@ public class UINodeAdapter {
      * @throws UnsupportedOperationException 节点类型不受支持
      */
     public RuleNode toRule(UINode node) {
-        if (node instanceof ANode action) {
-            return aNode2Rule(action, new ArrayList<>());
+        if (node instanceof ActionNode action) {
+            return actionNode2Rule(action, new ArrayList<>());
         }
-        if (node instanceof CNode condition) {
-            return cNode2Rule(condition);
+        if (node instanceof ConditionNode condition) {
+            return conditionNode2Rule(condition);
         }
-        if (node instanceof DNode decision) {
-            return dNode2Rule(decision);
+        if (node instanceof DecisionNode decision) {
+            return decisionNode2Rule(decision);
         }
-        if (node instanceof SNode serial) {
-            return sNode2Rule(serial);
+        if (node instanceof SerialNode serial) {
+            return serialNode2Rule(serial);
         }
-        if (node instanceof PNode parallel) {
-            return pNode2Rule(parallel);
+        if (node instanceof ParallelNode parallel) {
+            return parallelNode2Rule(parallel);
+        }
+        if (node instanceof LoopNode loop) {
+            return loopNode2Rule(loop);
         }
         throw new UnsupportedOperationException("not support node type:"
                 + node.getClass().getSimpleName());
     }
 
-    private RuleNode pNode2Rule(PNode node) {
+    private RuleNode parallelNode2Rule(ParallelNode node) {
         List<RuleNode> rules = new ArrayList<>(node.getBranches().size() + 1);
         rules.add(new ExprNode(Constants.NOP));
         for (UINode branch : node.getBranches()) {
@@ -64,7 +68,7 @@ public class UINodeAdapter {
         return new ParNode(rules.toArray(new RuleNode[0]));
     }
 
-    private RuleNode sNode2Rule(SNode node) {
+    private RuleNode serialNode2Rule(SerialNode node) {
         List<RuleNode> rules = new ArrayList<>(node.getBranches().size() + 1);
         rules.add(new ExprNode(Constants.NOP));
         for (UINode branch : node.getBranches()) {
@@ -73,7 +77,12 @@ public class UINodeAdapter {
         return new SerNode(rules.toArray(new RuleNode[0]));
     }
 
-    private RuleNode cNode2Rule(CNode node) {
+    private RuleNode loopNode2Rule(LoopNode node) {
+        return new com.nianien.mosika.eval.node.LoopNode(
+                node.getMax(), parse(node.getCondition().ruleExpr()), toRule(node.getAction()));
+    }
+
+    private RuleNode conditionNode2Rule(ConditionNode node) {
         RuleNode condition = parse(node.getRule().ruleExpr());
         if (node.getNext() == null) {
             return condition;
@@ -81,16 +90,16 @@ public class UINodeAdapter {
         return new CaseNode(condition, toRule(node.getNext()));
     }
 
-    private RuleNode dNode2Rule(DNode node) {
+    private RuleNode decisionNode2Rule(DecisionNode node) {
         if (node.getBranches().isEmpty()
                 || node.getBranches().size() == 1 && node.getDefaultBranch() == null) {
-            throw new IllegalArgumentException("DNode requires at least two outcomes!");
+            throw new IllegalArgumentException("DecisionNode requires at least two outcomes!");
         }
         RuleNode fallback = node.getDefaultBranch() == null
                 ? null
                 : toRule(node.getDefaultBranch());
         for (int i = node.getBranches().size() - 1; i >= 0; i--) {
-            CNode branch = node.getBranches().get(i);
+            ConditionNode branch = node.getBranches().get(i);
             RuleNode matched = branch.getNext() == null
                     ? new ExprNode(Constants.NOP)
                     : toRule(branch.getNext());
@@ -99,12 +108,12 @@ public class UINodeAdapter {
         return fallback;
     }
 
-    private RuleNode aNode2Rule(ANode node, List<RuleNode> rules) {
+    private RuleNode actionNode2Rule(ActionNode node, List<RuleNode> rules) {
         rules.add(parse(node.getRule().ruleExpr()));
         UINode next = node.getNext();
         if (next != null) {
-            if (next instanceof ANode action) {
-                return aNode2Rule(action, rules);
+            if (next instanceof ActionNode action) {
+                return actionNode2Rule(action, rules);
             }
             rules.add(toRule(next));
         }

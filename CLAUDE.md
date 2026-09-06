@@ -60,9 +60,9 @@ Rule = R | And(Rule, Rule+) | Or(Rule, Rule+) | Hits(bounds, Rule+)
 ```
 
 - Structure is explicit, not inferred from layout/coordinates/edge direction. `S(P(a,b),P(c,d))` directly means "finish first parallel group, then run second". Keep explicit serial nodes — do not encode semantics via "vertical=serial, horizontal=parallel" layout conventions, which would force merge points and degrade the tree into a DAG.
-- `SNode`/`PNode`/`DNode`/`JNode` are first-class virtual roots of their subtrees; any same-kind subtree must be substitutable for another (any `FlowNode` as a branch, any `RNode` as a sub-rule).
-- `RNode.expr` holds a stable `RuleDefinition.ruleId` reference; `RNode.name` is the node's editable UI name (initial value may come from `RuleDefinition.desc`). Rule names are UI metadata on the rule node (`RNode.name`, inherited by `LNode`/`HNode`), never on the outer `JNode`, and don't participate in `ruleExpr()`/evaluation.
-- `UINodeAdapter` keeps only `toRule()` — a one-way compile of UI AST to `RuleNode` that drops `label`/`name` and cannot reverse-recover the UI tree. Legacy `CNode` remains a valid model and must keep JSON round-trip + `toRule()` compatibility.
+- `SerialNode`/`ParallelNode`/`DecisionNode`/`JNode` are first-class virtual roots of their subtrees; any same-kind subtree must be substitutable for another (any `FlowNode` as a branch, any `AtomicNode` as a sub-rule).
+- `AtomicNode.expr` holds a stable `RuleDefinition.ruleId` reference; `AtomicNode.name` is the node's editable UI name (initial value may come from `RuleDefinition.desc`). Rule names are UI metadata on the rule node (`AtomicNode.name`, inherited by `LogicNode`/`MatchNode`), never on the outer `JNode`, and don't participate in `ruleExpr()`/evaluation.
+- `UINodeAdapter` keeps only `toRule()` — a one-way compile of UI AST to `RuleNode` that drops `label`/`name` and cannot reverse-recover the UI tree. Legacy `ConditionNode` remains a valid model and must keep JSON round-trip + `toRule()` compatibility.
 - When editing any node, keep consistent: `toRule()` compilation, all recursive edges in `TreeNode.visit()`, `NodeTypeResolver` JSON type mapping, and "UI → JSON → UI → Rule" structural/semantic equivalence. Do not reintroduce the removed `tree2`.
 
 ## Web layer (`mosika-web`)

@@ -6,10 +6,10 @@
 })(typeof self !== "undefined" ? self : (typeof globalThis !== "undefined" ? globalThis : this), function () {
     "use strict";
 
-    const FLOW_TYPES = ["A", "C", "S", "P", "D"];
-    const RULE_TYPES = new Set(["R", "B", "L", "H"]);
-    const NEGATABLE = new Set(["B", "L", "H"]);
-    const ARGS = new Set(["R", "B"]);
+    const FLOW_TYPES = ["ActionNode", "ConditionNode", "SerialNode", "ParallelNode", "DecisionNode", "LoopNode"];
+    const RULE_TYPES = new Set(["AtomicNode", "BooleanNode", "LogicNode", "MatchNode"]);
+    const NEGATABLE = new Set(["BooleanNode", "LogicNode", "MatchNode"]);
+    const ARGS = new Set(["AtomicNode", "BooleanNode"]);
 
     function edge(relation, node, kind, owner, field, list, index) {
         return { relation, node, kind, owner, field, list, index };
@@ -19,31 +19,35 @@
         if (!node) return [];
         const edges = [];
         switch (node.type) {
-            case "T":
+            case "TreeNode":
                 if (node.next) edges.push(edge("next", node.next, "single", node, "next"));
                 break;
-            case "A":
+            case "ActionNode":
                 if (node.rule) edges.push(edge("rule", node.rule, "single", node, "rule"));
                 if (node.next) edges.push(edge("next", node.next, "single", node, "next"));
                 break;
-            case "C":
+            case "ConditionNode":
                 if (node.rule) edges.push(edge("rule", node.rule, "single", node, "rule"));
                 if (node.next) edges.push(edge("matched", node.next, "single", node, "next"));
                 break;
-            case "S":
-            case "P":
+            case "SerialNode":
+            case "ParallelNode":
                 (node.branches || []).forEach((child, index) => {
                     if (child) edges.push(edge("branch", child, "list", node, "branches", node.branches, index));
                 });
                 break;
-            case "D":
+            case "DecisionNode":
                 (node.branches || []).forEach((child, index) => {
                     if (child) edges.push(edge("decision", child, "list", node, "branches", node.branches, index));
                 });
                 if (node.defaultBranch) edges.push(edge("default", node.defaultBranch, "single", node, "defaultBranch"));
                 break;
-            case "L":
-            case "H":
+            case "LoopNode":
+                if (node.condition) edges.push(edge("rule", node.condition, "single", node, "condition"));
+                if (node.action) edges.push(edge("branch", node.action, "single", node, "action"));
+                break;
+            case "LogicNode":
+            case "MatchNode":
                 (node.rules || []).forEach((child, index) => {
                     if (child) edges.push(edge("rule", child, "list", node, "rules", node.rules, index));
                 });
@@ -74,41 +78,45 @@
     function serialize(node) {
         if (node == null) return null;
         const type = node.type;
-        if (type === "PH") throw new Error("存在待配置的占位节点，无法保存");
-        if (!["T", ...FLOW_TYPES, ...RULE_TYPES].includes(type)) {
+        if (!["TreeNode", ...FLOW_TYPES, ...RULE_TYPES].includes(type)) {
             throw new Error(`不支持的节点类型: ${type}`);
         }
         const out = { type, name: node.name || "" };
 
         switch (type) {
-            case "T":
+            case "TreeNode":
                 if (node.next) out.next = serialize(node.next);
                 break;
-            case "A":
-            case "C":
+            case "ActionNode":
+            case "ConditionNode":
                 if (node.rule) out.rule = serialize(node.rule);
                 if (node.next) out.next = serialize(node.next);
                 break;
-            case "S":
-            case "P":
+            case "SerialNode":
+            case "ParallelNode":
                 out.branches = (node.branches || []).map(serialize);
                 break;
-            case "D":
+            case "DecisionNode":
                 out.branches = (node.branches || []).map(serialize);
                 if (node.defaultBranch) out.defaultBranch = serialize(node.defaultBranch);
                 break;
-            case "R":
-            case "B":
+            case "LoopNode":
+                out.max = node.max;
+                if (node.condition) out.condition = serialize(node.condition);
+                if (node.action) out.action = serialize(node.action);
+                break;
+            case "AtomicNode":
+            case "BooleanNode":
                 out.expr = node.expr;
                 if (ARGS.has(type) && node.args != null && node.args !== "") out.args = node.args;
                 if (NEGATABLE.has(type)) out.negative = !!node.negative;
                 break;
-            case "L":
+            case "LogicNode":
                 out.expr = node.expr;
                 out.negative = !!node.negative;
                 out.rules = (node.rules || []).map(serialize);
                 break;
-            case "H":
+            case "MatchNode":
                 out.expr = "some";
                 out.negative = !!node.negative;
                 out.rules = (node.rules || []).map(serialize);
@@ -129,41 +137,45 @@
     function fromObject(source) {
         if (source == null) return null;
         const type = source.type;
-        if (!["T", ...FLOW_TYPES, ...RULE_TYPES, "PH"].includes(type)) {
+        if (!["TreeNode", ...FLOW_TYPES, ...RULE_TYPES].includes(type)) {
             throw new Error(`不支持的节点类型: ${type}`);
         }
-        if (type === "PH") return { type, slot: source.slot || "branch" };
         const node = { type, name: source.name || "" };
 
         switch (type) {
-            case "T":
+            case "TreeNode":
                 node.next = fromObject(source.next);
                 break;
-            case "A":
-            case "C":
+            case "ActionNode":
+            case "ConditionNode":
                 node.rule = fromObject(source.rule);
                 node.next = fromObject(source.next);
                 break;
-            case "S":
-            case "P":
+            case "SerialNode":
+            case "ParallelNode":
                 node.branches = (source.branches || []).map(fromObject);
                 break;
-            case "D":
+            case "DecisionNode":
                 node.branches = (source.branches || []).map(fromObject);
                 node.defaultBranch = fromObject(source.defaultBranch);
                 break;
-            case "R":
-            case "B":
+            case "LoopNode":
+                node.max = source.max;
+                node.condition = fromObject(source.condition);
+                node.action = fromObject(source.action);
+                break;
+            case "AtomicNode":
+            case "BooleanNode":
                 node.expr = source.expr;
                 node.args = source.args || "";
                 if (NEGATABLE.has(type)) node.negative = !!source.negative;
                 break;
-            case "L":
+            case "LogicNode":
                 node.expr = source.expr;
                 node.negative = !!source.negative;
                 node.rules = (source.rules || []).map(fromObject);
                 break;
-            case "H":
+            case "MatchNode":
                 node.expr = "some";
                 node.negative = !!source.negative;
                 node.rules = (source.rules || []).map(fromObject);
@@ -185,19 +197,24 @@
     }
 
     const make = {
-        root: () => ({ type: "T", name: "", next: null }),
-        action: (expr) => ({ type: "A", name: "", rule: rule("R", expr), next: null }),
-        condition: (conditionRule) => ({ type: "C", name: "", rule: conditionRule || null, next: null }),
-        serial: () => ({ type: "S", name: "", branches: [] }),
-        parallel: () => ({ type: "P", name: "", branches: [] }),
-        decision: () => ({ type: "D", name: "", branches: [], defaultBranch: null }),
-        atom: (expr, name) => ({ ...rule("B", expr, name || ""), negative: false }),
-        logic: (expr) => ({ type: "L", name: "", expr: expr === "||" ? "||" : "&&", negative: false, rules: [] }),
-        some: (minHits, maxHits) => ({
-            type: "H", name: "", expr: "some", negative: false, rules: [],
-            minHits: minHits ?? null, maxHits: maxHits ?? null
+        root: () => ({ type: "TreeNode", name: "", next: null }),
+        action: (expr) => ({
+            type: "ActionNode", name: "",
+            rule: expr == null || expr === "" ? null : rule("AtomicNode", expr), next: null
         }),
-        placeholder: (slot) => ({ type: "PH", slot: slot || "branch" })
+        condition: (conditionRule) => ({ type: "ConditionNode", name: "", rule: conditionRule || null, next: null }),
+        serial: () => ({ type: "SerialNode", name: "", branches: [] }),
+        parallel: () => ({ type: "ParallelNode", name: "", branches: [] }),
+        decision: () => ({ type: "DecisionNode", name: "", branches: [], defaultBranch: null }),
+        loop: (max, condition, action) => ({
+            type: "LoopNode", name: "", max, condition: condition || null, action: action || null
+        }),
+        atom: (expr, name) => ({ ...rule("BooleanNode", expr, name || ""), negative: false }),
+        logic: (expr) => ({ type: "LogicNode", name: "", expr: expr === "||" ? "||" : "&&", negative: false, rules: [] }),
+        some: (minHits, maxHits) => ({
+            type: "MatchNode", name: "", expr: "some", negative: false, rules: [],
+            minHits: minHits ?? null, maxHits: maxHits ?? null
+        })
     };
 
     return {

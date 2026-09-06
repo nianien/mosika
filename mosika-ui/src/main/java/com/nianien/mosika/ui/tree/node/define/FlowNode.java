@@ -5,8 +5,8 @@ import lombok.Data;
 /**
  * 绑定一棵规则表达式并拥有单一出口的原子执行节点
  * <p>
- * {@link com.nianien.mosika.ui.tree.node.flow.ANode} 将出口解释为无条件后继
- * {@link com.nianien.mosika.ui.tree.node.flow.CNode} 将出口解释为条件命中分支
+ * {@link com.nianien.mosika.ui.tree.node.flow.ActionNode} 将出口解释为无条件后继
+ * {@link com.nianien.mosika.ui.tree.node.flow.ConditionNode} 将出口解释为条件命中分支
  * <pre>
  *     fN
  *      |

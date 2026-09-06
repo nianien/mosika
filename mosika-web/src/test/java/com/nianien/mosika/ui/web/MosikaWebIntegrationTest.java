@@ -44,11 +44,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MosikaWebIntegrationTest {
 
     private static final Path DB_PATH = createDatabasePath();
-    private static final String EMPTY_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\"∅\"}}}";
-    private static final String INVALID_DECISION_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"D\",\"branches\":[],\"defaultBranch\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\"∅\"}}}}";
-    private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"D\",\"branches\":[{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\"true\"}},{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\"false\"}}]}}";
-    private static final String EMPTY_SERIAL_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"S\",\"branches\":[]}}";
-    private static final String SINGLE_LOGIC_TREE = "{\"type\":\"T\",\"next\":{\"type\":\"C\",\"rule\":{\"type\":\"L\",\"expr\":\"&&\",\"rules\":[{\"type\":\"B\",\"expr\":\"true\"}]}}}";
+    private static final String EMPTY_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\"∅\"}}}";
+    private static final String INVALID_DECISION_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"DecisionNode\",\"branches\":[],\"defaultBranch\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\"∅\"}}}}";
+    private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"DecisionNode\",\"branches\":[{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"BooleanNode\",\"expr\":\"true\"}},{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"BooleanNode\",\"expr\":\"false\"}}]}}";
+    private static final String EMPTY_SERIAL_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"SerialNode\",\"branches\":[]}}";
+    private static final String SINGLE_LOGIC_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"LogicNode\",\"expr\":\"&&\",\"rules\":[{\"type\":\"BooleanNode\",\"expr\":\"true\"}]}}}";
+    private static final String LOOP_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"LoopNode\",\"max\":0,\"condition\":{\"type\":\"BooleanNode\",\"expr\":\"true\"},\"action\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\"∅\"}}}}";
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -509,6 +510,12 @@ class MosikaWebIntegrationTest {
         String flowId = created.path("flowId").asText();
         assertTrue(flowId.startsWith("f"));
 
+        mvc.perform(put("/api/flows/{flowId}", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("flow", INVALID_DECISION_TREE, 1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+
         mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(flowBody("flow", INVALID_DECISION_TREE, 1))))
@@ -585,6 +592,22 @@ class MosikaWebIntegrationTest {
     }
 
     @Test
+    void webFlowAcceptsLoopNode() throws Exception {
+        String flowId = createFlow("loop", LOOP_TREE);
+
+        mvc.perform(post("/api/flows/{flowId}/publish", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(flowBody("loop", LOOP_TREE, 1))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1));
+
+        mvc.perform(post("/api/eval/flow/{flowId}", flowId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void flowTryExecutesUnsavedTreeAndReturnsVisualPaths() throws Exception {
         Map<String, Object> action = ruleBody(
                 "remember-preview",
@@ -597,12 +620,12 @@ class MosikaWebIntegrationTest {
                 .andReturn()).path("ruleId").asText();
         RuleSuite active = suiteManager.getSuite("default");
         String tree = """
-                {"type":"T","next":{"type":"D","branches":[
-                  {"type":"C","rule":{"type":"B","expr":"false"},
-                   "next":{"type":"A","rule":{"type":"R","expr":"∅"}}},
-                  {"type":"C","rule":{"type":"B","expr":"true"},
-                   "next":{"type":"A","rule":{"type":"R","expr":"%s"}}}
-                ],"defaultBranch":{"type":"A","rule":{"type":"R","expr":"∅"}}}}
+                {"type":"TreeNode","next":{"type":"DecisionNode","branches":[
+                  {"type":"ConditionNode","rule":{"type":"BooleanNode","expr":"false"},
+                   "next":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"∅"}}},
+                  {"type":"ConditionNode","rule":{"type":"BooleanNode","expr":"true"},
+                   "next":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"%s"}}}
+                ],"defaultBranch":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"∅"}}}}
                 """.formatted(actionRuleId);
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("namespace", "default");
@@ -624,6 +647,29 @@ class MosikaWebIntegrationTest {
 
         assertSame(active, suiteManager.getSuite("default"));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM rule_flow", Integer.class));
+    }
+
+    @Test
+    void flowTryExecutesLoopAndReturnsLoopBodyPath() throws Exception {
+        String tree = """
+                {"type":"TreeNode","next":{"type":"LoopNode","max":1,
+                  "condition":{"type":"BooleanNode","expr":"true"},
+                  "action":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"∅"}}}}
+                """;
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("namespace", "default");
+        request.put("ruleTree", tree);
+        request.put("target", Map.of());
+        request.put("context", Map.of());
+
+        mvc.perform(post("/api/eval/flow/try")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.executedPaths[0]").value("$"))
+                .andExpect(jsonPath("$.data.executedPaths[1]").value("$.next"))
+                .andExpect(jsonPath("$.data.executedPaths[2]").value("$.next.action"))
+                .andExpect(jsonPath("$.data.executedPaths.length()").value(3));
     }
 
     @Test
@@ -805,7 +851,13 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(not(containsString(">版本</th>"))));
         mvc.perform(get("/ui/index.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("id=\"treeRoot\"")));
+                .andExpect(content().string(containsString("id=\"treeRoot\"")))
+                .andExpect(content().string(containsString("value=\"LoopNode\"")))
+                .andExpect(content().string(containsString("id=\"nodeConfigConfirmButton\"")))
+                .andExpect(content().string(containsString("id=\"actionConfigFields\"")))
+                .andExpect(content().string(containsString("id=\"ruleDialogLoopMax\"")))
+                .andExpect(content().string(not(containsString("id=\"nodeConfigLoopMax\""))))
+                .andExpect(content().string(not(containsString("id=\"nodeConfigRule\""))));
 
         mvc.perform(get("/"))
                 .andExpect(status().isOk())
@@ -863,7 +915,12 @@ class MosikaWebIntegrationTest {
                 .andExpect(jsonPath("$.code").value(400));
 
         for (String invalidTree : java.util.List.of(EMPTY_SERIAL_TREE, SINGLE_LOGIC_TREE)) {
-            String flowId = createFlow("invalid", invalidTree);
+            mvc.perform(post("/api/flows")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(flowBody("invalid", invalidTree, null))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value(400));
+            String flowId = createFlow("invalid", EMPTY_TREE);
             mvc.perform(post("/api/flows/{flowId}/publish", flowId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(flowBody("invalid", invalidTree, 1))))
@@ -977,17 +1034,17 @@ class MosikaWebIntegrationTest {
     }
 
     private String judgeTree(String ruleId) {
-        return "{\"type\":\"T\",\"next\":{\"type\":\"C\",\"rule\":{\"type\":\"B\",\"expr\":\""
+        return "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"BooleanNode\",\"expr\":\""
                 + ruleId + "\"}}}";
     }
 
     private String actionTree(String ruleId) {
-        return "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\""
+        return "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\""
                 + ruleId + "\"}}}";
     }
 
     private String compositeReferenceTree(String flowId) {
-        return "{\"type\":\"T\",\"next\":{\"type\":\"A\",\"rule\":{\"type\":\"R\",\"expr\":\""
+        return "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\""
                 + flowId + "\"}}}";
     }
 

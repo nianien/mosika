@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260814-3">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260907-1">
     <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
 <body class="editor-page">
@@ -182,33 +182,30 @@
 <dialog id="nodeConfigDialog">
     <form method="dialog" class="node-config-form">
         <div class="dialog-heading">
-            <div><h2>配置节点</h2></div>
+            <div><h2 id="nodeConfigTitle">添加节点</h2></div>
             <button class="icon-button" id="nodeConfigCloseButton" aria-label="关闭" type="button">×</button>
         </div>
         <label class="detail-field" id="nodeConfigTypeField">
             <span class="detail-label">节点类型</span>
             <select id="nodeConfigType">
-                <option value="A">动作节点</option>
-                <option value="C">条件节点</option>
-                <option value="S">串行节点</option>
-                <option value="P">并行节点</option>
-                <option value="D">分支节点</option>
+                <option value="ActionNode">动作节点</option>
+                <option value="ConditionNode">条件节点</option>
+                <option value="SerialNode">串行节点</option>
+                <option value="ParallelNode">并行节点</option>
+                <option value="DecisionNode">分支节点</option>
+                <option value="LoopNode">循环节点</option>
             </select>
         </label>
-        <label class="detail-field" id="nodeConfigRuleField">
-            <span class="detail-label">引用规则</span>
-            <div class="rule-picker" data-definition-kind="action">
-                <input class="rule-picker-filter" id="nodeConfigRuleFilter" type="text" autocomplete="off"
-                       placeholder="输入规则名称或 ID" role="combobox" aria-autocomplete="list"
-                       aria-expanded="false" aria-controls="nodeConfigRuleOptions" aria-label="选择引用规则">
-                <input id="nodeConfigRule" type="hidden" data-rule-picker-value>
-                <div class="rule-picker-menu" id="nodeConfigRuleOptions" role="listbox" hidden></div>
-            </div>
-        </label>
-        <p class="form-note" id="nodeConfigNote"></p>
+        <section id="actionConfigFields" hidden>
+            <label class="detail-field">
+                <span class="detail-label">引用规则</span>
+                <span id="actionConfigRule"></span>
+            </label>
+            <div id="actionConfigParams"></div>
+        </section>
         <div class="dialog-actions">
             <button id="nodeConfigCancelButton" type="button">取消</button>
-            <button class="primary" id="nodeConfigConfirmButton" type="button">确认</button>
+            <button class="primary" id="nodeConfigConfirmButton" type="button">添加</button>
         </div>
     </form>
 </dialog>
@@ -231,6 +228,10 @@
     <div class="rule-dialog-shell">
         <header class="rule-dialog-header">
             <div><h2 id="ruleDialogTitle">判断条件</h2></div>
+            <label class="loop-max-field" id="ruleDialogLoopMaxField" hidden>
+                <span>最大循环次数</span>
+                <input id="ruleDialogLoopMax" type="number" min="0" step="1" inputmode="numeric">
+            </label>
             <div class="rule-dialog-header-actions">
                 <button id="ruleDialogCancelButton" type="button">取消</button>
                 <button class="primary" id="ruleDialogCloseButton" type="button">保存</button>
@@ -334,9 +335,9 @@
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
 <script src="/ui/ui-common.js?v=20260813-1"></script>
-<script src="/ui/treenode.js?v=20260813-1"></script>
+<script src="/ui/treenode.js?v=20260906-3"></script>
 <script src="/ui/api.js?v=20260813-1"></script>
 <script src="/ui/ns.js?v=20260813-1"></script>
-<script src="/ui/app.js?v=20260814-3"></script>
+<script src="/ui/app.js?v=20260907-15"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 package com.nianien.mosika.ui.tree.node.flow;
 
 import com.nianien.mosika.ui.tree.node.define.FlowNode;
-import com.nianien.mosika.ui.tree.node.rule.RNode;
+import com.nianien.mosika.ui.tree.node.rule.AtomicNode;
 
 /**
  * 动作原子节点
@@ -17,5 +17,5 @@ import com.nianien.mosika.ui.tree.node.rule.RNode;
  * @author skyfalling {@literal <skyfalling@live.com>}
  * Created on 2022-07-19
  */
-public class ANode extends FlowNode<RNode> {
+public class ActionNode extends FlowNode<AtomicNode> {
 }

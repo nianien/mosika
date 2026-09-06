@@ -10,11 +10,12 @@ import com.nianien.mosika.suite.RuleSuite;
 import com.nianien.mosika.spring.boot.SpringUdfLoader;
 import com.nianien.mosika.ui.tree.node.TreeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
-import com.nianien.mosika.ui.tree.node.flow.ANode;
-import com.nianien.mosika.ui.tree.node.flow.CNode;
-import com.nianien.mosika.ui.tree.node.flow.DNode;
-import com.nianien.mosika.ui.tree.node.flow.PNode;
-import com.nianien.mosika.ui.tree.node.flow.SNode;
+import com.nianien.mosika.ui.tree.node.flow.ActionNode;
+import com.nianien.mosika.ui.tree.node.flow.ConditionNode;
+import com.nianien.mosika.ui.tree.node.flow.DecisionNode;
+import com.nianien.mosika.ui.tree.node.flow.LoopNode;
+import com.nianien.mosika.ui.tree.node.flow.ParallelNode;
+import com.nianien.mosika.ui.tree.node.flow.SerialNode;
 import com.nianien.mosika.ui.web.common.BusinessException;
 import com.nianien.mosika.ui.web.config.DatabaseMigrationInitializer;
 import com.nianien.mosika.ui.web.dao.AtomicRuleDao;
@@ -420,21 +421,21 @@ public class RuleSuiteManager {
         }
 
         private String defineNode(UINode node, String path) {
-            if (node instanceof ANode action) {
+            if (node instanceof ActionNode action) {
                 String expression = action.getRule().ruleExpr();
                 if (action.getNext() != null) {
                     expression += "->" + defineNode(action.getNext(), path + ".next");
                 }
                 return add(path, expression);
             }
-            if (node instanceof CNode condition) {
+            if (node instanceof ConditionNode condition) {
                 String expression = condition.getRule().ruleExpr();
                 if (condition.getNext() != null) {
                     expression += "?" + defineNode(condition.getNext(), path + ".next");
                 }
                 return add(path, expression);
             }
-            if (node instanceof SNode serial) {
+            if (node instanceof SerialNode serial) {
                 List<String> expressions = new ArrayList<>();
                 expressions.add(Constants.NOP);
                 for (int i = 0; i < serial.getBranches().size(); i++) {
@@ -443,7 +444,7 @@ public class RuleSuiteManager {
                 }
                 return add(path, String.join("->", expressions));
             }
-            if (node instanceof PNode parallel) {
+            if (node instanceof ParallelNode parallel) {
                 List<String> expressions = new ArrayList<>();
                 expressions.add(Constants.NOP);
                 for (int i = 0; i < parallel.getBranches().size(); i++) {
@@ -452,12 +453,12 @@ public class RuleSuiteManager {
                 }
                 return add(path, String.join("=>", expressions));
             }
-            if (node instanceof DNode decision) {
+            if (node instanceof DecisionNode decision) {
                 String fallback = decision.getDefaultBranch() == null
                         ? null
                         : defineNode(decision.getDefaultBranch(), path + ".defaultBranch");
                 for (int i = decision.getBranches().size() - 1; i >= 0; i--) {
-                    CNode branch = decision.getBranches().get(i);
+                    ConditionNode branch = decision.getBranches().get(i);
                     String branchPath = path + ".branches[" + i + "]";
                     String condition = add(branchPath, branch.getRule().ruleExpr());
                     String matched = branch.getNext() == null
@@ -467,6 +468,12 @@ public class RuleSuiteManager {
                             + (fallback == null ? "" : ":(" + fallback + ")");
                 }
                 return add(path, fallback);
+            }
+            if (node instanceof LoopNode loop) {
+                String action = defineNode(loop.getAction(), path + ".action");
+                String expression = "loop(" + loop.getMax() + ","
+                        + loop.getCondition().ruleExpr() + "," + action + ")";
+                return add(path, expression);
             }
             throw new UnsupportedOperationException(
                     "not support node type: " + node.getClass().getSimpleName());
