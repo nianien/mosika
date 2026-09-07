@@ -168,13 +168,13 @@
     // 各真实递归边允许的可创建节点类型。
     const RELATIONS = {
         next: { types: FLOW_TYPES },
-        matched: { types: FLOW_TYPES },
         branch: { types: FLOW_TYPES },
         decision: { types: ["ConditionNode"] },
         default: { types: ["ActionNode", "SerialNode", "ParallelNode", "DecisionNode", "LoopNode"] }
     };
 
     const TREE_LIMITS = { maxDepth: 128, maxNodes: 2000 };
+    const SINGLE_FLOW_TYPES = new Set(["ActionNode", "ConditionNode", "LoopNode"]);
 
     const $ = window.MosikaUi.$;
     const escapeText = window.MosikaUi.escapeHtml;
@@ -194,14 +194,28 @@
         return true;
     }
 
-    function openConfirm(message, { title = "确认操作", confirmLabel = "确定" } = {}) {
+    function openConfirm(message, {
+        title = "确认操作",
+        confirmLabel = "确定",
+        alternateLabel = null
+    } = {}) {
+        const choiceMode = Boolean(alternateLabel);
         $("#confirmDialogTitle").textContent = title;
-        $("#confirmDialogMessage").textContent = message;
+        const messageElement = $("#confirmDialogMessage");
+        messageElement.textContent = message;
+        messageElement.hidden = choiceMode;
         $("#confirmDialogConfirm").textContent = confirmLabel;
+        $("#confirmDialogChoices").hidden = !choiceMode;
+        $("#confirmDialogActions").hidden = choiceMode;
+        $("#confirmDialogAlternateTitle").textContent = alternateLabel || "";
+        $("#confirmDialogChoiceConfirmTitle").textContent = confirmLabel;
+        confirmDialog.classList.toggle("choice-dialog", choiceMode);
         return new Promise((resolve) => {
             const onClose = () => {
                 confirmDialog.removeEventListener("close", onClose);
-                resolve(confirmDialog.returnValue === "default");
+                resolve(confirmDialog.returnValue === "alternate"
+                    ? "alternate"
+                    : confirmDialog.returnValue === "default");
             };
             confirmDialog.addEventListener("close", onClose);
             confirmDialog.showModal();
@@ -223,14 +237,11 @@
     }
 
     function conditionRule(node) {
-        if (node?.type === "ConditionNode") return node.rule || null;
-        if (node?.type === "LoopNode") return node.condition || null;
-        return null;
+        return isConditionOwner(node) ? node.rule || null : null;
     }
 
     function setConditionRule(node, rule) {
-        if (node.type === "ConditionNode") node.rule = rule;
-        else if (node.type === "LoopNode") node.condition = rule;
+        node.rule = rule;
     }
 
     function countNodes(node) {
@@ -381,10 +392,8 @@
     function availableRelations(parent) {
         if (parent.type === "TreeNode") return parent.next ? [] : ["next"];
         const relations = [];
-        if (parent.type === "ActionNode" && !parent.next) relations.push("next");
-        if (parent.type === "ConditionNode" && !parent.next) relations.push("matched");
+        if (["ActionNode", "ConditionNode", "LoopNode"].includes(parent.type) && !parent.next) relations.push("next");
         if (["SerialNode", "ParallelNode"].includes(parent.type)) relations.push("branch");
-        if (parent.type === "LoopNode" && !parent.action) relations.push("branch");
         if (parent.type === "DecisionNode") {
             relations.push("decision");
             if (!parent.defaultBranch) relations.push("default");
@@ -408,9 +417,9 @@
             add("decision", "添加条件分支", "添加条件分支");
             add("default", "添加默认分支", "添加默认分支");
         } else if (node.type === "ConditionNode") {
-            add("matched", "添加命中流程", "添加命中流程");
+            add("next", "添加命中流程", "添加命中流程");
         } else if (node.type === "LoopNode") {
-            add("branch", "添加循环体", "添加循环体");
+            add("next", "添加循环体", "添加循环体");
         } else if (node.type === "ActionNode") {
             add("next", "添加后续", "添加后续");
         }
@@ -418,13 +427,12 @@
     }
 
     function canDeleteFlowNode(node, parent, relation) {
-        if (!parent) return false;
-        if (["SerialNode", "ParallelNode"].includes(parent.type) && relation === "branch") return true;
-        if (parent.type === "DecisionNode") {
-            if (relation === "decision" || relation === "default") return true;
-        }
-        if (parent.type === "LoopNode" && relation === "branch") return true;
-        return true;
+        return Boolean(parent);
+    }
+
+    function canDeleteCurrentOnly(node, parent, relation) {
+        return Boolean(parent && node?.next && SINGLE_FLOW_TYPES.has(node.type)
+            && RELATIONS[relation]?.types.includes(node.next.type));
     }
 
     // 从父节点上按 relation 移除某个子节点
@@ -438,8 +446,6 @@
             const idx = parent.branches.indexOf(node);
             if (idx >= 0) parent.branches.splice(idx, 1);
         } else if (relation === "next") {
-            parent.next = null;
-        } else if (relation === "matched") {
             parent.next = null;
         } else if (relation === "default") {
             parent.defaultBranch = null;
@@ -467,8 +473,7 @@
 
     // ---- 主画布渲染 ----
     function flowChildPath(parentPath, edge) {
-        if (edge.relation === "next" || edge.relation === "matched") return `${parentPath}.next`;
-        if (edge.field === "action") return `${parentPath}.action`;
+        if (edge.relation === "next") return `${parentPath}.next`;
         if (edge.relation === "branch" || edge.relation === "decision") {
             return `${parentPath}.branches[${edge.index}]`;
         }
@@ -478,7 +483,7 @@
 
     function requiredFlowRelations(node) {
         if (node.type === "TreeNode") return node.next ? [] : ["next"];
-        if (node.type === "LoopNode") return node.action ? [] : ["branch"];
+        if (node.type === "LoopNode") return node.next ? [] : ["next"];
         if (["SerialNode", "ParallelNode"].includes(node.type)) {
             return Array(Math.max(0, 2 - node.branches.length)).fill("branch");
         }
@@ -1927,7 +1932,7 @@
             return !expr;
         }
         if (node.type === "ConditionNode") { const r = conditionRule(node); return !r || (r.type === "BooleanNode" && !((r.expr || "").trim())); }
-        if (node.type === "LoopNode") return !node.condition || !Number.isInteger(node.max) || node.max < 0;
+        if (node.type === "LoopNode") return !node.rule || !Number.isInteger(node.max) || node.max < 0;
         return false;
     }
 
@@ -1944,9 +1949,8 @@
 
     // 把新建节点挂到父节点的目标关系边上（列表边支持定位）
     function attachChild(parent, relation, node, placement, anchorId) {
-        if (relation === "next" || relation === "matched") { parent.next = node; return; }
+        if (relation === "next") { parent.next = node; return; }
         if (relation === "default") { parent.defaultBranch = node; return; }
-        if (relation === "branch" && parent.type === "LoopNode") { parent.action = node; return; }
         const list = parent.branches;
         if (placement === "first") { list.unshift(node); return; }
         if (placement === "before" || placement === "after") {
@@ -2203,14 +2207,28 @@
         const descendants = countFlowNodes(found.node) - 1;
         const nodeName = flowNodeDisplayName(found.node);
         const nodeId = idOf(found.node);
-        const message = descendants
-            ? `确定删除「${nodeName}」及其 ${descendants} 个流程子节点吗？`
-            : `确定删除「${nodeName}」吗？`;
-        if (!(await openConfirm(message, { title: "确认删除", confirmLabel: "删除" }))) return;
+        const canDeleteOnly = canDeleteCurrentOnly(found.node, found.parent, found.relation);
+        const message = canDeleteOnly
+            ? ""
+            : (descendants
+                ? `确定删除「${nodeName}」及其 ${descendants} 个流程子节点吗？`
+                : `确定删除「${nodeName}」吗？`);
+        const choice = await openConfirm(message, {
+            title: canDeleteOnly ? "删除节点" : "确认删除",
+            confirmLabel: canDeleteOnly ? "删除当前及后续" : "删除",
+            alternateLabel: canDeleteOnly ? "仅删除当前节点" : null
+        });
+        if (!choice) return;
         const current = findNode(nodeId);
         if (!current || !canDeleteFlowNode(current.node, current.parent, current.relation)) return;
-        detachChild(current.parent, current.node, current.relation);
-        selectedId = idOf(current.parent);
+        if (choice === "alternate" && canDeleteCurrentOnly(current.node, current.parent, current.relation)) {
+            const next = current.node.next;
+            replaceChild(current.parent, current.node, current.relation, next);
+            selectedId = idOf(next);
+        } else {
+            detachChild(current.parent, current.node, current.relation);
+            selectedId = idOf(current.parent);
+        }
         render({ preserveView: true });
         markDraft();
     }
@@ -2637,10 +2655,10 @@
                 if (!Number.isInteger(node.max) || node.max < 0) {
                     problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "最大循环次数必须是非负整数" });
                 }
-                if (!node.condition) {
+                if (!node.rule) {
                     problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "循环条件不能为空" });
                 }
-                if (!node.action) {
+                if (!node.next) {
                     problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "循环体不能为空" });
                 }
             }

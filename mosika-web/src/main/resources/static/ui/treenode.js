@@ -23,12 +23,10 @@
                 if (node.next) edges.push(edge("next", node.next, "single", node, "next"));
                 break;
             case "ActionNode":
+            case "ConditionNode":
+            case "LoopNode":
                 if (node.rule) edges.push(edge("rule", node.rule, "single", node, "rule"));
                 if (node.next) edges.push(edge("next", node.next, "single", node, "next"));
-                break;
-            case "ConditionNode":
-                if (node.rule) edges.push(edge("rule", node.rule, "single", node, "rule"));
-                if (node.next) edges.push(edge("matched", node.next, "single", node, "next"));
                 break;
             case "SerialNode":
             case "ParallelNode":
@@ -41,10 +39,6 @@
                     if (child) edges.push(edge("decision", child, "list", node, "branches", node.branches, index));
                 });
                 if (node.defaultBranch) edges.push(edge("default", node.defaultBranch, "single", node, "defaultBranch"));
-                break;
-            case "LoopNode":
-                if (node.condition) edges.push(edge("rule", node.condition, "single", node, "condition"));
-                if (node.action) edges.push(edge("branch", node.action, "single", node, "action"));
                 break;
             case "LogicNode":
             case "MatchNode":
@@ -89,6 +83,8 @@
                 break;
             case "ActionNode":
             case "ConditionNode":
+            case "LoopNode":
+                if (type === "LoopNode") out.max = node.max;
                 if (node.rule) out.rule = serialize(node.rule);
                 if (node.next) out.next = serialize(node.next);
                 break;
@@ -99,11 +95,6 @@
             case "DecisionNode":
                 out.branches = (node.branches || []).map(serialize);
                 if (node.defaultBranch) out.defaultBranch = serialize(node.defaultBranch);
-                break;
-            case "LoopNode":
-                out.max = node.max;
-                if (node.condition) out.condition = serialize(node.condition);
-                if (node.action) out.action = serialize(node.action);
                 break;
             case "AtomicNode":
             case "BooleanNode":
@@ -148,6 +139,8 @@
                 break;
             case "ActionNode":
             case "ConditionNode":
+            case "LoopNode":
+                if (type === "LoopNode") node.max = source.max;
                 node.rule = fromObject(source.rule);
                 node.next = fromObject(source.next);
                 break;
@@ -158,11 +151,6 @@
             case "DecisionNode":
                 node.branches = (source.branches || []).map(fromObject);
                 node.defaultBranch = fromObject(source.defaultBranch);
-                break;
-            case "LoopNode":
-                node.max = source.max;
-                node.condition = fromObject(source.condition);
-                node.action = fromObject(source.action);
                 break;
             case "AtomicNode":
             case "BooleanNode":
@@ -207,7 +195,7 @@
         parallel: () => ({ type: "ParallelNode", name: "", branches: [] }),
         decision: () => ({ type: "DecisionNode", name: "", branches: [], defaultBranch: null }),
         loop: (max, condition, action) => ({
-            type: "LoopNode", name: "", max, condition: condition || null, action: action || null
+            type: "LoopNode", name: "", max, rule: condition || null, next: action || null
         }),
         atom: (expr, name) => ({ ...rule("BooleanNode", expr, name || ""), negative: false }),
         logic: (expr) => ({ type: "LogicNode", name: "", expr: expr === "||" ? "||" : "&&", negative: false, rules: [] }),

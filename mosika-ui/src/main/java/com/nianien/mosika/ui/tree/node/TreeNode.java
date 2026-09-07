@@ -9,7 +9,6 @@ import com.nianien.mosika.ui.tree.node.define.TypeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
 import com.nianien.mosika.ui.tree.node.flow.ActionNode;
 import com.nianien.mosika.ui.tree.node.flow.DecisionNode;
-import com.nianien.mosika.ui.tree.node.flow.LoopNode;
 import com.nianien.mosika.ui.tree.node.rule.LogicNode;
 import com.nianien.mosika.ui.tree.node.rule.AtomicNode;
 import com.nianien.mosika.ui.tree.visitor.TreeVisitor;
@@ -164,13 +163,6 @@ public class TreeNode extends NameNode {
                 stack.push(new VisitFrame(decision.getDefaultBranch(), childDepth));
             }
             pushChildren(stack, decision.getBranches(), childDepth);
-        } else if (node instanceof LoopNode loop) {
-            if (loop.getAction() != null) {
-                stack.push(new VisitFrame(loop.getAction(), childDepth));
-            }
-            if (loop.getCondition() != null) {
-                stack.push(new VisitFrame(loop.getCondition(), childDepth));
-            }
         } else if (node instanceof BranchNode<?> branch) {
             pushChildren(stack, branch.getBranches(), childDepth);
         } else if (node instanceof LogicNode logic) {
@@ -220,9 +212,6 @@ public class TreeNode extends NameNode {
                 visitNode(child, consumer, result);
             }
             visitNode(decision.getDefaultBranch(), consumer, result);
-        } else if (node instanceof LoopNode loop) {
-            visitNode(loop.getCondition(), consumer, result);
-            visitNode(loop.getAction(), consumer, result);
         } else if (node instanceof BranchNode<?> branch) {
             for (TypeNode child : branch.getBranches()) {
                 visitNode(child, consumer, result);

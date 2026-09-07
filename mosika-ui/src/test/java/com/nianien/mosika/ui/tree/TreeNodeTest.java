@@ -157,6 +157,8 @@ public class TreeNodeTest {
         String json = tree.toJson();
 
         assertTrue(json.contains("\"type\":\"LoopNode\""));
+        assertFalse(json.contains("\"condition\":"));
+        assertFalse(json.contains("\"action\":"));
         assertEquals("loop(3,outerCondition,loop(2,innerCondition,innerAction))",
                 tree.toRule().expr());
         assertEquals(Set.of("outerCondition", "innerCondition", "innerAction"),
@@ -215,12 +217,12 @@ public class TreeNodeTest {
         assertThrows(IllegalStateException.class, tree(negativeMax)::validate);
 
         LoopNode missingCondition = new LoopNode();
-        missingCondition.setAction(a("action"));
+        missingCondition.setNext(a("action"));
         assertThrows(IllegalStateException.class, tree(missingCondition)::validate);
 
-        LoopNode missingAction = new LoopNode();
-        missingAction.setCondition(b("condition"));
-        assertThrows(IllegalStateException.class, tree(missingAction)::validate);
+        LoopNode missingNext = new LoopNode();
+        missingNext.setRule(b("condition"));
+        assertThrows(IllegalStateException.class, tree(missingNext)::validate);
     }
 
     @Test
@@ -245,7 +247,7 @@ public class TreeNodeTest {
         assertThrows(IllegalStateException.class, () -> tree(repeatedDefault).validateSize(128, 1000));
 
         LoopNode cyclicLoop = loop(1, "condition", a("action"));
-        cyclicLoop.setAction(cyclicLoop);
+        cyclicLoop.setNext(cyclicLoop);
         assertThrows(IllegalStateException.class,
                 () -> tree(cyclicLoop).validateSize(128, 1000));
 
@@ -316,8 +318,8 @@ public class TreeNodeTest {
     private LoopNode loop(int max, String condition, UINode action) {
         LoopNode loop = new LoopNode();
         loop.setMax(max);
-        loop.setCondition(b(condition));
-        loop.setAction(action);
+        loop.setRule(b(condition));
+        loop.setNext(action);
         return loop;
     }
 }

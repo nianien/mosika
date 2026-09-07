@@ -555,6 +555,22 @@ dialog form { display: grid; gap: 15px; padding: 19px; }
 .icon-button { min-width: 30px; width: 30px; padding: 0; font-size: 20px; /* × 字形，不纳入文字刻度 */ }
 .confirm-message { margin: 0; color: #5f6d82; font-size: var(--fs-minor); line-height: 1.65; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 3px; }
+.dialog-actions[hidden] { display: none; }
+.choice-dialog { width: min(360px, calc(100vw - 32px)); }
+.choice-dialog form { gap: 14px; }
+.delete-choices { display: grid; grid-template-columns: repeat(2, 142px); justify-content: center; gap: 10px; }
+.delete-choices[hidden] { display: none; }
+.delete-choice {
+    width: 100%; height: 38px; min-height: 38px; padding: 0 12px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid #dce4ed; border-radius: 8px; background: #fff;
+    color: #2d3b55; text-align: center;
+}
+.delete-choice strong { font-size: var(--fs-base); font-weight: 650; white-space: nowrap; }
+.delete-choice:hover { border-color: #8bc8bc; background: #f5fbf9; }
+.delete-choice:focus-visible { outline: 2px solid rgba(15,157,138,.22); outline-offset: 2px; }
+.delete-choice.danger-choice strong { color: #c94d55; }
+.delete-choice.danger-choice:hover { border-color: #e6a9af; background: #fdf5f5; }
 
 /* 画布节点右键上下文菜单 */
 .context-menu {

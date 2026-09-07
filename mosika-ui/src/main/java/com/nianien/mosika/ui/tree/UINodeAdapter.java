@@ -79,7 +79,7 @@ public class UINodeAdapter {
 
     private RuleNode loopNode2Rule(LoopNode node) {
         return new com.nianien.mosika.eval.node.LoopNode(
-                node.getMax(), parse(node.getCondition().ruleExpr()), toRule(node.getAction()));
+                node.getMax(), parse(node.getRule().ruleExpr()), toRule(node.getNext()));
     }
 
     private RuleNode conditionNode2Rule(ConditionNode node) {

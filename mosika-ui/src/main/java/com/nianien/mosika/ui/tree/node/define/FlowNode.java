@@ -3,10 +3,11 @@ package com.nianien.mosika.ui.tree.node.define;
 import lombok.Data;
 
 /**
- * 绑定一棵规则表达式并拥有单一出口的原子执行节点
+ * 绑定一棵规则表达式并拥有单一递归子节点的流程节点
  * <p>
  * {@link com.nianien.mosika.ui.tree.node.flow.ActionNode} 将出口解释为无条件后继
  * {@link com.nianien.mosika.ui.tree.node.flow.ConditionNode} 将出口解释为条件命中分支
+ * {@link com.nianien.mosika.ui.tree.node.flow.LoopNode} 将出口解释为循环体
  * <pre>
  *     fN
  *      |
@@ -19,9 +20,9 @@ import lombok.Data;
 @Data
 public abstract class FlowNode<T extends RuleNode> extends UINode implements TypeNode {
 
-    /** 当前原子节点绑定的规则 */
+    /** 当前节点绑定的规则 */
     private T rule;
 
-    /** 单一出口，具体语义由原子节点类型决定 */
+    /** 单一递归子节点，具体语义由节点类型决定 */
     private UINode next;
 }

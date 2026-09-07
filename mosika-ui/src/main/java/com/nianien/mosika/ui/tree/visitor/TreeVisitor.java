@@ -7,11 +7,11 @@ import com.nianien.mosika.ui.tree.node.define.RuleNode;
 import com.nianien.mosika.ui.tree.node.define.TypeNode;
 import com.nianien.mosika.ui.tree.node.define.UINode;
 import com.nianien.mosika.ui.tree.node.flow.ActionNode;
-import com.nianien.mosika.ui.tree.node.flow.ConditionNode;
 import com.nianien.mosika.ui.tree.node.flow.DecisionNode;
 import com.nianien.mosika.ui.tree.node.flow.LoopNode;
 import com.nianien.mosika.ui.tree.node.flow.ParallelNode;
 import com.nianien.mosika.ui.tree.node.flow.SerialNode;
+import com.nianien.mosika.ui.tree.node.rule.BooleanNode;
 import com.nianien.mosika.ui.tree.node.rule.MatchNode;
 import com.nianien.mosika.ui.tree.node.rule.LogicNode;
 import com.nianien.mosika.ui.tree.node.rule.AtomicNode;
@@ -46,10 +46,8 @@ public final class TreeVisitor {
 
     /** 收集条件节点引用的原子规则表达式 */
     public static final BiConsumer<TypeNode, Set<String>> CONDITION_RULE_ID_COLLECTOR = (node, result) -> {
-        if (node instanceof ConditionNode condition) {
-            collectReferences(condition.getRule(), result);
-        } else if (node instanceof LoopNode loop) {
-            collectReferences(loop.getCondition(), result);
+        if (node instanceof FlowNode<?> flow && flow.getRule() instanceof BooleanNode rule) {
+            collectReferences(rule, result);
         }
     };
 
@@ -69,11 +67,8 @@ public final class TreeVisitor {
             if (loop.getMax() < 0) {
                 throw new IllegalStateException("LoopNode max cannot be negative");
             }
-            if (loop.getCondition() == null) {
-                throw new IllegalStateException("LoopNode condition is required");
-            }
-            if (loop.getAction() == null) {
-                throw new IllegalStateException("LoopNode action is required");
+            if (loop.getNext() == null) {
+                throw new IllegalStateException("LoopNode next is required");
             }
         }
         if (node instanceof MatchNode hits) {

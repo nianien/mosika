@@ -49,7 +49,7 @@ class MosikaWebIntegrationTest {
     private static final String OPTIONAL_ACTION_DECISION_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"DecisionNode\",\"branches\":[{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"BooleanNode\",\"expr\":\"true\"}},{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"BooleanNode\",\"expr\":\"false\"}}]}}";
     private static final String EMPTY_SERIAL_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"SerialNode\",\"branches\":[]}}";
     private static final String SINGLE_LOGIC_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"ConditionNode\",\"rule\":{\"type\":\"LogicNode\",\"expr\":\"&&\",\"rules\":[{\"type\":\"BooleanNode\",\"expr\":\"true\"}]}}}";
-    private static final String LOOP_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"LoopNode\",\"max\":0,\"condition\":{\"type\":\"BooleanNode\",\"expr\":\"true\"},\"action\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\"∅\"}}}}";
+    private static final String LOOP_TREE = "{\"type\":\"TreeNode\",\"next\":{\"type\":\"LoopNode\",\"max\":0,\"rule\":{\"type\":\"BooleanNode\",\"expr\":\"true\"},\"next\":{\"type\":\"ActionNode\",\"rule\":{\"type\":\"AtomicNode\",\"expr\":\"∅\"}}}}";
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -653,8 +653,8 @@ class MosikaWebIntegrationTest {
     void flowTryExecutesLoopAndReturnsLoopBodyPath() throws Exception {
         String tree = """
                 {"type":"TreeNode","next":{"type":"LoopNode","max":1,
-                  "condition":{"type":"BooleanNode","expr":"true"},
-                  "action":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"∅"}}}}
+                  "rule":{"type":"BooleanNode","expr":"true"},
+                  "next":{"type":"ActionNode","rule":{"type":"AtomicNode","expr":"∅"}}}}
                 """;
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("namespace", "default");
@@ -668,7 +668,7 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.executedPaths[0]").value("$"))
                 .andExpect(jsonPath("$.data.executedPaths[1]").value("$.next"))
-                .andExpect(jsonPath("$.data.executedPaths[2]").value("$.next.action"))
+                .andExpect(jsonPath("$.data.executedPaths[2]").value("$.next.next"))
                 .andExpect(jsonPath("$.data.executedPaths.length()").value(3));
     }
 

@@ -470,9 +470,9 @@ public class RuleSuiteManager {
                 return add(path, fallback);
             }
             if (node instanceof LoopNode loop) {
-                String action = defineNode(loop.getAction(), path + ".action");
+                String action = defineNode(loop.getNext(), path + ".next");
                 String expression = "loop(" + loop.getMax() + ","
-                        + loop.getCondition().ruleExpr() + "," + action + ")";
+                        + loop.getRule().ruleExpr() + "," + action + ")";
                 return add(path, expression);
             }
             throw new UnsupportedOperationException(

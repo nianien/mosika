@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260907-2">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260907-6">
     <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
 <body class="editor-page">
@@ -172,7 +172,15 @@
             <button class="icon-button" value="cancel" aria-label="关闭" type="submit">×</button>
         </div>
         <p class="confirm-message" id="confirmDialogMessage"></p>
-        <div class="dialog-actions">
+        <div class="delete-choices" id="confirmDialogChoices" hidden>
+            <button class="delete-choice" id="confirmDialogAlternate" value="alternate" type="submit">
+                <strong id="confirmDialogAlternateTitle">仅删除当前节点</strong>
+            </button>
+            <button class="delete-choice danger-choice" id="confirmDialogChoiceConfirm" value="default" type="submit">
+                <strong id="confirmDialogChoiceConfirmTitle">删除当前及后续</strong>
+            </button>
+        </div>
+        <div class="dialog-actions" id="confirmDialogActions">
             <button value="cancel" type="submit">取消</button>
             <button class="danger" id="confirmDialogConfirm" value="default" type="submit">确定</button>
         </div>
@@ -335,9 +343,9 @@
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
 <script src="/ui/ui-common.js?v=20260813-1"></script>
-<script src="/ui/treenode.js?v=20260906-3"></script>
+<script src="/ui/treenode.js?v=20260907-4"></script>
 <script src="/ui/api.js?v=20260813-1"></script>
 <script src="/ui/ns.js?v=20260813-1"></script>
-<script src="/ui/app.js?v=20260907-20"></script>
+<script src="/ui/app.js?v=20260907-24"></script>
 </body>
 </html>
