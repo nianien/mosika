@@ -1095,14 +1095,9 @@
                 </div>
             </div>`);
         }
-        const location = findNode(nodeId);
-        const canWrap = Boolean(["ActionNode", "ConditionNode"].includes(node.type)
-            && location?.parent && location.relation !== "decision");
-        const typeEditable = ["SerialNode", "ParallelNode"].includes(node.type) || canWrap;
+        const typeEditable = ["SerialNode", "ParallelNode"].includes(node.type);
         const typeActive = typeEditable && inspectorEditingField === editKey(nodeId, "type");
-        const typeOptions = ["SerialNode", "ParallelNode"].includes(node.type)
-            ? ["SerialNode", "ParallelNode"]
-            : (canWrap ? [node.type, "SerialNode", "ParallelNode"] : [node.type]);
+        const typeOptions = typeEditable ? ["SerialNode", "ParallelNode"] : [node.type];
         parts.push(`<div class="detail-field${typeEditable ? " editable" : ""}${typeActive ? " field-editing" : ""}" data-field="type">
             <span class="detail-label">节点类型</span>
             <div class="field-row">
@@ -1134,14 +1129,19 @@
                     ${rulePencil("判断条件")}
                 </div>
             </div>`);
-        } else if (["SerialNode", "ParallelNode", "DecisionNode"].includes(node.type)) {
+        } else if (["SerialNode", "ParallelNode"].includes(node.type)) {
             parts.push(`<div class="detail-field">
                 <span class="detail-label">分支数</span>
                 <span class="detail-value">${node.branches.length} 个</span>
             </div>`);
+        } else if (node.type === "DecisionNode") {
+            parts.push(`<div class="detail-field">
+                <span class="detail-label">分支数</span>
+                <span class="detail-value">${node.branches.length + (node.defaultBranch ? 1 : 0)} 个</span>
+            </div>`);
         } else if (node.type === "LoopNode") {
             parts.push(`<div class="detail-field">
-                <span class="detail-label">最大执行次数</span>
+                <span class="detail-label">最大循环次数</span>
                 <span class="detail-value">${Number.isInteger(node.max) && node.max >= 0 ? node.max : "未设置"}</span>
             </div>`);
             parts.push(`<div class="detail-field">
@@ -1231,13 +1231,6 @@
         } else if (field === "type" && ["SerialNode", "ParallelNode"].includes(node.type)) {
             const newType = $("#inspectorTypeSelect").value;
             if (["SerialNode", "ParallelNode"].includes(newType)) node.type = newType;
-        } else if (field === "type" && ["ActionNode", "ConditionNode"].includes(node.type)) {
-            const newType = $("#inspectorTypeSelect").value;
-            if (["SerialNode", "ParallelNode"].includes(newType)) {
-                inspectorEditingField = null;
-                insertNodeBefore(newType);
-                return;
-            }
         }
         inspectorEditingField = null;
         render({ preserveView: true });
@@ -2588,7 +2581,7 @@
                 }
             } else if (node.type === "LoopNode") {
                 if (!Number.isInteger(node.max) || node.max < 0) {
-                    problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "最大执行次数必须是非负整数" });
+                    problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "最大循环次数必须是非负整数" });
                 }
                 if (!node.condition) {
                     problems.push({ id: idOf(node), name: flowNodeDisplayName(node), reason: "循环条件不能为空" });
@@ -2973,7 +2966,7 @@
             const max = Number(ruleDialogLoopMaxDraft);
             if (ruleDialogLoopMaxDraft === "" || !Number.isInteger(max) || max < 0) {
                 $("#ruleDialogLoopMax").focus();
-                openConfirm("最大次数必须是非负整数", { title: "节点尚未完成", confirmLabel: "知道了" });
+                openConfirm("最大循环次数必须是非负整数", { title: "节点尚未完成", confirmLabel: "知道了" });
                 return;
             }
             judge.max = max;
