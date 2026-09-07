@@ -668,6 +668,9 @@ dialog.rule-dialog {
 .rule-add-row-button { border-style: dashed; color: #526fd0; background: #fff; }
 .rule-logic-field { margin: 0; padding: 0; border: 0; }
 .rule-logic-field legend { margin-bottom: 6px; color: #68758a; font-size: var(--fs-label); font-weight: 600; }
+.rule-match-bounds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rule-match-bounds label { display: grid; gap: 5px; }
+.rule-match-bounds[hidden] { display: none; }
 .rule-radio-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .rule-radio-group label { display: block; cursor: pointer; }
 .rule-radio-group input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

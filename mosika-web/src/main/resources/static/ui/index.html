@@ -8,7 +8,7 @@
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260907-1">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260907-2">
     <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
 </head>
 <body class="editor-page">
@@ -255,6 +255,10 @@
                 <div class="rule-editor-panel" id="ruleEditorPanel" hidden>
                     <div class="inspector-heading rule-editor-heading" id="ruleEditorHeading"></div>
                     <div class="detail-field" id="ruleEditorLogicField" data-field="rulelogic" hidden></div>
+                    <label id="ruleReferenceField" hidden>
+                        <span id="ruleReferenceLabel">命中要求</span>
+                        <input id="ruleNodeExpression" readonly>
+                    </label>
                     <div class="detail-field rule-negate-field" id="ruleNegateField" hidden>
                         <span class="detail-label">取反</span>
                         <label class="rule-negate-row">
@@ -269,10 +273,6 @@
                         <div class="rule-add-rows" id="ruleEditorSubrules"></div>
                         <button class="rule-add-row-button" id="ruleEditorAddRuleButton" type="button" hidden>＋ 添加规则</button>
                     </div>
-                    <label id="ruleReferenceField" hidden>
-                        <span id="ruleReferenceLabel">命中表达式</span>
-                        <input id="ruleNodeExpression" readonly>
-                    </label>
                     <div class="rule-editor-params" id="ruleEditorParamsField" hidden></div>
                     <div class="inspector-add" id="ruleAddPanel" hidden>
                         <div class="inspector-add-title" id="ruleAddTitle">添加规则</div>
@@ -338,6 +338,6 @@
 <script src="/ui/treenode.js?v=20260906-3"></script>
 <script src="/ui/api.js?v=20260813-1"></script>
 <script src="/ui/ns.js?v=20260813-1"></script>
-<script src="/ui/app.js?v=20260907-16"></script>
+<script src="/ui/app.js?v=20260907-20"></script>
 </body>
 </html>

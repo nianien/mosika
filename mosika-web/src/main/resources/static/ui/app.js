@@ -28,7 +28,7 @@
         DecisionNode: { name: "分支节点", kind: "structure", short: "分", help: "首个命中分支生效" },
         ConditionNode: { name: "条件节点", kind: "structure", short: "条件", help: "按条件决定后续流程" },
         LogicNode: { name: "逻辑", kind: "structure", short: "与", help: "组合多个判断条件" },
-        MatchNode: { name: "命中数", kind: "structure", short: "H", help: "按命中数量判定" },
+        MatchNode: { name: "命中数量", kind: "structure", short: "命中数", help: "按命中数量判定" },
         AtomicNode: { name: "动作规则", kind: "action", short: "R", help: "执行动作规则" },
         BooleanNode: { name: "条件规则", kind: "condition", short: "B", help: "执行判断规则" },
         ActionNode: { name: "动作节点", kind: "action", short: "动作", help: "执行指定动作" },
@@ -454,12 +454,15 @@
         if (node.type === "LoopNode") return "循";
         if (node.type === "ConditionNode") return "规则";
         if (node.type !== "MatchNode") return type.short;
-        const low = node.minHits == null ? "_" : String(node.minHits);
-        const high = node.maxHits == null ? "_" : String(node.maxHits);
-        if (high === "_" && low !== "_") return `${low}+`;
-        if (low === "_") return `≤${high}`;
-        if (low === high) return `=${low}`;
-        return `${low}…${high}`;
+        return "限";
+    }
+
+    function matchRequirementLabel(node) {
+        if (node.minHits == null && node.maxHits == null) return "未设置";
+        if (node.minHits == null) return `至多 ${node.maxHits} 个`;
+        if (node.maxHits == null) return `至少 ${node.minHits} 个`;
+        if (node.minHits === node.maxHits) return `恰好 ${node.minHits} 个`;
+        return `${node.minHits}～${node.maxHits} 个`;
     }
 
     // ---- 主画布渲染 ----
@@ -1397,7 +1400,7 @@
         const container = $("#ruleEditorLogicField");
         if (!container) return;
         const node = findRuleNode(ruleSelectedId)?.node;
-        if (!node || node.type === "MatchNode") { container.hidden = true; return; }
+        if (!node) { container.hidden = true; return; }
         container.hidden = false;
         if (node.type === "BooleanNode") {
             ruleLogicEditing = false;
@@ -1406,7 +1409,9 @@
                 <div class="field-row"><span class="detail-value">原子节点</span></div>`;
             return;
         }
-        const label = node.expr === "||" ? "逻辑或" : "逻辑与";
+        if (!["LogicNode", "MatchNode"].includes(node.type)) { container.hidden = true; return; }
+        const value = node.type === "MatchNode" ? "some" : (node.expr === "||" ? "||" : "&&");
+        const label = value === "some" ? "命中数量" : (value === "||" ? "条件或" : "条件与");
         container.className = "detail-field editable" + (ruleLogicEditing ? " field-editing" : "");
         const pencil = `<button class="field-edit" type="button" data-rulelogic-edit aria-label="编辑" title="编辑">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
@@ -1420,27 +1425,75 @@
                 <span class="detail-value">${label}</span>
                 ${ruleLogicEditing ? "" : pencil}
                 <select class="field-control" id="ruleLogicSelect">
-                    <option value="&&" ${node.expr !== "||" ? "selected" : ""}>逻辑与</option>
-                    <option value="||" ${node.expr === "||" ? "selected" : ""}>逻辑或</option>
+                    <option value="&&" ${value === "&&" ? "selected" : ""}>条件与</option>
+                    <option value="||" ${value === "||" ? "selected" : ""}>条件或</option>
+                    <option value="some" ${value === "some" ? "selected" : ""}>命中数量</option>
                 </select>
                 ${ruleLogicEditing ? confirmCancel : ""}
-            </div>`;
+            </div>
+            ${ruleLogicEditing ? `<div class="rule-match-bounds" id="ruleMatchBounds" ${value === "some" ? "" : "hidden"}>
+                <label>
+                    <span class="detail-label">最少命中数</span>
+                    <input class="field-control" id="ruleMatchMin" type="number" min="0" max="${node.rules.length}" step="1"
+                           value="${node.type === "MatchNode" && node.minHits != null ? node.minHits : ""}" placeholder="不限">
+                </label>
+                <label>
+                    <span class="detail-label">最多命中数</span>
+                    <input class="field-control" id="ruleMatchMax" type="number" min="0" max="${node.rules.length}" step="1"
+                           value="${node.type === "MatchNode" && node.maxHits != null ? node.maxHits : ""}" placeholder="不限">
+                </label>
+            </div>` : ""}`;
     }
 
     function beginRuleLogicEdit() {
         const node = findRuleNode(ruleSelectedId)?.node;
-        if (!node || node.type !== "LogicNode") return;
+        if (!node || !["LogicNode", "MatchNode"].includes(node.type)) return;
         ruleLogicEditing = true;
         renderRuleLogicField();
     }
 
     function confirmRuleLogicEdit() {
         const found = findRuleNode(ruleSelectedId);
-        if (!found || found.node.type !== "LogicNode") { ruleLogicEditing = false; renderRuleLogicField(); return; }
-        found.node.expr = $("#ruleLogicSelect")?.value === "||" ? "||" : "&&";
+        if (!found || !["LogicNode", "MatchNode"].includes(found.node.type)) {
+            ruleLogicEditing = false;
+            renderRuleLogicField();
+            return;
+        }
+        const node = found.node;
+        const value = $("#ruleLogicSelect")?.value || "&&";
+        if (value === "some") {
+            const minText = $("#ruleMatchMin")?.value.trim() || "";
+            const maxText = $("#ruleMatchMax")?.value.trim() || "";
+            const minHits = minText === "" ? null : Number(minText);
+            const maxHits = maxText === "" ? null : Number(maxText);
+            const min = minHits == null ? 0 : minHits;
+            const max = maxHits == null ? node.rules.length : maxHits;
+            if (minHits == null && maxHits == null) {
+                openConfirm("最少命中数和最多命中数不能同时为空", { title: "节点尚未完成", confirmLabel: "知道了" });
+                return;
+            }
+            if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || min > max || max > node.rules.length) {
+                openConfirm(`命中数范围必须满足 0 ≤ 最少命中数 ≤ 最多命中数 ≤ 子规则数（${node.rules.length}）`,
+                    { title: "节点尚未完成", confirmLabel: "知道了" });
+                return;
+            }
+            node.type = "MatchNode";
+            node.expr = "some";
+            node.minHits = minHits;
+            node.maxHits = maxHits;
+        } else {
+            if (node.rules.length < 2) {
+                openConfirm("条件与和条件或至少需要两个子规则", { title: "无法转换", confirmLabel: "知道了" });
+                return;
+            }
+            node.type = "LogicNode";
+            node.expr = value === "||" ? "||" : "&&";
+            delete node.minHits;
+            delete node.maxHits;
+        }
         ruleLogicEditing = false;
-        renderRuleLogicField();
         renderRuleTree();
+        updateRuleEditor();
         render({ preserveView: true });
     }
 
@@ -1465,7 +1518,8 @@
         renderRuleEditorHeading();
         const isHits = node.type === "MatchNode";
         $("#ruleReferenceField").hidden = !isHits;
-        $("#ruleNodeExpression").value = isHits ? compactStructureLabel(node, TYPES.MatchNode) : "";
+        $("#ruleReferenceLabel").textContent = "命中要求";
+        $("#ruleNodeExpression").value = isHits ? matchRequirementLabel(node) : "";
         $("#ruleNodeExpression").readOnly = true;
         $("#ruleEditorSubrulesField").hidden = false;
         renderRuleEditorSubrules();
@@ -3057,6 +3111,11 @@
         if (event.target.closest("[data-rulelogic-edit]")) { beginRuleLogicEdit(); return; }
         if (event.target.closest("[data-rulelogic-confirm]")) { confirmRuleLogicEdit(); return; }
         if (event.target.closest("[data-rulelogic-cancel]")) { cancelRuleLogicEdit(); return; }
+    });
+    $("#ruleEditorLogicField").addEventListener("change", (event) => {
+        if (event.target.id === "ruleLogicSelect") {
+            $("#ruleMatchBounds").hidden = event.target.value !== "some";
+        }
     });
     $("#ruleNegateInput").addEventListener("change", (event) => {
         const node = findRuleNode(ruleSelectedId)?.node;
