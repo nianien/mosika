@@ -1224,12 +1224,13 @@
         const children = kids.length
             ? `<div class="rule-children">${kids.map((child) => renderRuleBranch(child, node)).join("")}</div>` : "";
         const title = ruleNodeCanvasLabel(node);
+        const cardTitle = `${node.negative ? "取反 · " : ""}${type.kind === "structure" ? type.name : title}`;
         const negateBadge = node.negative ? `<span class="negate-badge" title="取反">非</span>` : "";
         const id = idOf(node);
         return `
             <div class="rule-branch" data-rule-branch-id="${id}">
                 <div class="node-shell"${reorderable ? ' data-reorderable="1"' : ""} data-rule-node-id="${id}" tabindex="0" role="treeitem" aria-selected="${ruleSelectedId === id}">
-                    <div class="node-card ${type.kind} node-type-${node.type.toLowerCase()}${node.negative ? " is-negated" : ""}" aria-label="${escapeText(`${node.negative ? "取反 · " : ""}${type.name} · ${ruleNodeDisplayName(node)}`)}">
+                    <div class="node-card ${type.kind} node-type-${node.type.toLowerCase()}${node.negative ? " is-negated" : ""}" title="${escapeText(cardTitle)}" aria-label="${escapeText(cardTitle)}">
                         <span class="node-title">${escapeText(title || type.short)}</span>
                         ${expression}
                     </div>
