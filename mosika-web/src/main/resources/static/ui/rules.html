@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
+    <link rel="stylesheet" href="/ui/ui-common.css?v=20260908-9">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
@@ -18,40 +19,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.11/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
-[hidden]{display:none!important}
-.app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr)}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
-.brandwrap{display:flex;align-items:center}
-.brand{display:flex;align-items:center;gap:11px}
-.brand-home{color:inherit;text-decoration:none;border-radius:10px}
-.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
-.brand-home .brand-mark{transition:transform .16s ease,box-shadow .16s ease}.brand-home:hover{color:var(--teal-d)}.brand-home:hover .brand-mark{transform:translateY(-1px);box-shadow:0 7px 16px rgba(15,157,138,.4)}.brand-home:focus-visible{outline:2px solid var(--teal);outline-offset:4px}
-.brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
-.tabs{display:flex;gap:6px;margin-left:26px}
-.tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
-.tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
-.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
-.search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
-.btn:hover{border-color:#a9d3cc;background:#f5faf9}
-.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
-.btn.primary:hover{background:var(--teal-d)}
-.btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;cursor:pointer}
-.btn.link.danger{color:#c9504f}
-.main{overflow:auto;padding:22px 26px}
+.app-shell{height:100vh}
 .page-head{display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px}
 .filter-groups{display:flex;align-items:center;gap:18px}
 .filters{display:flex;gap:8px}
 .chip{height:30px;padding:0 14px;border-radius:16px;border:1px solid var(--border);background:#fff;color:#54706a;font-size:var(--fs-meta);display:flex;align-items:center;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
-.panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:900px;border-collapse:collapse;font-size:var(--fs-base)}
-thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
-tbody td{padding:14px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:#f7fcfb}
+table{min-width:900px}
 .name{font-weight:600;font-size:var(--fs-strong)}
 .name .id{color:#9fb4af;font-weight:400;font-size:var(--fs-caption);margin-left:7px}
 .rowdesc{color:#71887f;font-size:var(--fs-minor);margin-top:3px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -67,18 +41,9 @@ tbody tr:hover{background:#f7fcfb}
 .refbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
 .refbadge.zero{color:#a7c0ba}.refbadge.zero .dot{background:#cdddd8}
 .actions{display:flex;gap:14px;align-items:center;justify-content:flex-end}
-.status-toggle{height:28px;padding:0;border:0;background:transparent;display:inline-flex;align-items:center;gap:7px;color:#8aa39d;cursor:pointer;text-align:left}
-.status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
-.status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
-.status-toggle.is-on{color:var(--color-brand-strong);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--color-brand)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
-.status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
-.status-toggle:focus-visible{outline:2px solid var(--color-brand);outline-offset:3px;border-radius:7px}
-.status-toggle-label{font-size:var(--fs-meta);line-height:1;min-width:42px}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
-.toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(1280px,96vw)}
-dialog::backdrop{background:rgba(18,48,56,.3)}
+.status-toggle{display:inline-flex;color:#8aa39d}
+.status-toggle-label{min-width:42px}
+dialog{width:min(1280px,96vw)}
 .dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
 .dlg-body{padding:12px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch;max-height:80vh;overflow-y:auto}
 .dlg-body>.field.span-2{grid-column:1/-1}
@@ -94,7 +59,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 #ruleDlg .dlg-body{display:flex;flex-direction:column;gap:0;height:auto;max-height:none;overflow:hidden;padding-left:0;padding-right:0}
 /* 名称/描述/类型与页签常驻不滚，只有页内容滚，避免滚动时顶部剩半截输入框 */
 #ruleDlg .dlg-fixed{flex:none;display:flex;flex-direction:column;gap:12px;padding:0 24px}
-#ruleDlg .rule-info{display:grid;grid-template-columns:1fr 1.5fr;gap:10px 14px;align-items:start}
+#ruleDlg .rule-info{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:10px 14px;align-items:start}
+#ruleDlg .rule-info>.field-description{grid-column:1/-1;grid-row:2}
+#ruleDlg .field-description textarea{min-height:68px;line-height:1.55;font-family:var(--ff-sans);resize:vertical}
 /* 弹窗分页：表达式与参数 / 试运行 */
 .dlg-tabs{display:flex;gap:4px;border-bottom:1px solid #eef4f2}
 .dtab{padding:8px 14px;border:0;background:none;color:#6f8b86;font-size:var(--fs-base);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -106,8 +73,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 #ruleDlg .test-inputs .mono-area{min-height:210px}
 #ruleDlg .test-output .test-result{min-height:210px}
 /* 类型独占一行，标签与单选框横向排在同一行，避免上下两行的空白 */
-#ruleDlg .rule-info>.field-kind{grid-column:1/-1;display:flex;align-items:center;gap:12px}
-#ruleDlg .rule-info>.field-kind>label{margin-bottom:0;flex:none}
+#ruleDlg .rule-info>.field-kind{grid-column:2;grid-row:1;display:block}
 #ruleDlg .rule-info>.field-kind .radiobar{height:auto}
 #ruleDlg .rule-info>.field{height:auto}
 #ruleDlg .rule-info>.field>.hint{margin-top:6px;padding-top:0}
@@ -122,27 +88,22 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .param-card.flash{animation:paramFlash .9s ease-out}
 
 /* 行内圆点单选：条件 / 动作 */
-.radiobar{display:flex;align-items:center;gap:8px;height:43px}
-.radiobar .rd{position:relative;display:inline-flex;align-items:center;gap:6px;height:31px;padding:0 11px 0 9px;border:1px solid var(--border);border-radius:16px;background:#fff;color:#5c766f;font-size:var(--fs-base);cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s}
-.radiobar .rd:hover{border-color:#a9d3cc;background:#f8fcfb}
+.radiobar{display:flex;align-items:center;gap:18px;height:31px}
+.radiobar .rd{position:relative;display:inline-flex;align-items:center;gap:7px;height:31px;padding:0 2px;color:#5c766f;font-size:var(--fs-base);cursor:pointer;white-space:nowrap;transition:color .15s}
+.radiobar .rd:hover{color:var(--teal-d)}
 .radiobar .rd input{position:absolute;opacity:0;width:0;height:0;margin:0}
 .radiobar .rd .dot{width:14px;height:14px;border-radius:50%;border:1.5px solid #b9cfca;background:#fff;position:relative;flex:none}
-.radiobar .rd:has(input:checked){border-color:#9fd8cf;background:var(--teal-soft);color:var(--teal-d);font-weight:600}
+.radiobar .rd:has(input:checked){color:var(--teal-d);font-weight:600}
 .radiobar .rd:has(input:checked) .dot{border-color:var(--teal)}
 .radiobar .rd:has(input:checked) .dot::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--teal)}
-.radiobar .rd:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:2px}
+.radiobar .rd:has(input:focus-visible){outline:2px solid var(--teal);outline-offset:3px;border-radius:4px}
 
 /* 字段头：标签 + 右侧工具 */
-.field-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
-.field-bar label{margin-bottom:0}
-.field-tools{display:flex;align-items:center;gap:8px}
 .tag-lang{font-size:var(--fs-note);font-weight:700;letter-spacing:.04em;color:#5a6b86;background:var(--grey-soft);border-radius:4px;padding:3px 6px}
 .lint-state{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-minor);font-weight:600}
 .lint-state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .lint-state.ok{color:#1f9d5c}
 .lint-state.bad{color:#d64545}
-.mini-btn{height:26px;padding:0 11px;border:1px solid var(--border);border-radius:7px;background:#fff;color:#2c5049;font-size:var(--fs-minor);cursor:pointer}
-.mini-btn:hover{border-color:var(--teal);color:var(--teal-d);background:var(--teal-soft)}
 .mini-btn.dashed{border-style:dashed;border-color:#9fd8cf;color:var(--teal-d);background:#f4faf9}
 
 /* 代码编辑器外壳：文件条 + 固定高正文 + 行列状态栏 */
@@ -215,20 +176,16 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .result-desc code{font-family:var(--ff-sans);font-size:var(--fs-minor);line-height:1.6;color:#123038;word-break:break-word}
 .result-desc.bad code{color:#c0392b;font-family:var(--ff-mono)}
 .result-message{padding:9px 11px;font-size:var(--fs-minor);line-height:1.65;color:#8c3b3b;word-break:break-word}
-.dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+.dlg-foot{padding:14px 24px 20px}
 .dlg-body>.field{display:flex;flex-direction:column;height:100%}
 .dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
-.field label{display:block;font-size:var(--fs-meta);color:#5c766f;margin-bottom:7px;font-weight:600}
-.field .hint{margin-top:6px;font-size:var(--fs-caption);color:#8aa39d;line-height:1.5}
 .field .CodeMirror{border:1px solid var(--border);border-radius:9px;height:auto;min-height:340px;font-family:var(--ff-mono);font-size:var(--fs-base);background:#fbfefe;padding:4px 2px;transition:border-color .15s,box-shadow .15s}.field .CodeMirror-scroll{max-height:60vh}#ruleDlg{position:relative}.CodeMirror-hints{position:absolute;z-index:100;max-height:220px;font-size:var(--fs-base);font-family:var(--ff-mono);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(18,48,56,.18);padding:4px}.CodeMirror-hint{padding:4px 10px;border-radius:5px;color:#123038}li.CodeMirror-hint-active{background:var(--teal);color:#fff}.CodeMirror-lint-tooltip{z-index:101;font-family:inherit;font-size:var(--fs-minor);border-radius:7px}
 .field .CodeMirror-scroll{max-height:320px}
 .field .CodeMirror-focused{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .field .CodeMirror-lines{padding:6px 0}
 .field .CodeMirror-gutters{background:#f2faf9;border-right:1px solid #e4efec}
 .field .CodeMirror-linenumber{color:#a7c0ba}
-.field input,.field textarea,.field select{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038;background:#fff;font-family:inherit}
 .field textarea{min-height:64px;resize:vertical;font-family:var(--ff-mono)}
-.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .params-editor{display:flex;flex-direction:column;gap:6px}
 .params-empty{font-size:var(--fs-minor);color:#8aa39d;padding:2px 0}
 .param-head{display:grid;grid-template-columns:130px 1fr 88px 1.3fr 116px 26px;gap:6px;padding:0 8px 4px;font-size:var(--fs-caption);color:#8aa39d;font-weight:600}
@@ -254,9 +211,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   #ruleDlg .dlg-head{padding:12px 24px 4px}
   #ruleDlg .dlg-foot{padding:10px 24px 14px}
   #ruleDlg .dlg-body{gap:8px}
-  #ruleDlg .rule-info{grid-template-columns:1fr 138px 1.4fr;gap:8px 14px}
-  #ruleDlg .rule-info>.field-kind{grid-column:auto;display:block}
-  #ruleDlg .rule-info>.field-kind>label{margin-bottom:7px}
+  #ruleDlg .rule-info{gap:8px 14px}
   #ruleDlg .dtab{padding:6px 12px}
   #ruleDlg .dpane{min-height:0}
   #ruleDlg .field-expr .CodeMirror{height:clamp(88px,16vh,196px)}
@@ -266,6 +221,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 @media(max-width:900px){
   #ruleDlg{width:96vw}
   #ruleDlg .rule-info{grid-template-columns:1fr}
+  #ruleDlg .rule-info>.field-description,#ruleDlg .rule-info>.field-kind{grid-column:1;grid-row:auto}
   #ruleDlg .test-pane{grid-template-columns:1fr}
   #ruleDlg .rule-work{max-height:none}
   #ruleDlg .rule-work>.field-params{flex:none;min-height:0}
@@ -277,9 +233,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   #ruleDlg .param-card .param-remove{grid-column:4}
   .dlg-body{grid-template-columns:1fr}.dlg-body>.field.span-2{grid-column:1}
 }
-@media(max-width:800px){.app-shell{height:auto;min-height:100vh}.main{padding:16px 12px}.page-head{align-items:flex-end;flex-direction:column;gap:12px}.filter-groups{max-width:100%;overflow-x:auto;padding-bottom:2px}.filters{flex:none}}
+@media(max-width:800px){.app-shell{height:auto}.page-head{align-items:flex-end;flex-direction:column;gap:12px}.filter-groups{max-width:100%;overflow-x:auto;padding-bottom:2px}.filters{flex:none}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -320,7 +275,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dlg-fixed">
     <div class="rule-info">
       <div class="field"><label>规则名称 *</label><input id="fName" placeholder="如：黑名单命中"></div>
-      <div class="field"><label>规则描述</label><input id="fDesc" placeholder="规则用途" title="支持表达式插值：${$.字段} 取入参，${$$.字段} 取上下文，运行时替换为实际值"></div>
+      <div class="field field-description"><label>规则描述</label><textarea id="fDesc" rows="2" placeholder="规则用途" title="支持表达式插值：${$.字段} 取输入数据，${$$.字段} 取上下文，运行时替换为实际值"></textarea></div>
       <div class="field field-kind">
         <label>类型</label>
         <div class="radiobar" role="radiogroup" aria-label="规则类型">
@@ -363,7 +318,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
       <div class="field field-params">
         <div class="field-bar">
-          <label>参数<span class="field-sub">$args 参数自动提取</span></label>
+          <label>规则参数<span class="field-sub">自动从表达式提取</span></label>
           <div class="field-tools">
             <button type="button" class="mini-btn" id="reExtractBtn">重新提取</button>
             <button type="button" class="mini-btn dashed" id="addParamBtn">＋ 手动添加</button>
@@ -377,8 +332,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     <div class="dpane test-pane" data-dpane="test" hidden>
       <div class="test-inputs">
         <div class="test-tabs" role="tablist">
-          <button type="button" class="ttab on" data-tab="target" role="tab">入参 $</button>
-          <button type="button" class="ttab" data-tab="args" role="tab">参数 $args<i class="tab-count" id="argsCount" hidden></i></button>
+          <button type="button" class="ttab on" data-tab="target" role="tab">输入数据<i class="tab-count" id="targetCount" hidden></i></button>
+          <button type="button" class="ttab" data-tab="args" role="tab">规则参数<i class="tab-count" id="argsCount" hidden></i></button>
         </div>
         <textarea id="tTarget" class="mono-area tpane" spellcheck="false" data-pane="target" data-json>{}</textarea>
         <div class="json-err" data-json-err="target" hidden></div>
@@ -399,7 +354,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/ui-common.js?v=20260908-5"></script>
 <script src="/ui/code-editor.js?v=20260908-3"></script>
 <script src="/ui/api.js?v=20260908-3"></script>
 <script src="/ui/ns.js?v=20260908-3"></script>
@@ -413,14 +368,26 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   const $ = Ui.$;
   let kindFilter = "";
   let keyword = "";
-  let loadSequence = 0;
   let rules = [];
   let refCount = new Map(); // ruleId(String) -> 引用场景数
   let editing = null;
 
   const toast = Ui.createToast("#toast", { duration: 2000 });
   const esc = Ui.escapeHtml;
-  const pager = Ui.createPager("#pager", loadRules);
+  const ruleList = Ui.createPagedTable({
+    rows: "#rows",
+    pager: "#pager",
+    columns: 5,
+    fetchPage: ({ pageNumber, pageSize }) => {
+      const params = { keyword, pageNumber, pageSize, namespace: Ns.code() };
+      if (kindFilter) params.kind = kindFilter;
+      return Api.listRules(params);
+    },
+    renderRows: (items) => {
+      rules = items;
+      renderRows();
+    }
+  });
 
   // 参数模板编辑：参数名由表达式里的 $args.xxx 自动提取，其余字段手工补全。
   const PARAM_TYPES = [["string", "文本"], ["number", "数字"], ["boolean", "布尔"], ["enum", "枚举"]];
@@ -453,6 +420,18 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     let m;
     while ((m = re.exec(code)) !== null) {
       const name = m[1] || m[3];
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+  }
+
+  function extractTargetNames(src) {
+    const code = stripNonCode(src);
+    const re = /(^|[^\w$])\$\s*\.\s*([A-Za-z_$][\w$]*)/g;
+    const names = [];
+    let match;
+    while ((match = re.exec(code)) !== null) {
+      const name = match[2];
       if (name && !names.includes(name)) names.push(name);
     }
     return names;
@@ -573,28 +552,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     } catch (_) {}
   }
 
-  async function loadRules() {
-    const sequence = ++loadSequence;
-    $("#rows").innerHTML = `<tr><td colspan="5"><div class="loading">加载中…</div></td></tr>`;
-    const params = {
-      keyword,
-      pageNumber: pager.pageNumber,
-      pageSize: pager.pageSize,
-      namespace: Ns.code()
-    };
-    if (kindFilter) params.kind = kindFilter;
-    try {
-      const page = await Api.listRules(params);
-      if (sequence !== loadSequence) return;
-      rules = page.items || [];
-      if (pager.update(page.total || 0)) return loadRules();
-      renderRows();
-    } catch (e) {
-      if (sequence !== loadSequence) return;
-      $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
-      pager.hide();
-    }
-  }
+  const loadRules = ruleList.load;
 
   function renderRows() {
     if (!rules.length) { $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">暂无业务规则</div></td></tr>`; return; }
@@ -693,6 +651,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     extractTimer = setTimeout(() => {
       absorbParamInputs();
       syncParamsFromExpr();
+      syncTestTargetFromExpr();
     }, 400);
   }
 
@@ -778,6 +737,35 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     refreshArgsCount();
   }
 
+  function syncTestTargetFromExpr(source = currentExpression(), reset = false) {
+    const area = $("#tTarget");
+    const names = extractTargetNames(source);
+    let value = {};
+    if (!reset) {
+      try {
+        const current = JSON.parse(area.value || "{}");
+        if (!current || Array.isArray(current) || typeof current !== "object") {
+          refreshTargetCount(names.length);
+          return;
+        }
+        value = current;
+      } catch (_) {
+        refreshTargetCount(names.length);
+        return;
+      }
+    }
+    let changed = reset;
+    names.forEach((name) => {
+      if (!Object.prototype.hasOwnProperty.call(value, name)) {
+        value[name] = null;
+        changed = true;
+      }
+    });
+    if (changed) area.value = JSON.stringify(value, null, 2);
+    refreshTargetCount(names.length);
+    validateJsonField(area);
+  }
+
   function readTestArgsRaw() {
     const out = {};
     document.querySelectorAll("#tArgs [data-arg]").forEach((el) => { out[el.dataset.arg] = el.value; });
@@ -836,7 +824,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     const expression = currentExpression().trim();
     if (!expression) { renderTestError("表达式不能为空"); return; }
     if (!validateJsonField($("#tTarget"))) { switchTestPane("target"); $("#tTarget").focus(); return; }
-    const target = parseJsonField($("#tTarget").value, "入参 $");
+    const target = parseJsonField($("#tTarget").value, "输入数据");
     const context = {};
     const collected = collectTestArgs();
     if (collected.error) { renderTestError(collected.error); return; }
@@ -866,8 +854,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
         ? `<div class="result-desc bad"><span>说明</span><code>渲染失败：${esc(rendered.error)}</code></div>`
         : (rendered.text ? `<div class="result-desc"><span>说明</span><code>${esc(rendered.text)}</code></div>` : "");
       // 布尔结果已经在徽标上，正文只回显本次实际输入；非布尔结果单独展示返回值
-      const echo = [["$", target.value === undefined ? null : target.value]];
-      if (Object.keys(collected.args).length) echo.push(["$args", collected.args]);
+      const echo = [["输入数据", target.value === undefined ? null : target.value]];
+      if (Object.keys(collected.args).length) echo.push(["规则参数", collected.args]);
       const returned = isBool ? "" : `<div class="result-value"><div><span>返回值</span><code>${
         esc(typeof result === "object" && result !== null ? JSON.stringify(result, null, 2) : String(result))}</code></div></div>`;
       const rows = echo.map(([k, v]) => `<div><span>${k}</span><code>${esc(JSON.stringify(v))}</code></div>`).join("");
@@ -884,7 +872,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     }
   }
 
-  // 入参与参数分页切换，参数页标出当前参数个数
+  // 输入数据与规则参数分页切换并显示自动提取数量
   function switchTestPane(pane) {
     document.querySelectorAll("#ruleDlg .ttab").forEach((b) => b.classList.toggle("on", b.dataset.tab === pane));
     document.querySelectorAll("#ruleDlg .tpane").forEach((a) => { a.hidden = a.dataset.pane !== pane; });
@@ -911,6 +899,12 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     badge.textContent = count;
   }
 
+  function refreshTargetCount(count = extractTargetNames(currentExpression()).length) {
+    const badge = $("#targetCount");
+    badge.hidden = count === 0;
+    badge.textContent = count;
+  }
+
   // 弹窗分页：编辑页藏起来时 CodeMirror 量不到尺寸，切回来必须 refresh
   function switchDialogPane(pane) {
     document.querySelectorAll("#ruleDlg .dtab").forEach((b) => b.classList.toggle("on", b.dataset.dtab === pane));
@@ -918,8 +912,8 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     if (pane === "edit" && exprEditor) requestAnimationFrame(() => exprEditor.refresh());
   }
 
-  function resetTestPanel() {
-    $("#tTarget").value = "{}";
+  function resetTestPanel(expression = "") {
+    syncTestTargetFromExpr(expression, true);
     document.querySelectorAll("#ruleDlg [data-json]").forEach((a) => validateJsonField(a));
     switchTestPane("target");
     switchDialogPane("edit");
@@ -947,7 +941,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       manual: !exprNames.includes(String(p.name || "")),
       stale: false
     }));
-    resetTestPanel();
+    resetTestPanel(expr);
     $("#ruleDlg").showModal();
     loadUdfPaths();
     const cm = ensureExprEditor();
@@ -989,7 +983,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       const tip = cnt > 0
         ? `该规则仍被 ${cnt} 个业务场景引用。停用（下架）后：新场景将无法再选用它，但已在使用的场景仍会继续正常运行。确定停用？`
         : "确定停用该规则？停用后新场景将无法再选用它。";
-      if (!window.confirm(tip)) return;
+      if (!await Ui.confirmAction(tip, { title: "停用规则", confirmLabel: "停用", danger: true })) return;
     }
     try {
       if (to === 0) await Api.disableRule(id, r.version);
@@ -1015,9 +1009,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   $("#kindFilters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
     document.querySelectorAll("#kindFilters .chip").forEach((c) => c.classList.remove("on"));
-    chip.classList.add("on"); kindFilter = chip.dataset.kind; pager.reset(); loadRules();
+    chip.classList.add("on"); kindFilter = chip.dataset.kind; ruleList.reset();
   });
-  $("#searchInput").addEventListener("input", Ui.debounce((e) => { keyword = e.target.value.trim(); pager.reset(); loadRules(); }, 250));
+  $("#searchInput").addEventListener("input", Ui.debounce((e) => { keyword = e.target.value.trim(); ruleList.reset(); }, 250));
   $("#newRuleBtn").addEventListener("click", () => openDialog(null));
   $("#dlgCancel").addEventListener("click", () => $("#ruleDlg").close());
   $("#dlgSave").addEventListener("click", saveRule);

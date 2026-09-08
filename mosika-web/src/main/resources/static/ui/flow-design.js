@@ -10,9 +10,15 @@
     const RULE_TYPES = ["BooleanNode", "LogicNode", "MatchNode"];
     const COMPOSITE_RULE_TYPES = ["LogicNode", "MatchNode"];
     const DEFAULT_BRANCH_TYPES = ["ActionNode", "SerialNode", "ParallelNode", "DecisionNode", "LoopNode"];
+    const RULE_OPERATORS = [
+        { value: "&&", label: "条件与" },
+        { value: "||", label: "条件或" },
+        { value: "some", label: "限定匹配" }
+    ];
 
     const CAPABILITIES = {
         TreeNode: {
+            name: "根节点", kind: "root", short: "开始", help: "规则树入口",
             config: "root",
             canvasLabel: "full",
             relations: {
@@ -20,6 +26,7 @@
             }
         },
         ActionNode: {
+            name: "动作节点", kind: "action", short: "动作", help: "执行指定动作",
             config: "action",
             canvasLabel: "full",
             passThrough: true,
@@ -28,6 +35,7 @@
             }
         },
         ConditionNode: {
+            name: "条件节点", kind: "condition", short: "条件", help: "按条件决定后续流程",
             config: "condition",
             canvasLabel: "full",
             passThrough: true,
@@ -36,6 +44,7 @@
             }
         },
         SerialNode: {
+            name: "串行节点", kind: "structure", short: "串", help: "子节点顺序执行",
             config: "structure",
             canvasLabel: "compact",
             conversions: ["SerialNode", "ParallelNode"],
@@ -44,6 +53,7 @@
             }
         },
         ParallelNode: {
+            name: "并行节点", kind: "structure", short: "并", help: "子节点并行执行",
             config: "structure",
             canvasLabel: "compact",
             conversions: ["SerialNode", "ParallelNode"],
@@ -52,6 +62,7 @@
             }
         },
         DecisionNode: {
+            name: "分支节点", kind: "structure", short: "分", help: "首个命中分支生效",
             config: "structure",
             canvasLabel: "compact",
             relations: {
@@ -62,12 +73,25 @@
             }
         },
         LoopNode: {
+            name: "循环节点", kind: "structure", short: "循", help: "条件命中时重复执行循环体",
             config: "loop",
             canvasLabel: "compact",
             passThrough: true,
             relations: {
                 next: relation(FLOW_TYPES, "添加循环体", 1, 1, "循环体不能为空")
             }
+        },
+        LogicNode: {
+            name: "逻辑", kind: "structure", short: "与", help: "组合多个判断条件"
+        },
+        MatchNode: {
+            name: "限定匹配", kind: "structure", short: "限", help: "按匹配数量判定"
+        },
+        AtomicNode: {
+            name: "动作规则", kind: "action", short: "R", help: "执行动作规则"
+        },
+        BooleanNode: {
+            name: "条件规则", kind: "condition", short: "B", help: "执行判断规则"
         }
     };
 
@@ -172,6 +196,13 @@
         return capability(nodeOrType)?.canvasLabel === "compact";
     }
 
+    function ruleOperator(nodeOrValue) {
+        const value = typeof nodeOrValue === "string"
+            ? nodeOrValue
+            : (nodeOrValue?.type === "MatchNode" ? "some" : nodeOrValue?.expr);
+        return RULE_OPERATORS.find((operator) => operator.value === value) || RULE_OPERATORS[0];
+    }
+
     function isCompositeRule(nodeOrType) {
         const type = typeof nodeOrType === "string" ? nodeOrType : nodeOrType?.type;
         return COMPOSITE_RULE_TYPES.includes(type);
@@ -186,6 +217,7 @@
         FLOW_TYPES,
         RULE_TYPES,
         COMPOSITE_RULE_TYPES,
+        RULE_OPERATORS,
         CAPABILITIES,
         capability,
         availableRelations,
@@ -200,6 +232,7 @@
         isPassThrough,
         conversionTypes,
         usesCompactCanvasLabel,
+        ruleOperator,
         isCompositeRule,
         canAddRule
     };

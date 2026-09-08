@@ -6,37 +6,10 @@
 <title>业务场景 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
+    <link rel="stylesheet" href="/ui/ui-common.css?v=20260908-9">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
-[hidden]{display:none!important}
-.app-shell{height:100vh;display:grid;grid-template-rows:58px minmax(0,1fr);position:relative}
-.topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:24px;padding:0 22px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(20,80,72,.05);}
-.brandwrap{display:flex;align-items:center;gap:14px}
-.brand{display:flex;align-items:center;gap:11px}
-.brand-home{color:inherit;text-decoration:none;border-radius:10px}
-.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:#fff;font-weight:800;background:linear-gradient(145deg,#2fd6c6,#0f9d8a);box-shadow:0 5px 12px rgba(15,157,138,.32)}
-.brand-home .brand-mark{transition:transform .16s ease,box-shadow .16s ease}.brand-home:hover{color:var(--teal-d)}.brand-home:hover .brand-mark{transform:translateY(-1px);box-shadow:0 7px 16px rgba(15,157,138,.4)}.brand-home:focus-visible{outline:2px solid var(--teal);outline-offset:4px}
-.brand b{font-size:var(--fs-panel)}.brand small{display:block;color:#6f8b86;font-size:var(--fs-caption);margin-top:1px}
-.tabs{display:flex;gap:6px}
-.tab{height:32px;padding:0 14px;border-radius:8px;font-size:var(--fs-base);color:#5c766f;display:flex;align-items:center;cursor:pointer;text-decoration:none}
-.tab.on{background:var(--teal-soft);color:var(--teal-d);font-weight:600}
-.search{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:var(--fs-panel)}/* 该字号只作用于框内 🔍 字形，输入框自带 --fs-base */
-.search input{border:none;outline:none;font-size:var(--fs-base);width:200px;background:transparent;color:#123038}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
-.btn:hover{border-color:#a9d3cc;background:#f5faf9}
-.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
-.btn.primary:hover{background:var(--teal-d)}
-.btn.danger{color:#fff;border-color:#cf5552;background:#cf5552;font-weight:600}
-.btn.danger:hover{border-color:#b94340;background:#b94340}
-.btn.link{border:none;background:none;color:var(--teal-d);padding:0 6px;height:auto;cursor:pointer}
-.main{overflow:auto;padding:24px 28px 32px}
-.panel{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(20,80,72,.05)}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:820px;border-collapse:collapse;font-size:var(--fs-base)}
-thead th{text-align:left;padding:13px 18px;color:#6f8b86;font-weight:600;font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
-tbody td{padding:15px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
-tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:#f7fcfb}
+.app-shell{height:100vh;position:relative}
+table{min-width:820px}
 .name{font-weight:600;font-size:var(--fs-strong)}
 .name .id{color:#9fb4af;font-weight:400;font-size:var(--fs-caption);margin-left:7px}
 .rowdesc{color:#71887f;font-size:var(--fs-minor);margin-top:3px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -50,17 +23,10 @@ tbody tr:hover{background:#f7fcfb}
 .actions{display:flex;gap:14px;align-items:center;justify-content:flex-end;white-space:nowrap}
 .actions .open{appearance:none;box-shadow:none;color:var(--teal-d);background:var(--teal-soft);border:1px solid #9fd8cf;border-radius:7px;height:28px;padding:0 16px;font-weight:600;font-size:var(--fs-meta);cursor:pointer}
 .actions .open:hover{background:#cdeee7;border-color:#7fccc0}
-.status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
-.status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
-.status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
-.status-toggle.is-on{color:var(--color-brand-strong);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--color-brand)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
+.status-toggle{width:104px;display:grid;grid-template-columns:34px 1fr;justify-self:end;color:#71887f}
 .status-toggle.is-draft{color:#a67823}.status-toggle.is-draft .status-toggle-track{background:#e4c77c}
-.status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
-.status-toggle:focus-visible{outline:2px solid var(--color-brand);outline-offset:3px;border-radius:7px}
 .status-toggle:disabled{cursor:wait;opacity:.58}.status-toggle.is-pending .status-toggle-track{animation:switchPulse .8s ease-in-out infinite alternate}
-.status-toggle-label{font-size:var(--fs-meta);line-height:1}
 @keyframes switchPulse{to{opacity:.5}}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d;font-size:var(--fs-field)}
 /* drawer */
 .scrim{position:absolute;inset:58px 0 0 0;background:rgba(18,48,56,.28);display:none}
 .scrim.show{display:block}
@@ -70,11 +36,7 @@ tbody tr:hover{background:#f7fcfb}
 .dw-head h2{font-size:var(--fs-title);display:flex;align-items:center;gap:10px}
 .x{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#6f8b86;cursor:pointer;font-size:15px}/* × 字形，不纳入文字刻度 */
 .dw-body{padding:20px 22px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:18px}
-.field label{display:block;font-size:var(--fs-meta);color:#5c766f;margin-bottom:7px;font-weight:600}
-.field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038;background:#fff;font-family:inherit}
-.field input:focus,.field textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .field textarea{min-height:80px;resize:vertical;line-height:1.55}
-.hint{font-size:var(--fs-caption);color:#93a89f;margin-top:6px}
 .metarow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .metabox{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#f8fcfb}
 .metabox .k{font-size:var(--fs-caption);color:#6f8b86}.metabox .v{font-size:var(--fs-title);font-weight:700;color:#234;margin-top:3px}
@@ -87,24 +49,19 @@ tbody tr:hover{background:#f7fcfb}
 .seg.on{background:var(--teal-soft);border-color:#9fd8cf;color:var(--teal-d);font-weight:600}
 .dw-foot{display:flex;align-items:center;gap:10px;padding:16px 22px;border-top:1px solid #eef4f2}
 .dw-foot .grow{flex:1}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
-.toast.show{opacity:.95}
-dialog{border:none;border-radius:14px;padding:0;margin:auto;box-shadow:0 20px 60px rgba(18,48,56,.28);width:min(420px,92vw)}
-dialog::backdrop{background:rgba(18,48,56,.3)}
+dialog{width:min(420px,92vw)}
 #newDlg{width:min(720px,94vw)}
 #newDlg .dlg-body{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;align-items:stretch}
 #newDlg .dlg-body>.field{display:flex;flex-direction:column;height:100%}
 #newDlg .dlg-body>.field>.hint{margin-top:auto;padding-top:6px}
-#newDlg .dlg-body>.field.span-2{grid-column:1/-1}
 @media(max-width:900px){#newDlg .dlg-body{grid-template-columns:1fr}#newDlg .dlg-body>.field.span-2{grid-column:1}}
 .dlg-head{padding:18px 24px 6px;font-size:var(--fs-title);font-weight:700}
 .dlg-body{padding:12px 24px;display:flex;flex-direction:column;gap:14px}
-.dlg-foot{padding:14px 24px 20px;display:flex;justify-content:flex-end;gap:10px}
+.dlg-foot{padding:14px 24px 20px}
 .confirm-message{font-size:var(--fs-base);color:#23443d;line-height:1.6}
 .confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:var(--fs-minor);line-height:1.55}
-@media(max-width:800px){.app-shell{height:auto;min-height:100vh}.brand-mark{width:32px;height:32px}.main{padding:16px 12px 24px}.drawer{width:100%;max-width:100vw}}
+@media(max-width:800px){.app-shell{height:auto}.drawer{width:100%;max-width:100vw}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -184,7 +141,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/ui-common.js?v=20260908-5"></script>
 <script src="/ui/api.js?v=20260908-3"></script>
 <script src="/ui/ns.js?v=20260908-3"></script>
 <script>
@@ -195,7 +152,6 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   const Ui = window.MosikaUi;
   const $ = Ui.$;
   let keyword = "";
-  let loadSequence = 0;
   let flows = [];
   let ruleNameById = new Map();
   let current = null; // drawer 当前 flow
@@ -206,7 +162,18 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
   const toast = Ui.createToast("#toast", { duration: 2000 });
   const esc = Ui.escapeHtml;
-  const pager = Ui.createPager("#pager", loadFlows);
+  const flowList = Ui.createPagedTable({
+    rows: "#rows",
+    pager: "#pager",
+    columns: 4,
+    fetchPage: ({ pageNumber, pageSize }) => Api.listFlows({
+      keyword, pageNumber, pageSize, namespace: Ns.code()
+    }),
+    renderRows: (items) => {
+      flows = items;
+      renderRows();
+    }
+  });
 
   // 把后端英文技术错误映射为可读中文；返回 {msg, detail}。detail 为原始信息（仅在有助于排查时展示）。
   function friendlyError(raw) {
@@ -252,26 +219,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
     } catch (_) { /* 引用名称不是列表主链路 */ }
   }
 
-  async function loadFlows() {
-    const sequence = ++loadSequence;
-    $("#rows").innerHTML = `<tr><td colspan="4"><div class="loading">加载中…</div></td></tr>`;
-    try {
-      const page = await Api.listFlows({
-        keyword,
-        pageNumber: pager.pageNumber,
-        pageSize: pager.pageSize,
-        namespace: Ns.code()
-      });
-      if (sequence !== loadSequence) return;
-      flows = page.items || [];
-      if (pager.update(page.total || 0)) return loadFlows();
-      renderRows();
-    } catch (e) {
-      if (sequence !== loadSequence) return;
-      $("#rows").innerHTML = `<tr><td colspan="4"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
-      pager.hide();
-    }
-  }
+  const loadFlows = flowList.load;
 
   const STATUS_META = {
     0: { label: "草稿", cls: "draft" },
@@ -342,8 +290,10 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
       $("#dwName").value.trim() !== (current.name || "").trim()
       || $("#dwDesc").value.trim() !== (current.description || "").trim()));
   }
-  function closeDrawer(force = false) {
-    if (!force && drawerDirty() && !window.confirm("详情中有未保存修改，确定关闭吗？")) return false;
+  async function closeDrawer(force = false) {
+    if (!force && drawerDirty() && !await Ui.confirmAction("详情中有未保存修改，确定关闭吗？", {
+      title: "放弃修改", confirmLabel: "放弃", danger: true
+    })) return false;
     $("#scrim").classList.remove("show"); $("#drawer").classList.remove("show");
     document.querySelector(".topbar").inert = false;
     document.querySelector(".main").inert = false;
@@ -482,8 +432,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
   });
   $("#searchInput").addEventListener("input", Ui.debounce((e) => {
     keyword = e.target.value.trim();
-    pager.reset();
-    loadFlows();
+    flowList.reset();
   }, 250));
   $("#dwClose").addEventListener("click", () => closeDrawer());
   $("#dwCancel").addEventListener("click", () => closeDrawer());

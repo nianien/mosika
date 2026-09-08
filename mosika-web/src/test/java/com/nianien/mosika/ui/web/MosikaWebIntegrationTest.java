@@ -795,33 +795,47 @@ class MosikaWebIntegrationTest {
     void webRoutesUseSpringBootStaticResources() throws Exception {
         mvc.perform(get("/ui/console.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("<main id=\"main\">")));
+                .andExpect(content().string(containsString("<main id=\"main\">")))
+                .andExpect(content().string(not(containsString("<code>$</code><span>输入数据"))));
         mvc.perform(get("/ui/namespaces.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("id=\"newBtn\"")));
+                .andExpect(this::assertSharedStylesPrecedePageStyles)
+                .andExpect(content().string(containsString("id=\"newBtn\"")))
+                .andExpect(content().string(containsString("Ui.confirmAction(")))
+                .andExpect(content().string(not(containsString("window.confirm"))));
         mvc.perform(get("/ui/ui-common.js"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("function createPager")))
+                .andExpect(content().string(containsString("function createPagedTable")))
+                .andExpect(content().string(containsString("function confirmAction")))
                 .andExpect(content().string(containsString("data-page-previous")))
                 .andExpect(content().string(containsString("data-page-next")));
         mvc.perform(get("/ui/ui-common.css"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(".control-page .pager")))
-                .andExpect(content().string(containsString(".control-page .top-actions")));
+                .andExpect(content().string(containsString(".control-page .top-actions")))
+                .andExpect(content().string(containsString(".control-page .field > label")))
+                .andExpect(content().string(not(containsString(".control-page .field label {"))));
         mvc.perform(get("/ui/flow-design.js"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("const CAPABILITIES")))
+                .andExpect(content().string(containsString("const RULE_OPERATORS")))
+                .andExpect(content().string(containsString("MatchNode: {")))
+                .andExpect(content().string(containsString("value: \"some\"")))
                 .andExpect(content().string(containsString("function requiredRelations")));
         mvc.perform(get("/ui/app.js"))
                 .andExpect(status().isOk())
                 .andExpect(result -> {
                     String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
-                    assertThat(source, containsString("name: \"限定匹配\""));
+                    assertThat(source, containsString("const TYPES = D.CAPABILITIES"));
+                    assertThat(source, containsString("function renderRuleBuilder"));
                     assertThat(source, containsString("textContent = \"匹配数量\""));
+                    assertThat(source, containsString("parseTestJson($(\"#testTargetInput\"), \"输入数据\")"));
                     assertThat(source, not(containsString("命中要求")));
                 });
         mvc.perform(get("/ui/scenes.html"))
                 .andExpect(status().isOk())
+                .andExpect(this::assertSharedStylesPrecedePageStyles)
                 .andExpect(content().string(containsString("id=\"newFlowBtn\"")))
                 .andExpect(content().string(not(containsString("id=\"sceneTitle\""))))
                 .andExpect(content().string(not(containsString("id=\"subCount\""))))
@@ -829,10 +843,13 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(not(containsString("data-status=\""))))
                 .andExpect(content().string(containsString("class=\"top-actions\"")))
                 .andExpect(content().string(not(containsString("class=\"workspace-head\""))))
-                .andExpect(content().string(containsString("Ui.createPager(\"#pager\", loadFlows)")))
+                .andExpect(content().string(containsString("Ui.createPagedTable({")))
+                .andExpect(content().string(containsString("Ui.confirmAction(")))
+                .andExpect(content().string(not(containsString("window.confirm"))))
                 .andExpect(content().string(not(containsString("function renderPager"))));
         mvc.perform(get("/ui/rules.html"))
                 .andExpect(status().isOk())
+                .andExpect(this::assertSharedStylesPrecedePageStyles)
                 .andExpect(content().string(containsString("id=\"newRuleBtn\"")))
                 .andExpect(content().string(not(containsString("id=\"subCount\""))))
                 .andExpect(content().string(not(containsString("<h1>"))))
@@ -841,10 +858,22 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(containsString("class=\"top-actions\"")))
                 .andExpect(content().string(containsString("params.kind = kindFilter")))
                 .andExpect(content().string(not(containsString("params.status = statusFilter"))))
-                .andExpect(content().string(containsString("Ui.createPager(\"#pager\", loadRules)")))
+                .andExpect(content().string(containsString("Ui.createPagedTable({")))
+                .andExpect(content().string(containsString("class=\"field field-description\"")))
+                .andExpect(content().string(containsString("function extractTargetNames")))
+                .andExpect(result -> {
+                    String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
+                    assertThat(source, containsString(">输入数据<i class=\"tab-count\""));
+                    assertThat(source, containsString(">规则参数<i class=\"tab-count\""));
+                    assertThat(source, not(containsString(">入参 $</button>")));
+                    assertThat(source, not(containsString(">参数 $args")));
+                })
+                .andExpect(content().string(containsString("Ui.confirmAction(")))
+                .andExpect(content().string(not(containsString("window.confirm"))))
                 .andExpect(content().string(not(containsString("function renderPager"))));
         mvc.perform(get("/ui/udfs.html"))
                 .andExpect(status().isOk())
+                .andExpect(this::assertSharedStylesPrecedePageStyles)
                 .andExpect(content().string(containsString("id=\"createBtn\"")))
                 .andExpect(content().string(not(containsString("<h1>"))))
                 .andExpect(content().string(not(containsString("id=\"filters\""))))
@@ -860,26 +889,26 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(containsString("id=\"jsDialog\"")))
                 .andExpect(content().string(containsString("data-js-view")))
                 .andExpect(content().string(not(containsString("data-toggle"))))
-                .andExpect(content().string(containsString("Ui.createPager(\"#pager\",load)")))
+                .andExpect(content().string(containsString("Ui.createPagedTable({")))
                 .andExpect(content().string(not(containsString("class=\"source"))))
                 .andExpect(content().string(not(containsString(">版本</th>"))));
         mvc.perform(get("/ui/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"treeRoot\"")))
-                .andExpect(content().string(containsString("value=\"LoopNode\"")))
+                .andExpect(content().string(containsString("<select id=\"nodeConfigType\"></select>")))
                 .andExpect(content().string(containsString("id=\"nodeConfigConfirmButton\"")))
                 .andExpect(content().string(containsString("id=\"actionConfigFields\"")))
                 .andExpect(content().string(containsString("id=\"ruleDialogLoopMax\"")))
-                .andExpect(content().string(containsString("name=\"ruleAddLogic\" value=\"some\"")))
-                .andExpect(content().string(containsString("id=\"ruleAddMatchBounds\"")))
-                .andExpect(content().string(containsString("name=\"ruleCompositeLogic\" value=\"some\"")))
-                .andExpect(content().string(containsString("id=\"ruleCompositeMatchBounds\"")))
+                .andExpect(content().string(containsString("id=\"ruleAddLogicField\" hidden></fieldset>")))
+                .andExpect(content().string(containsString("id=\"ruleCompositeLogicField\" hidden></fieldset>")))
+                .andExpect(content().string(not(containsString("<code>$</code><span>输入数据"))))
                 .andExpect(result -> {
                     String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
-                    assertThat(source, containsString("<span>限定匹配</span>"));
                     assertThat(source, containsString("id=\"ruleReferenceLabel\">匹配数量"));
                 })
-                .andExpect(content().string(containsString("/ui/flow-design.js?v=20260908-5")))
+                .andExpect(content().string(containsString("/ui/ui-common.css?v=20260908-9")))
+                .andExpect(content().string(containsString("/ui/ui-common.js?v=20260908-5")))
+                .andExpect(content().string(containsString("/ui/flow-design.js?v=20260908-6")))
                 .andExpect(content().string(not(containsString("id=\"nodeConfigLoopMax\""))))
                 .andExpect(content().string(not(containsString("id=\"nodeConfigRule\""))));
 
@@ -1090,6 +1119,11 @@ class MosikaWebIntegrationTest {
 
     private JsonNode data(MvcResult result) throws Exception {
         return mapper.readTree(result.getResponse().getContentAsString()).path("data");
+    }
+
+    private void assertSharedStylesPrecedePageStyles(MvcResult result) throws Exception {
+        String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
+        assertTrue(source.indexOf("/ui/ui-common.css") < source.indexOf("<style>"));
     }
 
     private static Path createDatabasePath() {

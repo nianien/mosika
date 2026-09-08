@@ -6,33 +6,14 @@
 <title>命名空间 · Mosika</title>
 <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
 <link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-9">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-/* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
-[hidden]{display:none!important}
-.app-shell{min-height:100vh;display:grid;grid-template-rows:58px 1fr}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 22px;border-bottom:1px solid var(--border);background:#fff}
-.brandwrap,.brand,.top-right,.actions,.pager{display:flex;align-items:center}
-.brand{gap:11px}
-.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:linear-gradient(145deg,#2fd6c6,#0f9d8a)}
-.brand b{font-size:var(--fs-panel)}
 .back-link{margin-left:26px;font-size:var(--fs-base);color:#5c766f;text-decoration:none;padding:0 10px;height:32px;display:none;align-items:center;border-radius:8px}
 .back-link.show{display:flex}
 .back-link:hover{background:var(--teal-soft);color:var(--teal-d)}
-.btn{height:34px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#2c5049;font-size:var(--fs-base);cursor:pointer}
-.btn.primary{color:#fff;border-color:var(--teal);background:var(--teal);font-weight:600}
-.btn.link{border:0;background:none;color:var(--teal-d);padding:0 5px}
-.btn.link.danger{color:#c2503c}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.main{padding:22px 26px;overflow:auto}
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .page-head h1{font-size:var(--fs-page)}
-.panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.scroll{overflow-x:auto}
-table{width:100%;min-width:880px;border-collapse:collapse;font-size:var(--fs-base)}
-th{text-align:left;padding:13px 18px;color:var(--muted);font-size:var(--fs-meta);background:#f4faf9;border-bottom:1px solid var(--border)}
-td{padding:14px 18px;border-bottom:1px solid #eef4f2;vertical-align:middle}
-tbody tr:last-child td{border-bottom:0}
+table{min-width:880px}
 .code{font-weight:600;font-size:var(--fs-base);font-family:var(--ff-mono);color:#086b60}
 .desc{color:#71887f;font-size:var(--fs-minor);margin-top:4px}
 .usage{color:#4d6b64;font-size:var(--fs-meta)}
@@ -41,25 +22,14 @@ tbody tr:last-child td{border-bottom:0}
 .pill.on{color:#1f7a43;background:#dcf9e4}
 .pill.off{color:var(--grey);background:var(--grey-soft)}
 .actions{gap:11px;justify-content:flex-end}
-.empty,.loading{padding:60px 20px;text-align:center;color:#8aa39d}
-.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#123038;color:#fff;padding:10px 18px;border-radius:10px;font-size:var(--fs-base);opacity:0;transition:.2s;pointer-events:none;z-index:20;max-width:70vw;text-align:center;line-height:1.5}
-.toast.show{opacity:.95}
-dialog{border:0;border-radius:16px;padding:0;margin:auto;width:min(560px,94vw);box-shadow:0 24px 70px rgba(18,48,56,.28)}
-dialog::backdrop{background:rgba(18,48,56,.32)}
+dialog{width:min(560px,94vw)}
 .dlg-head{padding:22px 26px 0}
-.dlg-title{font-size:var(--fs-title);font-weight:700}
-.dlg-sub{margin-top:6px;font-size:var(--fs-meta);color:var(--muted);line-height:1.55}
 .dlg-body{padding:18px 26px 4px;display:grid;gap:17px}
-.field label{display:block;font-size:var(--fs-meta);color:#3f5c56;margin-bottom:7px;font-weight:600}
-.field .req{color:#e0654e;margin-left:2px}
-.field input{width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:var(--fs-field);color:#123038}
-.field input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
 .field input:disabled{background:#f4faf9;color:#6f8b86}
-.hint{font-size:var(--fs-caption);color:#8aa39d;line-height:1.55;margin-top:6px}
-.dlg-foot{padding:14px 26px 22px;display:flex;align-items:center;justify-content:flex-end;gap:10px}
-@media(max-width:800px){.topbar{height:auto;padding:12px 14px;flex-wrap:wrap}.main{padding:16px 12px}.page-head{flex-direction:column}}
+.field textarea{min-height:80px;resize:vertical;line-height:1.55}
+.dlg-foot{padding:14px 26px 22px}
+@media(max-width:800px){.page-head{flex-direction:column}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -96,7 +66,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   <div class="dlg-body">
     <div class="field"><label>标识<span class="req">*</span></label><input id="cCode" placeholder="如 sales" autocomplete="off"><div class="hint">字母开头，最长 64 个字符；支持字母、数字、下划线、句点和连字符。创建后不可修改。</div></div>
     <div class="field"><label>名称<span class="req">*</span></label><input id="cName" placeholder="如 销售规则域" autocomplete="off"></div>
-    <div class="field"><label>描述</label><input id="cDesc" placeholder="业务边界" autocomplete="off"></div>
+    <div class="field"><label>描述</label><textarea id="cDesc" rows="2" placeholder="业务边界"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="cCancel">取消</button><button class="btn primary" id="cSave">创建</button></div>
 </dialog>
@@ -106,13 +76,13 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   <div class="dlg-body">
     <div class="field"><label>标识</label><input id="eCode" disabled></div>
     <div class="field"><label>名称<span class="req">*</span></label><input id="eName" autocomplete="off"></div>
-    <div class="field"><label>描述</label><input id="eDesc" autocomplete="off"></div>
+    <div class="field"><label>描述</label><textarea id="eDesc" rows="2"></textarea></div>
   </div>
   <div class="dlg-foot"><button class="btn" id="eCancel">取消</button><button class="btn primary" id="eSave">保存</button></div>
 </dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/ui-common.js?v=20260908-5"></script>
 <script src="/ui/api.js?v=20260908-3"></script>
 <script>
 (() => {
@@ -203,7 +173,9 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
         toast(`「${disable}」还有 ${u.rule} 条规则、${u.flow} 个场景、${u.udf} 个函数，清空后才能停用`);
         return;
       }
-      if (!window.confirm(`停用命名空间「${disable}」？停用后其下内容不再进入运行态。`)) return;
+      if (!await Ui.confirmAction(`停用命名空间「${disable}」？停用后其下内容不再进入运行态。`, {
+        title: "停用命名空间", confirmLabel: "停用", danger: true
+      })) return;
       btn.disabled = true;
       try { await Api.disableNamespace(disable); toast("已停用"); await load(); }
       catch (err) { toast(err.message); btn.disabled = false; }

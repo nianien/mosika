@@ -9,7 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
     <link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
     <link rel="stylesheet" href="/ui/styles.css?v=20260908-9">
-    <link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
+    <link rel="stylesheet" href="/ui/ui-common.css?v=20260908-9">
 </head>
 <body class="editor-page">
 <main class="app-shell">
@@ -94,7 +94,7 @@
                 </div>
                 <div class="test-json-tabs" aria-label="测试输入类型">
                     <div class="test-json-tab is-active">
-                        <code>$</code><span>输入数据</span>
+                        <span>输入数据</span>
                     </div>
                 </div>
                 <div class="test-json-editors">
@@ -193,14 +193,7 @@
         </div>
         <label class="detail-field" id="nodeConfigTypeField">
             <span class="detail-label">节点类型</span>
-            <select id="nodeConfigType">
-                <option value="ActionNode">动作节点</option>
-                <option value="ConditionNode">条件节点</option>
-                <option value="SerialNode">串行节点</option>
-                <option value="ParallelNode">并行节点</option>
-                <option value="DecisionNode">分支节点</option>
-                <option value="LoopNode">循环节点</option>
-            </select>
+            <select id="nodeConfigType"></select>
         </label>
         <section id="actionConfigFields" hidden>
             <label class="detail-field">
@@ -283,27 +276,7 @@
                         <div class="inspector-add-title" id="ruleAddTitle">添加规则</div>
                         <div class="rule-add-rows" id="ruleAddRows"></div>
                         <button class="rule-add-row-button" id="ruleAddRowButton" type="button">＋ 添加规则</button>
-                        <fieldset class="rule-logic-field" id="ruleAddLogicField" hidden>
-                            <legend>组合方式</legend>
-                            <div class="rule-radio-group">
-                                <label>
-                                    <input type="radio" name="ruleAddLogic" value="&amp;&amp;" checked>
-                                    <span>条件与</span>
-                                </label>
-                                <label>
-                                    <input type="radio" name="ruleAddLogic" value="||">
-                                    <span>条件或</span>
-                                </label>
-                                <label>
-                                    <input type="radio" name="ruleAddLogic" value="some">
-                                    <span>限定匹配</span>
-                                </label>
-                            </div>
-                            <div class="rule-match-bounds rule-builder-bounds" id="ruleAddMatchBounds" hidden>
-                                <label><span>最少匹配</span><input id="ruleAddMatchMin" type="number" min="0" step="1" placeholder="不限"></label>
-                                <label><span>最多匹配</span><input id="ruleAddMatchMax" type="number" min="0" step="1" placeholder="不限"></label>
-                            </div>
-                        </fieldset>
+                        <fieldset class="rule-logic-field" id="ruleAddLogicField" hidden></fieldset>
                         <div class="inspector-actions">
                             <button id="ruleAddCancelButton" type="button">取消</button>
                             <button class="primary" id="ruleAddConfirmButton" type="button">确认添加</button>
@@ -331,18 +304,7 @@
         </div>
         <div class="rule-add-rows" id="ruleCompositeRows"></div>
         <button class="rule-add-row-button" id="ruleCompositeAddRow" type="button" aria-label="添加一条规则">＋</button>
-        <fieldset class="rule-logic-field" id="ruleCompositeLogicField" hidden>
-            <legend>组合方式</legend>
-            <div class="rule-radio-group">
-                <label><input type="radio" name="ruleCompositeLogic" value="&&" checked><span>条件与</span></label>
-                <label><input type="radio" name="ruleCompositeLogic" value="||"><span>条件或</span></label>
-                <label><input type="radio" name="ruleCompositeLogic" value="some"><span>限定匹配</span></label>
-            </div>
-            <div class="rule-match-bounds rule-builder-bounds" id="ruleCompositeMatchBounds" hidden>
-                <label><span>最少匹配</span><input id="ruleCompositeMatchMin" type="number" min="0" step="1" placeholder="不限"></label>
-                <label><span>最多匹配</span><input id="ruleCompositeMatchMax" type="number" min="0" step="1" placeholder="不限"></label>
-            </div>
-        </fieldset>
+        <fieldset class="rule-logic-field" id="ruleCompositeLogicField" hidden></fieldset>
         <div class="dialog-actions">
             <button value="cancel" type="submit">取消</button>
             <button class="primary" id="ruleCompositeConfirmButton" type="button">确认</button>
@@ -352,11 +314,11 @@
 
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
-<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/ui-common.js?v=20260908-5"></script>
 <script src="/ui/treenode.js?v=20260908-4"></script>
-<script src="/ui/flow-design.js?v=20260908-5"></script>
+<script src="/ui/flow-design.js?v=20260908-6"></script>
 <script src="/ui/api.js?v=20260908-3"></script>
 <script src="/ui/ns.js?v=20260908-3"></script>
-<script src="/ui/app.js?v=20260908-13"></script>
+<script src="/ui/app.js?v=20260908-15"></script>
 </body>
 </html>

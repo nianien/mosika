@@ -22,19 +22,7 @@
     const D = window.MosikaFlowDesign;
     const { childEdges, childNodes, executionEdges, make } = T;
 
-    const TYPES = {
-        TreeNode: { name: "根节点", kind: "root", short: "开始", help: "规则树入口" },
-        SerialNode: { name: "串行节点", kind: "structure", short: "串", help: "子节点顺序执行" },
-        ParallelNode: { name: "并行节点", kind: "structure", short: "并", help: "子节点并行执行" },
-        DecisionNode: { name: "分支节点", kind: "structure", short: "分", help: "首个命中分支生效" },
-        ConditionNode: { name: "条件节点", kind: "condition", short: "条件", help: "按条件决定后续流程" },
-        LogicNode: { name: "逻辑", kind: "structure", short: "与", help: "组合多个判断条件" },
-        MatchNode: { name: "限定匹配", kind: "structure", short: "限", help: "按匹配数量判定" },
-        AtomicNode: { name: "动作规则", kind: "action", short: "R", help: "执行动作规则" },
-        BooleanNode: { name: "条件规则", kind: "condition", short: "B", help: "执行判断规则" },
-        ActionNode: { name: "动作节点", kind: "action", short: "动作", help: "执行指定动作" },
-        LoopNode: { name: "循环节点", kind: "structure", short: "循", help: "条件命中时重复执行循环体" }
-    };
+    const TYPES = D.CAPABILITIES;
 
     // 规则定义：默认演示假数据，接入后端后由 /api/rules 覆盖（见文件末尾接线层）。
     // expr 只保存稳定的 ruleId 引用；desc 供展示。动作与条件同源于规则池。
@@ -150,9 +138,6 @@
     let ruleJudgeDraft = null;
     let ruleDraftCommit = null;
     let ruleSelectedId = null;
-    let ruleAddRuleIds = [];
-    // 暂存面板每行已录入的 $args（JSON 文本），与 ruleAddRuleIds 同下标；确认添加时写入新建节点
-    let ruleAddArgs = [];
     // 后端接线：当前打开的 flow 元数据（null=独立演示，无法保存）。
     let flowMeta = null;
     let flowVersions = [];
@@ -1345,8 +1330,9 @@
             return;
         }
         if (!D.isCompositeRule(node)) { container.hidden = true; return; }
-        const value = node.type === "MatchNode" ? "some" : (node.expr === "||" ? "||" : "&&");
-        const label = value === "some" ? "限定匹配" : (value === "||" ? "条件或" : "条件与");
+        const operator = D.ruleOperator(node);
+        const value = operator.value;
+        const label = operator.label;
         container.className = "detail-field editable" + (ruleLogicEditing ? " field-editing" : "");
         const pencil = `<button class="field-edit" type="button" data-rulelogic-edit aria-label="编辑" title="编辑">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3z"/><path d="M13.5 6.5l4 4"/></svg>
@@ -1359,11 +1345,9 @@
             <div class="field-row">
                 <span class="detail-value">${label}</span>
                 ${ruleLogicEditing ? "" : pencil}
-                <select class="field-control" id="ruleLogicSelect">
-                    <option value="&&" ${value === "&&" ? "selected" : ""}>条件与</option>
-                    <option value="||" ${value === "||" ? "selected" : ""}>条件或</option>
-                    <option value="some" ${value === "some" ? "selected" : ""}>限定匹配</option>
-                </select>
+                <select class="field-control" id="ruleLogicSelect">${D.RULE_OPERATORS.map((item) =>
+                    `<option value="${item.value}" ${value === item.value ? "selected" : ""}>${item.label}</option>`
+                ).join("")}</select>
                 ${ruleLogicEditing ? confirmCancel : ""}
             </div>
             ${ruleLogicEditing ? `<div class="rule-match-bounds" id="ruleMatchBounds" ${value === "some" ? "" : "hidden"}>
@@ -1397,7 +1381,7 @@
         const node = found.node;
         const value = $("#ruleLogicSelect")?.value || "&&";
         if (value === "some") {
-            const bounds = parseMatchBounds($("#ruleMatchMin"), $("#ruleMatchMax"), node.rules.length);
+            const bounds = parseMatchBounds($("#ruleMatchMin").value, $("#ruleMatchMax").value, node.rules.length);
             if (bounds.error) {
                 openConfirm(bounds.error, { title: "节点尚未完成", confirmLabel: "知道了" });
                 return;
@@ -1527,137 +1511,124 @@
         });
     }
 
-    // ---- 组合规则构建（LogicNode 编辑器内联）----
-    let ruleCompositeRuleIds = [];
+    const RULE_BUILDER_VIEWS = {
+        root: { rows: "#ruleAddRows", logic: "#ruleAddLogicField", prefix: "ruleAdd" },
+        dialog: { rows: "#ruleCompositeRows", logic: "#ruleCompositeLogicField", prefix: "ruleComposite" }
+    };
+    let ruleBuilderState = null;
 
-    let compositePromoteFrom = null; // Atomic node being promoted to composite (null = adding to an existing composite)
+    function ruleBuilderView() {
+        return ruleBuilderState?.mode === "root" ? RULE_BUILDER_VIEWS.root : RULE_BUILDER_VIEWS.dialog;
+    }
+
+    function ruleBuilderRuleCount() {
+        return (ruleBuilderState?.rows.length || 0) + (ruleBuilderState?.promoteFrom ? 1 : 0);
+    }
+
+    function stagingRuleNode(row) {
+        return { type: "BooleanNode", expr: row?.ruleId || "", args: row?.args || "" };
+    }
+
+    function renderRuleBuilder(focusIndex = -1) {
+        if (!ruleBuilderState) return;
+        const view = ruleBuilderView();
+        const rows = $(view.rows);
+        rows.innerHTML = ruleBuilderState.rows.map((row, index) => {
+            const params = renderParamsSectionHtml(stagingRuleNode(row));
+            return `<div class="rule-add-row">
+                <div class="rule-add-field">
+                    <span class="detail-label">引用规则 ${index + 1}</span>
+                    ${definitionPickerHtml(
+                        `${view.prefix}Definition${index}`,
+                        "rule",
+                        RULE_DEFINITIONS,
+                        row.ruleId,
+                        row.ruleId,
+                        `data-rule-builder-select="${index}"`
+                    )}
+                </div>
+                <button type="button" data-rule-builder-remove="${index}" aria-label="删除规则 ${index + 1}"
+                        ${ruleBuilderState.rows.length === 1 ? "disabled" : ""}>×</button>
+            </div>
+            ${params ? `<div class="rule-add-params" data-rule-builder-params="${index}">${params}</div>` : ""}`;
+        }).join("");
+        renderRuleBuilderLogic();
+        requestAnimationFrame(() => {
+            if (focusIndex < 0) return;
+            const valueInput = rows.querySelector(`[data-rule-builder-select="${focusIndex}"]`);
+            valueInput?.closest(".rule-picker")?.querySelector(".rule-picker-filter")?.focus();
+        });
+    }
+
+    function renderRuleBuilderLogic() {
+        if (!ruleBuilderState) return;
+        const field = $(ruleBuilderView().logic);
+        const count = ruleBuilderRuleCount();
+        field.hidden = count < 2;
+        if (field.hidden) {
+            field.innerHTML = "";
+            return;
+        }
+        field.innerHTML = `<legend>组合方式</legend>
+            <div class="rule-radio-group">${D.RULE_OPERATORS.map((operator) => `<label>
+                <input type="radio" name="activeRuleBuilderLogic" value="${operator.value}"
+                       ${ruleBuilderState.operator === operator.value ? "checked" : ""}>
+                <span>${operator.label}</span>
+            </label>`).join("")}</div>
+            <div class="rule-match-bounds rule-builder-bounds" ${ruleBuilderState.operator === "some" ? "" : "hidden"}>
+                <label><span>最少匹配</span><input data-rule-builder-min type="number" min="0" max="${count}"
+                    step="1" placeholder="不限" value="${escapeText(ruleBuilderState.minHits)}"></label>
+                <label><span>最多匹配</span><input data-rule-builder-max type="number" min="0" max="${count}"
+                    step="1" placeholder="不限" value="${escapeText(ruleBuilderState.maxHits)}"></label>
+            </div>`;
+    }
+
+    function openRuleBuilder(mode, promoteFrom = null) {
+        const firstId = RULE_DEFINITIONS.find((definition) => definition.ruleId !== promoteFrom?.expr)?.ruleId
+            || RULE_DEFINITIONS[0]?.ruleId || "";
+        ruleBuilderState = {
+            mode,
+            promoteFrom,
+            operator: "&&",
+            minHits: "",
+            maxHits: "",
+            rows: [{ ruleId: firstId, args: "" }]
+        };
+        renderRuleBuilder(0);
+    }
+
+    function appendRuleBuilderRow() {
+        if (!ruleBuilderState) return;
+        const used = new Set(ruleBuilderState.rows.map((row) => row.ruleId));
+        if (ruleBuilderState.promoteFrom?.expr) used.add(ruleBuilderState.promoteFrom.expr);
+        const unused = RULE_DEFINITIONS.find((definition) => !used.has(definition.ruleId));
+        ruleBuilderState.rows.push({ ruleId: unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "", args: "" });
+        renderRuleBuilder(ruleBuilderState.rows.length - 1);
+    }
+
+    function removeRuleBuilderRow(index) {
+        if (!ruleBuilderState || ruleBuilderState.rows.length <= 1
+            || index < 0 || index >= ruleBuilderState.rows.length) return;
+        ruleBuilderState.rows.splice(index, 1);
+        renderRuleBuilder(Math.min(index, ruleBuilderState.rows.length - 1));
+    }
+
+    function cancelRuleBuilder() {
+        const root = ruleBuilderState?.mode === "root";
+        ruleBuilderState = null;
+        if (root) {
+            $("#ruleAddPanel").hidden = true;
+            updateRuleEditor();
+        } else if ($("#ruleAddDialog").open) {
+            $("#ruleAddDialog").close();
+        }
+    }
 
     function openCompositeBuilder() {
         const node = findRuleNode(ruleSelectedId)?.node;
         if (!node || !D.canAddRule(node)) return;
-        compositePromoteFrom = node.type === "BooleanNode" ? node : null;
-        const firstId = compositePromoteFrom
-            ? (RULE_DEFINITIONS.find((d) => d.ruleId !== compositePromoteFrom.expr)?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "")
-            : (RULE_DEFINITIONS[0]?.ruleId || "");
-        ruleCompositeRuleIds = [firstId];
-        document.querySelector('input[name="ruleCompositeLogic"][value="&&"]').checked = true;
-        $("#ruleCompositeMatchMin").value = "";
-        $("#ruleCompositeMatchMax").value = "";
-        renderCompositeRows();
-        document.getElementById("ruleAddDialog").showModal();
-    }
-
-    function renderCompositeRows() {
-        const container = $("#ruleCompositeRows");
-        container.innerHTML = ruleCompositeRuleIds.map((ruleId, index) => `
-            <div class="rule-add-row">
-                ${definitionPickerHtml(
-                    `compositeDefinition${index}`,
-                    "rule",
-                    RULE_DEFINITIONS,
-                    ruleId,
-                    ruleId,
-                    `data-composite-select="${index}"`
-                )}
-                <button type="button" data-composite-remove="${index}" aria-label="删除" ${ruleCompositeRuleIds.length <= 1 ? "disabled" : ""}>×</button>
-            </div>`).join("");
-        const compositeSize = ruleCompositeRuleIds.length + (compositePromoteFrom ? 1 : 0);
-        $("#ruleCompositeLogicField").hidden = compositeSize < 2;
-        syncBuilderBounds("ruleCompositeLogic", "#ruleCompositeMatchBounds", compositeSize);
-    }
-
-    function appendCompositeRow() {
-        const unused = RULE_DEFINITIONS.find((d) => !ruleCompositeRuleIds.includes(d.ruleId));
-        ruleCompositeRuleIds.push(unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "");
-        renderCompositeRows();
-    }
-
-    function removeCompositeRow(index) {
-        if (ruleCompositeRuleIds.length <= 1 || index < 0 || index >= ruleCompositeRuleIds.length) return;
-        ruleCompositeRuleIds.splice(index, 1);
-        renderCompositeRows();
-    }
-
-    function cancelCompositeBuilder() {
-        ruleCompositeRuleIds = [];
-        compositePromoteFrom = null;
-        document.getElementById("ruleAddDialog").close();
-    }
-
-    function confirmCompositeBuilder() {
-        const found = findRuleNode(ruleSelectedId);
-        const node = found?.node;
-        if (!node || ruleCompositeRuleIds.length < 1) return;
-        // Read latest select values
-        $("#ruleCompositeRows").querySelectorAll("[data-composite-select]").forEach((select) => {
-            ruleCompositeRuleIds[Number(select.dataset.compositeSelect)] = select.value;
-        });
-        const compositeSize = ruleCompositeRuleIds.length + (compositePromoteFrom ? 1 : 0);
-        const choice = compositeSize < 2
-            ? { operator: "&&", bounds: {} }
-            : builderChoice("ruleCompositeLogic", "#ruleCompositeMatchMin", "#ruleCompositeMatchMax", compositeSize);
-        if (!choice) return;
-
-        if (compositePromoteFrom && node.type === "BooleanNode") {
-            // 单规则转复合：保留原子规则并追加新规则
-            const lNode = choice.operator === "some"
-                ? make.some(choice.bounds.minHits, choice.bounds.maxHits)
-                : make.logic(choice.operator);
-            lNode.name = "";
-            // 保留原子规则的名称、取反状态和引用
-            const originalR = {
-                type: "BooleanNode", name: node.name || "", expr: node.expr,
-                args: node.args || "", negative: node.negative
-            };
-            if (node.name) originalR.name = node.name;
-            lNode.rules.push(originalR);
-            ruleCompositeRuleIds.forEach((ruleId) => {
-                const r = createAtomicRule(ruleId);
-                if (r) lNode.rules.push(r);
-            });
-            if (lNode.rules.length < 2) return;
-            const blocked = limitBlockReason(found.parent, lNode, 1);
-            if (blocked) {
-                document.getElementById("ruleAddDialog").close();
-                ruleCompositeRuleIds = []; compositePromoteFrom = null;
-                openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
-                return;
-            }
-            // parent 可能是 ConditionNode（rule 边）或组合规则节点（rules 数组）
-            const parent = found.parent;
-            if (isConditionOwner(parent)) {
-                setConditionRule(parent, lNode);
-            } else if (D.isCompositeRule(parent) && Array.isArray(parent.rules)) {
-                const idx = parent.rules.indexOf(node);
-                if (idx >= 0) parent.rules.splice(idx, 1, lNode);
-            }
-            document.getElementById("ruleAddDialog").close();
-            ruleCompositeRuleIds = []; compositePromoteFrom = null;
-            ruleSelectedId = idOf(lNode);
-            renderRuleTree();
-            updateRuleEditor();
-        } else if (D.isCompositeRule(node)) {
-            // 已有组合：直接追加子规则
-            let newNode;
-            if (ruleCompositeRuleIds.length === 1) {
-                newNode = createAtomicRule(ruleCompositeRuleIds[0]);
-            } else {
-                newNode = createCompositeRule(choice.operator, "", ruleCompositeRuleIds, choice.bounds);
-            }
-            if (!newNode) return;
-            const blocked = limitBlockReason(node, newNode);
-            if (blocked) {
-                document.getElementById("ruleAddDialog").close();
-                ruleCompositeRuleIds = []; compositePromoteFrom = null;
-                openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
-                return;
-            }
-            node.rules.push(newNode);
-            document.getElementById("ruleAddDialog").close();
-            ruleCompositeRuleIds = []; compositePromoteFrom = null;
-            renderRuleTree();
-            updateRuleEditor();
-        }
+        openRuleBuilder("dialog", node.type === "BooleanNode" ? node : null);
+        $("#ruleAddDialog").showModal();
     }
 
     function renderRuleDialog() {
@@ -1716,7 +1687,10 @@
         if (!ruleDialog.open) ruleDialog.showModal();
     }
 
-    function hideRulePopover() { $("#ruleAddPanel").hidden = true; }
+    function hideRulePopover() {
+        $("#ruleAddPanel").hidden = true;
+        if (ruleBuilderState?.mode === "root") ruleBuilderState = null;
+    }
 
     function ruleDefinitionById(ruleId) { return RULE_DEFINITION_BY_ID.get(ruleId) || null; }
     function actionDefinitionById(ruleId) { return ACTION_DEFINITION_BY_ID.get(ruleId) || null; }
@@ -1727,9 +1701,7 @@
         return make.atom(definition.ruleId, name.trim());
     }
 
-    function createCompositeRule(operator, name, ruleIds, bounds = {}) {
-        const rules = ruleIds.map((ruleId) => createAtomicRule(ruleId));
-        if (rules.some((rule) => !rule)) return null;
+    function createCompositeRule(operator, name, rules, bounds = {}) {
         const node = operator === "some"
             ? make.some(bounds.minHits, bounds.maxHits)
             : make.logic(operator);
@@ -1738,9 +1710,9 @@
         return node;
     }
 
-    function parseMatchBounds(minInput, maxInput, ruleCount) {
-        const minText = minInput?.value.trim() || "";
-        const maxText = maxInput?.value.trim() || "";
+    function parseMatchBounds(minValue, maxValue, ruleCount) {
+        const minText = String(minValue ?? "").trim();
+        const maxText = String(maxValue ?? "").trim();
         if (minText === "" && maxText === "") {
             return { error: "最少匹配和最多匹配不能同时为空" };
         }
@@ -1754,70 +1726,16 @@
         return { minHits, maxHits };
     }
 
-    function builderChoice(groupName, minSelector, maxSelector, ruleCount) {
-        const operator = document.querySelector(`input[name="${groupName}"]:checked`)?.value || "&&";
+    function ruleBuilderChoice() {
+        if (!ruleBuilderState) return null;
+        const operator = ruleBuilderRuleCount() < 2 ? "&&" : ruleBuilderState.operator;
         if (operator !== "some") return { operator, bounds: {} };
-        const bounds = parseMatchBounds($(minSelector), $(maxSelector), ruleCount);
+        const bounds = parseMatchBounds(ruleBuilderState.minHits, ruleBuilderState.maxHits, ruleBuilderRuleCount());
         if (bounds.error) {
             openConfirm(bounds.error, { title: "节点尚未完成", confirmLabel: "知道了" });
             return null;
         }
         return { operator, bounds };
-    }
-
-    function syncBuilderBounds(groupName, boundsSelector, ruleCount) {
-        const bounds = $(boundsSelector);
-        const selected = document.querySelector(`input[name="${groupName}"]:checked`)?.value || "&&";
-        bounds.hidden = selected !== "some";
-        bounds.querySelectorAll("input").forEach((input) => { input.max = String(ruleCount); });
-    }
-
-    // 暂存行的临时原子规则节点：仅用于复用参数区渲染与回填，不进入规则树
-    function stagingRuleNode(index) {
-        return { type: "BooleanNode", expr: ruleAddRuleIds[index] || "", args: ruleAddArgs[index] || "" };
-    }
-
-    function renderRuleAddRows(focusIndex = -1) {
-        $("#ruleAddRows").innerHTML = ruleAddRuleIds.map((ruleId, index) => {
-            const params = renderParamsSectionHtml(stagingRuleNode(index));
-            return `
-            <div class="rule-add-row">
-                <div class="rule-add-field">
-                    <span class="detail-label">引用规则 ${index + 1}</span>
-                    ${definitionPickerHtml(
-                        `ruleAddDefinition${index}`,
-                        "rule",
-                        RULE_DEFINITIONS,
-                        ruleId,
-                        ruleId,
-                        `data-rule-add-select="${index}"`
-                    )}
-                </div>
-                <button type="button" data-rule-add-remove="${index}" aria-label="删除规则 ${index + 1}" ${ruleAddRuleIds.length === 1 ? "disabled" : ""}>×</button>
-            </div>
-            ${params ? `<div class="rule-add-params" data-rule-add-params="${index}">${params}</div>` : ""}`;
-        }).join("");
-        $("#ruleAddLogicField").hidden = ruleAddRuleIds.length <= 1;
-        syncBuilderBounds("ruleAddLogic", "#ruleAddMatchBounds", ruleAddRuleIds.length);
-        requestAnimationFrame(() => {
-            if (focusIndex < 0) return;
-            const valueInput = $(`[data-rule-add-select="${focusIndex}"]`);
-            valueInput?.closest(".rule-picker")?.querySelector(".rule-picker-filter")?.focus();
-        });
-    }
-
-    function appendRuleAddRow() {
-        const unused = RULE_DEFINITIONS.find((definition) => !ruleAddRuleIds.includes(definition.ruleId));
-        ruleAddRuleIds.push(unused?.ruleId || RULE_DEFINITIONS[0]?.ruleId || "");
-        ruleAddArgs.push("");
-        renderRuleAddRows(ruleAddRuleIds.length - 1);
-    }
-
-    function removeRuleAddRow(index) {
-        if (ruleAddRuleIds.length <= 1 || index < 0 || index >= ruleAddRuleIds.length) return;
-        ruleAddRuleIds.splice(index, 1);
-        ruleAddArgs.splice(index, 1);
-        renderRuleAddRows(Math.min(index, ruleAddRuleIds.length - 1));
     }
 
     function startRuleAdd() {
@@ -1831,50 +1749,89 @@
         $("#ruleNegateField").hidden = true;
         $("#ruleReferenceField").hidden = true;
         $("#ruleAddTitle").textContent = "配置根规则";
-        ruleAddRuleIds = [RULE_DEFINITIONS[0]?.ruleId || ""];
-        ruleAddArgs = [""];
-        document.querySelector('input[name="ruleAddLogic"][value="&&"]').checked = true;
-        $("#ruleAddMatchMin").value = "";
-        $("#ruleAddMatchMax").value = "";
         $("#ruleEditorFooter").hidden = true;
         $("#ruleAddPanel").hidden = false;
-        renderRuleAddRows(0);
+        openRuleBuilder("root");
     }
 
-    function cancelRuleAdd() {
-        ruleAddRuleIds = [];
-        ruleAddArgs = [];
-        $("#ruleAddPanel").hidden = true;
-        updateRuleEditor();
+    function createRuleBuilderRules() {
+        if (!ruleBuilderState) return null;
+        const rules = ruleBuilderState.rows.map((row) => {
+            const rule = createAtomicRule(row.ruleId);
+            if (rule && row.args) rule.args = row.args;
+            return rule;
+        });
+        return rules.some((rule) => !rule) ? null : rules;
     }
 
-    function confirmRuleAdd() {
-        const judge = currentRuleJudge();
-        if (!judge || ruleAddRuleIds.length === 0 || conditionRule(judge)) return;
-        const choice = ruleAddRuleIds.length < 2
-            ? { operator: "&&", bounds: {} }
-            : builderChoice("ruleAddLogic", "#ruleAddMatchMin", "#ruleAddMatchMax", ruleAddRuleIds.length);
-        if (!choice) return;
-        const node = ruleAddRuleIds.length === 1
-            ? createAtomicRule(ruleAddRuleIds[0])
-            : createCompositeRule(choice.operator, "", ruleAddRuleIds, choice.bounds);
-        if (!node) return;
-        const blocked = limitBlockReason(judge, node);
-        if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
-        if (node.type === "BooleanNode") {
-            if (ruleAddArgs[0]) node.args = ruleAddArgs[0];
-        } else if (Array.isArray(node.rules)) {
-            node.rules.forEach((child, index) => {
-                if (child.type === "BooleanNode" && ruleAddArgs[index]) child.args = ruleAddArgs[index];
-            });
+    function createRuleBuilderNode(rules, choice) {
+        return rules.length === 1 ? rules[0] : createCompositeRule(choice.operator, "", rules, choice.bounds);
+    }
+
+    function closeRuleBuilderDialog() {
+        if ($("#ruleAddDialog").open) $("#ruleAddDialog").close();
+        ruleBuilderState = null;
+    }
+
+    function confirmRuleBuilder() {
+        if (!ruleBuilderState) return;
+        const choice = ruleBuilderChoice();
+        const rules = createRuleBuilderRules();
+        if (!choice || !rules) return;
+
+        if (ruleBuilderState.mode === "root") {
+            const judge = currentRuleJudge();
+            if (!judge || conditionRule(judge)) return;
+            const node = createRuleBuilderNode(rules, choice);
+            const blocked = limitBlockReason(judge, node);
+            if (blocked) { openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" }); return; }
+            setConditionRule(judge, node);
+            ruleSelectedId = idOf(node);
+            ruleBuilderState = null;
+            hideRulePopover();
+            renderRuleDialog();
+            render({ preserveView: true });
+            return;
         }
-        setConditionRule(judge, node);
-        ruleSelectedId = idOf(node);
-        ruleAddRuleIds = [];
-        ruleAddArgs = [];
-        hideRulePopover();
-        renderRuleDialog();
-        render({ preserveView: true });
+
+        const found = findRuleNode(ruleSelectedId);
+        const node = found?.node;
+        if (!node) return;
+
+        if (ruleBuilderState.promoteFrom && node.type === "BooleanNode") {
+            const composite = createCompositeRule(choice.operator, "", [cloneNode(node), ...rules], choice.bounds);
+            const blocked = limitBlockReason(found.parent, composite, 1);
+            if (blocked) {
+                closeRuleBuilderDialog();
+                openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
+                return;
+            }
+            const parent = found.parent;
+            if (isConditionOwner(parent)) {
+                setConditionRule(parent, composite);
+            } else if (D.isCompositeRule(parent)) {
+                const index = parent.rules.indexOf(node);
+                if (index >= 0) parent.rules.splice(index, 1, composite);
+            }
+            closeRuleBuilderDialog();
+            ruleSelectedId = idOf(composite);
+            renderRuleTree();
+            updateRuleEditor();
+            return;
+        }
+
+        if (!D.isCompositeRule(node)) return;
+        const added = createRuleBuilderNode(rules, choice);
+        const blocked = limitBlockReason(node, added);
+        if (blocked) {
+            closeRuleBuilderDialog();
+            openConfirm(blocked, { title: "超出编辑器上限", confirmLabel: "知道了" });
+            return;
+        }
+        node.rules.push(added);
+        closeRuleBuilderDialog();
+        renderRuleTree();
+        updateRuleEditor();
     }
 
     async function deleteSelectedRule() {
@@ -2495,7 +2452,7 @@
         materializeParamDefaults(tree);
         let target;
         try {
-            target = parseTestJson($("#testTargetInput"), "$ 输入数据");
+            target = parseTestJson($("#testTargetInput"), "输入数据");
         } catch (error) {
             showTestFailure(error.message);
             return;
@@ -2999,62 +2956,62 @@
     });
     $("#ruleDialogCancelButton").addEventListener("click", () => { ruleDialogCommitted = false; ruleDialog.close(); });
     $("#ruleEditorDeleteButton").addEventListener("click", () => { deleteSelectedRule(); });
-    $("#ruleAddCancelButton").addEventListener("click", cancelRuleAdd);
-    $("#ruleAddConfirmButton").addEventListener("click", confirmRuleAdd);
-    $("#ruleAddRowButton").addEventListener("click", appendRuleAddRow);
-    $("#ruleAddLogicField").addEventListener("change", (event) => {
-        if (event.target.name === "ruleAddLogic") {
-            syncBuilderBounds("ruleAddLogic", "#ruleAddMatchBounds", ruleAddRuleIds.length);
-        }
-    });
-    // 暂存行参数录入：就地写回该行 args 暂存值，不重渲染以保留输入焦点
-    const onRuleAddArgInput = (event) => {
+    $("#ruleAddCancelButton").addEventListener("click", cancelRuleBuilder);
+    $("#ruleAddConfirmButton").addEventListener("click", confirmRuleBuilder);
+    $("#ruleAddRowButton").addEventListener("click", appendRuleBuilderRow);
+    $("#ruleEditorAddRuleButton").addEventListener("click", openCompositeBuilder);
+    $("#ruleCompositeAddRow").addEventListener("click", appendRuleBuilderRow);
+    $("#ruleCompositeConfirmButton").addEventListener("click", confirmRuleBuilder);
+
+    const onRuleBuilderArgInput = (event) => {
         if (!event.target.classList.contains("arg-control")) return false;
-        const wrap = event.target.closest("[data-rule-add-params]");
+        const wrap = event.target.closest("[data-rule-builder-params]");
         if (!wrap) return false;
-        const index = Number(wrap.dataset.ruleAddParams);
-        if (!Number.isInteger(index) || ruleAddRuleIds[index] === undefined) return false;
-        const staging = stagingRuleNode(index);
+        const index = Number(wrap.dataset.ruleBuilderParams);
+        const row = ruleBuilderState?.rows[index];
+        if (!Number.isInteger(index) || !row) return false;
+        const staging = stagingRuleNode(row);
         commitArgsFromInputs(staging, wrap);
-        ruleAddArgs[index] = staging.args || "";
+        row.args = staging.args || "";
         refreshArgMarks(staging, wrap);
         return true;
     };
-    $("#ruleAddRows").addEventListener("input", onRuleAddArgInput);
-    $("#ruleAddRows").addEventListener("change", (event) => {
-        if (onRuleAddArgInput(event)) return;
-        const index = Number(event.target.dataset.ruleAddSelect);
-        if (!Number.isInteger(index) || ruleAddRuleIds[index] === undefined) return;
-        if (ruleAddRuleIds[index] !== event.target.value) ruleAddArgs[index] = "";
-        ruleAddRuleIds[index] = event.target.value;
-        renderRuleAddRows();
+
+    const onRuleBuilderRowsChange = (event) => {
+        if (onRuleBuilderArgInput(event)) return;
+        const select = event.target.closest("[data-rule-builder-select]");
+        if (!select) return;
+        const row = ruleBuilderState?.rows[Number(select.dataset.ruleBuilderSelect)];
+        if (!row) return;
+        if (row.ruleId !== select.value) row.args = "";
+        row.ruleId = select.value;
+        renderRuleBuilder();
+    };
+    const onRuleBuilderRowsClick = (event) => {
+        const button = event.target.closest("[data-rule-builder-remove]");
+        if (button) removeRuleBuilderRow(Number(button.dataset.ruleBuilderRemove));
+    };
+    const onRuleBuilderLogicChange = (event) => {
+        if (!ruleBuilderState || event.target.name !== "activeRuleBuilderLogic") return;
+        ruleBuilderState.operator = event.target.value;
+        renderRuleBuilderLogic();
+    };
+    const onRuleBuilderBoundsInput = (event) => {
+        if (!ruleBuilderState) return;
+        if (event.target.matches("[data-rule-builder-min]")) ruleBuilderState.minHits = event.target.value;
+        if (event.target.matches("[data-rule-builder-max]")) ruleBuilderState.maxHits = event.target.value;
+    };
+    ["#ruleAddRows", "#ruleCompositeRows"].forEach((selector) => {
+        $(selector).addEventListener("input", onRuleBuilderArgInput);
+        $(selector).addEventListener("change", onRuleBuilderRowsChange);
+        $(selector).addEventListener("click", onRuleBuilderRowsClick);
     });
-    $("#ruleAddRows").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-rule-add-remove]");
-        if (button) removeRuleAddRow(Number(button.dataset.ruleAddRemove));
+    ["#ruleAddLogicField", "#ruleCompositeLogicField"].forEach((selector) => {
+        $(selector).addEventListener("change", onRuleBuilderLogicChange);
+        $(selector).addEventListener("input", onRuleBuilderBoundsInput);
     });
-    $("#ruleEditorAddRuleButton").addEventListener("click", openCompositeBuilder);
-    $("#ruleCompositeAddRow").addEventListener("click", appendCompositeRow);
-    $("#ruleCompositeRows").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-composite-remove]");
-        if (button) removeCompositeRow(Number(button.dataset.compositeRemove));
-    });
-    $("#ruleCompositeRows").addEventListener("change", (event) => {
-        const valueInput = event.target.closest("[data-composite-select]");
-        if (!valueInput) return;
-        const index = Number(valueInput.dataset.compositeSelect);
-        if (Number.isInteger(index) && ruleCompositeRuleIds[index] !== undefined) {
-            ruleCompositeRuleIds[index] = valueInput.value;
-        }
-    });
-    $("#ruleCompositeCancelButton")?.addEventListener("click", cancelCompositeBuilder);
-    document.getElementById("ruleAddDialog").addEventListener("close", () => { ruleCompositeRuleIds = []; });
-    $("#ruleCompositeConfirmButton").addEventListener("click", confirmCompositeBuilder);
-    $("#ruleCompositeLogicField").addEventListener("change", (event) => {
-        if (event.target.name === "ruleCompositeLogic") {
-            const size = ruleCompositeRuleIds.length + (compositePromoteFrom ? 1 : 0);
-            syncBuilderBounds("ruleCompositeLogic", "#ruleCompositeMatchBounds", size);
-        }
+    $("#ruleAddDialog").addEventListener("close", () => {
+        if (ruleBuilderState?.mode === "dialog") ruleBuilderState = null;
     });
     $("#ruleEditorSubrules").addEventListener("change", (event) => {
         const select = event.target.closest("[data-subrule-select]");

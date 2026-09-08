@@ -59,9 +59,25 @@ test("every flow type has one centralized capability declaration", () => {
         const definition = Design.capability(type);
         assert.ok(definition, `${type} capability is missing`);
         assert.ok(definition.config, `${type} config is missing`);
+        assert.ok(definition.name, `${type} name is missing`);
+        assert.ok(definition.short, `${type} short label is missing`);
+        assert.ok(definition.kind, `${type} visual kind is missing`);
+        assert.ok(definition.help, `${type} help text is missing`);
         assert.ok(["full", "compact"].includes(definition.canvasLabel), `${type} canvas label policy is missing`);
         assert.ok(definition.relations, `${type} relations are missing`);
     });
+});
+
+test("node presentation and rule operator labels have one source", () => {
+    assert.equal(Design.capability("LoopNode").short, "循");
+    assert.equal(Design.capability("MatchNode").name, "限定匹配");
+    assert.deepEqual(Design.RULE_OPERATORS.map(({ value, label }) => [value, label]), [
+        ["&&", "条件与"],
+        ["||", "条件或"],
+        ["some", "限定匹配"]
+    ]);
+    assert.equal(Design.ruleOperator({ type: "LogicNode", expr: "||" }).label, "条件或");
+    assert.equal(Design.ruleOperator({ type: "MatchNode" }).label, "限定匹配");
 });
 
 test("tree model owns the rule argument capability", () => {

@@ -128,12 +128,89 @@
         };
     }
 
+    function createPagedTable(options) {
+        const rows = typeof options.rows === "string" ? query(options.rows) : options.rows;
+        const columns = options.columns;
+        let sequence = 0;
+        let pager;
+
+        async function load() {
+            const current = ++sequence;
+            rows.innerHTML = `<tr><td colspan="${columns}"><div class="loading">加载中…</div></td></tr>`;
+            try {
+                const page = await options.fetchPage({
+                    pageNumber: pager.pageNumber,
+                    pageSize: pager.pageSize
+                }) || {};
+                if (current !== sequence) return;
+                if (pager.update(page.total || 0)) return load();
+                options.renderRows(page.items || [], page);
+            } catch (error) {
+                if (current !== sequence) return;
+                rows.innerHTML = `<tr><td colspan="${columns}"><div class="empty">加载失败：${escapeHtml(error.message)}</div></td></tr>`;
+                pager.hide();
+            }
+        }
+
+        pager = createPager(options.pager, load, options.pageSize);
+        return {
+            pager,
+            load,
+            reset() {
+                pager.reset();
+                return load();
+            }
+        };
+    }
+
+    let confirmDialog;
+    let confirmPromise;
+
+    function createConfirmDialog() {
+        const dialog = document.createElement("dialog");
+        dialog.className = "ui-confirm-dialog";
+        dialog.innerHTML = `
+            <form method="dialog">
+                <div class="dlg-head"><div class="dlg-title" data-confirm-title></div></div>
+                <div class="dlg-body"><p class="confirm-message" data-confirm-message></p></div>
+                <div class="dlg-foot">
+                    <button class="btn" value="cancel">取消</button>
+                    <button class="btn" value="confirm" data-confirm-button></button>
+                </div>
+            </form>`;
+        document.body.appendChild(dialog);
+        return dialog;
+    }
+
+    function confirmAction(message, options) {
+        const settings = options || {};
+        confirmDialog ||= createConfirmDialog();
+        if (confirmDialog.open) return confirmPromise;
+        query("[data-confirm-title]", confirmDialog).textContent = settings.title || "确认操作";
+        query("[data-confirm-message]", confirmDialog).textContent = String(message ?? "");
+        const button = query("[data-confirm-button]", confirmDialog);
+        button.textContent = settings.confirmLabel || "确认";
+        button.className = `btn ${settings.danger ? "danger" : "primary"}`;
+        confirmDialog.returnValue = "";
+        confirmPromise = new Promise((resolve) => {
+            confirmDialog.addEventListener("close", () => {
+                const confirmed = confirmDialog.returnValue === "confirm";
+                confirmPromise = null;
+                resolve(confirmed);
+            }, { once: true });
+            confirmDialog.showModal();
+        });
+        return confirmPromise;
+    }
+
     root.MosikaUi = {
         $: query,
         escapeHtml,
         debounce,
         createToast,
         setBusy,
-        createPager
+        createPager,
+        createPagedTable,
+        confirmAction
     };
 })(window);
