@@ -47,10 +47,14 @@
     --color-brand-soft: #e7f6f2;
     --color-structure: #0e7490;
     --color-structure-soft: #e8f7fa;
+    --color-structure-border: #22d3ee;
+    --color-structure-line: #9dd6db;
     --color-condition: #a9690c;
     --color-condition-soft: #fff4dc;
+    --color-condition-border: #f2d34e;
     --color-action: #217a4b;
     --color-action-soft: #e4f6ea;
+    --color-action-border: #34c46f;
     --color-danger: #b94743;
     --color-danger-soft: #fff0ef;
 

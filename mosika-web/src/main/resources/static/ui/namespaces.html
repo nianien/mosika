@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>命名空间 · Mosika</title>
 <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-<link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
+<link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
@@ -27,7 +27,6 @@
 .main{padding:22px 26px;overflow:auto}
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
 .page-head h1{font-size:var(--fs-page)}
-.page-head p{font-size:var(--fs-base);color:var(--muted);margin-top:5px;line-height:1.6}
 .panel{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden}
 .scroll{overflow-x:auto}
 table{width:100%;min-width:880px;border-collapse:collapse;font-size:var(--fs-base)}
@@ -60,7 +59,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
 .dlg-foot{padding:14px 26px 22px;display:flex;align-items:center;justify-content:flex-end;gap:10px}
 @media(max-width:800px){.topbar{height:auto;padding:12px 14px;flex-wrap:wrap}.main{padding:16px 12px}.page-head{flex-direction:column}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -73,10 +72,7 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   </div>
   <main class="main">
     <div class="page-head">
-      <div>
-        <h1>命名空间</h1>
-        <p id="summary">加载中…</p>
-      </div>
+      <h1>命名空间</h1>
     </div>
     <section class="panel">
       <div class="scroll">
@@ -116,8 +112,8 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
 </dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/ui/ui-common.js?v=20260813-1"></script>
-<script src="/ui/api.js?v=20260813-1"></script>
+<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/api.js?v=20260908-3"></script>
 <script>
 (() => {
   "use strict";
@@ -173,7 +169,6 @@ dialog::backdrop{background:rgba(18,48,56,.32)}
   async function load() {
     try {
       items = (await Api.listNamespaces()) || [];
-      $("#summary").textContent = `共 ${items.length} 个命名空间`;
     } catch (e) {
       $("#rows").innerHTML = `<tr><td colspan="5"><div class="empty">加载失败：${esc(e.message)}</div></td></tr>`;
       return;

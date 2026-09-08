@@ -12,7 +12,7 @@
 <meta name="twitter:title" content="Mosika 2.0｜可视化规则编排与执行引擎">
 <meta name="twitter:description" content="在一棵规则树中表达条件判断、流程编排、规则复用、业务扩展和执行追踪。">
 <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-<link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
+<link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
 <style>
 :root{
   --home-ink:#17223b;
@@ -113,7 +113,6 @@ a{color:inherit}
 }
 .editor-title-meta,.editor-canvas-tools{display:flex;align-items:center;gap:8px}
 .editor-title-meta strong{color:#33415d;font-size:10px}
-.runtime-label{padding-left:8px;border-left:2px solid #08796c;color:#718095;font-family:var(--ff-mono);font-size:8px}
 .editor-tool{
   height:24px;padding:0 8px;border:1px solid #d8dfe8;border-radius:6px;
   display:grid;place-items:center;color:#667389;background:#fff;font-size:8px;
@@ -264,12 +263,12 @@ a:focus-visible{outline:2px solid var(--color-structure);outline-offset:3px}
           <div class="editor-workspace">
             <div class="editor-canvas-panel">
               <div class="editor-canvas-titlebar">
-                <div class="editor-title-meta"><strong>标准深度文章生成 V2</strong><span class="runtime-label">规则结构与执行语义一致</span><span>执行路径已渲染</span></div>
+                <div class="editor-title-meta"><strong>标准深度文章生成 V2</strong></div>
                 <div class="editor-canvas-tools"><span class="editor-tool">折叠全部</span><span class="editor-tool">测试</span><span class="editor-tool">V2 · 2.0 预览</span><span class="editor-tool primary">修改</span><span class="editor-state">当前版本</span></div>
               </div>
 
               <div class="editor-tree-viewport">
-                <div class="editor-tree-stage" role="img" aria-label="标准深度文章生成规则树，包含分支、串行、并行、命中数量判断、有界循环和发布动作">
+                <div class="editor-tree-stage" role="img" aria-label="标准深度文章生成规则树，包含分支、串行、并行、限定匹配、有界循环和发布动作">
                   <svg class="tree-lines" viewBox="0 0 800 558" aria-hidden="true">
                     <defs>
                       <linearGradient id="homeTrace" x1="0" y1="0" x2="1" y2="1">
@@ -340,7 +339,7 @@ a:focus-visible{outline:2px solid var(--color-structure);outline-offset:3px}
                   <ol class="test-path">
                     <li><span>深度文章生产准入</span><em>通过</em></li>
                     <li><span>素材证据链 / 并行生成</span><em>完成</em></li>
-                    <li><span>信源命中数量判断</span><em>5 / 6</em></li>
+                    <li><span>信源限定匹配</span><em>5 / 6</em></li>
                     <li><span>质量优化循环</span><em>第 2 轮通过</em></li>
                     <li><span>发布前质量门禁</span><em>通过</em></li>
                     <li><span>发布到微信</span><em>完成</em></li>
@@ -367,7 +366,7 @@ a:focus-visible{outline:2px solid var(--color-structure);outline-offset:3px}
           <article class="design-item">
             <span class="design-index">01</span>
             <h3>统一的规则结构</h3>
-            <div class="design-copy"><p>条件判断和执行流程使用同一种树形结构，覆盖与、或、非、命中数量、串行、并行、分支和有界循环。</p></div>
+            <div class="design-copy"><p>条件判断和执行流程使用同一种树形结构，覆盖与、或、非、限定匹配、串行、并行、分支和有界循环。</p></div>
           </article>
           <article class="design-item">
             <span class="design-index">02</span>

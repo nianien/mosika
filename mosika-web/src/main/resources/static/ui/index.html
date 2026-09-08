@@ -7,9 +7,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <title>加载中 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
-    <link rel="stylesheet" href="/ui/styles.css?v=20260907-6">
-    <link rel="stylesheet" href="/ui/ui-common.css?v=20260813-1">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
+    <link rel="stylesheet" href="/ui/styles.css?v=20260908-9">
+    <link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="editor-page">
 <main class="app-shell">
@@ -40,8 +40,6 @@
             <div class="canvas-titlebar">
                 <div class="canvas-title-meta">
                     <strong>流程画布</strong>
-                    <span class="core-runtime-label">UI AST → RuleNode → RuleSuite</span>
-                    <span id="nodeCount"></span>
                 </div>
                 <div class="canvas-tools">
                     <button id="foldAllButton" type="button" aria-label="折叠全部节点">
@@ -249,7 +247,6 @@
             <section class="rule-tree-panel" id="ruleTreePanel" aria-label="规则树">
                 <div class="rule-tree-caption">
                     <strong>条件组合</strong>
-                    <span id="ruleNodeCount"></span>
                 </div>
                 <div class="rule-tree-viewport">
                     <div id="ruleTreeRoot"></div>
@@ -264,7 +261,7 @@
                     <div class="inspector-heading rule-editor-heading" id="ruleEditorHeading"></div>
                     <div class="detail-field" id="ruleEditorLogicField" data-field="rulelogic" hidden></div>
                     <label id="ruleReferenceField" hidden>
-                        <span id="ruleReferenceLabel">命中要求</span>
+                        <span id="ruleReferenceLabel">匹配数量</span>
                         <input id="ruleNodeExpression" readonly>
                     </label>
                     <div class="detail-field rule-negate-field" id="ruleNegateField" hidden>
@@ -291,12 +288,20 @@
                             <div class="rule-radio-group">
                                 <label>
                                     <input type="radio" name="ruleAddLogic" value="&amp;&amp;" checked>
-                                    <span>与</span>
+                                    <span>条件与</span>
                                 </label>
                                 <label>
                                     <input type="radio" name="ruleAddLogic" value="||">
-                                    <span>或</span>
+                                    <span>条件或</span>
                                 </label>
+                                <label>
+                                    <input type="radio" name="ruleAddLogic" value="some">
+                                    <span>限定匹配</span>
+                                </label>
+                            </div>
+                            <div class="rule-match-bounds rule-builder-bounds" id="ruleAddMatchBounds" hidden>
+                                <label><span>最少匹配</span><input id="ruleAddMatchMin" type="number" min="0" step="1" placeholder="不限"></label>
+                                <label><span>最多匹配</span><input id="ruleAddMatchMax" type="number" min="0" step="1" placeholder="不限"></label>
                             </div>
                         </fieldset>
                         <div class="inspector-actions">
@@ -329,8 +334,13 @@
         <fieldset class="rule-logic-field" id="ruleCompositeLogicField" hidden>
             <legend>组合方式</legend>
             <div class="rule-radio-group">
-                <label><input type="radio" name="ruleCompositeLogic" value="&&" checked><span>与</span></label>
-                <label><input type="radio" name="ruleCompositeLogic" value="||"><span>或</span></label>
+                <label><input type="radio" name="ruleCompositeLogic" value="&&" checked><span>条件与</span></label>
+                <label><input type="radio" name="ruleCompositeLogic" value="||"><span>条件或</span></label>
+                <label><input type="radio" name="ruleCompositeLogic" value="some"><span>限定匹配</span></label>
+            </div>
+            <div class="rule-match-bounds rule-builder-bounds" id="ruleCompositeMatchBounds" hidden>
+                <label><span>最少匹配</span><input id="ruleCompositeMatchMin" type="number" min="0" step="1" placeholder="不限"></label>
+                <label><span>最多匹配</span><input id="ruleCompositeMatchMax" type="number" min="0" step="1" placeholder="不限"></label>
             </div>
         </fieldset>
         <div class="dialog-actions">
@@ -342,10 +352,11 @@
 
 <div id="nodeContextMenu" class="context-menu" hidden role="menu"></div>
 
-<script src="/ui/ui-common.js?v=20260813-1"></script>
-<script src="/ui/treenode.js?v=20260907-4"></script>
-<script src="/ui/api.js?v=20260813-1"></script>
-<script src="/ui/ns.js?v=20260813-1"></script>
-<script src="/ui/app.js?v=20260907-24"></script>
+<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/treenode.js?v=20260908-4"></script>
+<script src="/ui/flow-design.js?v=20260908-5"></script>
+<script src="/ui/api.js?v=20260908-3"></script>
+<script src="/ui/ns.js?v=20260908-3"></script>
+<script src="/ui/app.js?v=20260908-13"></script>
 </body>
 </html>

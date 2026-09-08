@@ -60,6 +60,11 @@
         return childEdges(node).filter((item) => item.relation !== "rule");
     }
 
+    function hasArgs(nodeOrType) {
+        const type = typeof nodeOrType === "string" ? nodeOrType : nodeOrType?.type;
+        return ARGS.has(type);
+    }
+
     function visit(node, visitor, parent = null, relation = null) {
         if (!node) return true;
         if (visitor(node, parent, relation) === false) return false;
@@ -210,6 +215,7 @@
         childEdges,
         childNodes,
         executionEdges,
+        hasArgs,
         visit,
         serialize,
         deserialize,

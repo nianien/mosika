@@ -353,26 +353,6 @@
     font-weight: 600;
 }
 
-.editor-page .core-runtime-label {
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 8px;
-    border-left: 2px solid var(--color-structure);
-    color: #5b7089;
-    background: #eef6f8;
-    font-family: var(--ff-mono);
-    font-size: var(--fs-note);
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-@media (max-width: 1050px) {
-    .editor-page .core-runtime-label {
-        display: none;
-    }
-}
-
 @media (max-width: 800px) {
     .control-page :is(.app-shell, .shell) {
         grid-template-rows: auto minmax(0, 1fr);

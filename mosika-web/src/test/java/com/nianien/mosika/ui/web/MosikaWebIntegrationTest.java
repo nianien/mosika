@@ -17,11 +17,13 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -806,6 +808,18 @@ class MosikaWebIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(".control-page .pager")))
                 .andExpect(content().string(containsString(".control-page .top-actions")));
+        mvc.perform(get("/ui/flow-design.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("const CAPABILITIES")))
+                .andExpect(content().string(containsString("function requiredRelations")));
+        mvc.perform(get("/ui/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(result -> {
+                    String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
+                    assertThat(source, containsString("name: \"限定匹配\""));
+                    assertThat(source, containsString("textContent = \"匹配数量\""));
+                    assertThat(source, not(containsString("命中要求")));
+                });
         mvc.perform(get("/ui/scenes.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"newFlowBtn\"")))
@@ -856,6 +870,16 @@ class MosikaWebIntegrationTest {
                 .andExpect(content().string(containsString("id=\"nodeConfigConfirmButton\"")))
                 .andExpect(content().string(containsString("id=\"actionConfigFields\"")))
                 .andExpect(content().string(containsString("id=\"ruleDialogLoopMax\"")))
+                .andExpect(content().string(containsString("name=\"ruleAddLogic\" value=\"some\"")))
+                .andExpect(content().string(containsString("id=\"ruleAddMatchBounds\"")))
+                .andExpect(content().string(containsString("name=\"ruleCompositeLogic\" value=\"some\"")))
+                .andExpect(content().string(containsString("id=\"ruleCompositeMatchBounds\"")))
+                .andExpect(result -> {
+                    String source = new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
+                    assertThat(source, containsString("<span>限定匹配</span>"));
+                    assertThat(source, containsString("id=\"ruleReferenceLabel\">匹配数量"));
+                })
+                .andExpect(content().string(containsString("/ui/flow-design.js?v=20260908-5")))
                 .andExpect(content().string(not(containsString("id=\"nodeConfigLoopMax\""))))
                 .andExpect(content().string(not(containsString("id=\"nodeConfigRule\""))));
 

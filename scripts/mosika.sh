@@ -195,6 +195,38 @@ process_matches_jar() {
     esac
 }
 
+# 返回占用指定端口、且命令行匹配 mosika-web JAR 的 PID
+# 用相对后缀匹配，兼容绝对路径启动和 `java -jar mosika-web/target/mosika-web.jar` 手动启动
+mosika_pids_on_port() {
+    local port="$1"
+    local pid
+    for pid in $(listening_pids "$port"); do
+        if process_matches_jar "$pid" "$MODULE/target/$MODULE.jar"; then
+            printf '%s\n' "$pid"
+        fi
+    done
+}
+
+# 结束占用指定端口的 mosika 实例，不依赖运行状态文件
+# 先尝试优雅停止，超过 STOP_TIMEOUT 仍存活则强制结束
+kill_mosika_on_port() {
+    local port="$1"
+    local pid
+    for pid in $(mosika_pids_on_port "$port"); do
+        info "结束占用端口 ${port} 的 mosika 进程：PID ${pid}"
+        kill "$pid" 2>/dev/null || true
+        local elapsed=0
+        while pid_alive "$pid" && [ "$elapsed" -lt "$STOP_TIMEOUT" ]; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        if pid_alive "$pid"; then
+            warn "优雅停止超时，强制结束 PID ${pid}"
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    done
+}
+
 reset_state() {
     STATE_PID=""
     STATE_PORT=""
@@ -488,16 +520,21 @@ cmd_stop() {
 }
 
 cmd_restart() {
+    validate_config
     resolve_runtime_tools
+    # 若有受管状态，沿用其记录的端口和数据库；另一 checkout 的状态（返回 2）仍拒绝接管
     local state_result=0
     if load_or_adopt_state; then
         PORT="$STATE_PORT"
         [ -n "$STATE_DB" ] && DB_PATH="$STATE_DB"
-        cmd_stop "${1:-}"
     else
         state_result=$?
         [ "$state_result" -eq 1 ] || return "$state_result"
     fi
+    # 不看状态文件：凡是占用目标端口且命令匹配 mosika JAR 的进程一律结束
+    # 覆盖手动启动或状态丢失的游离实例
+    kill_mosika_on_port "$PORT"
+    clear_state
     cmd_start
 }
 
@@ -631,8 +668,7 @@ Mosika 规则编排服务管理
   build           构建 mosika-web 可执行胖包
   start           后台启动并等待健康检查
   stop [--force]  停止受管实例；--force 允许端口异常或超时后强制结束
-  restart [--force]
-                  使用已记录的端口和数据库重启
+  restart         结束占用端口的 mosika 实例（含手动启动/游离实例）后重启
   status          显示受管实例、真实端口和健康状态
   logs [-f]       查看最近 100 行日志；-f 持续跟踪
   dev             前台运行 Spring Boot 开发模式

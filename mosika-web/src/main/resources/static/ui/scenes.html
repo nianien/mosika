@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>业务场景 · Mosika</title>
     <link rel="icon" type="image/svg+xml" href="/ui/logo.svg">
-    <link rel="stylesheet" href="/ui/tokens.css?v=20260813-1">
+    <link rel="stylesheet" href="/ui/tokens.css?v=20260908-3">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* hidden 属性兜底：带 display 的类（.pager/.targs 等）会盖掉 UA 的 [hidden]{display:none} */
@@ -53,10 +53,10 @@ tbody tr:hover{background:#f7fcfb}
 .status-toggle{width:104px;height:28px;padding:0;border:0;background:transparent;display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;justify-self:end;color:#71887f;cursor:pointer;text-align:left}
 .status-toggle-track{width:34px;height:19px;border-radius:10px;background:#cbd8d5;position:relative;transition:background .18s ease,box-shadow .18s ease}
 .status-toggle-thumb{position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(18,48,56,.28);transition:transform .18s ease}
-.status-toggle.is-on{color:var(--teal-d);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--teal)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
+.status-toggle.is-on{color:var(--color-brand-strong);font-weight:600}.status-toggle.is-on .status-toggle-track{background:var(--color-brand)}.status-toggle.is-on .status-toggle-thumb{transform:translateX(15px)}
 .status-toggle.is-draft{color:#a67823}.status-toggle.is-draft .status-toggle-track{background:#e4c77c}
 .status-toggle:hover .status-toggle-track{box-shadow:0 0 0 3px rgba(15,157,138,.12)}
-.status-toggle:focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:7px}
+.status-toggle:focus-visible{outline:2px solid var(--color-brand);outline-offset:3px;border-radius:7px}
 .status-toggle:disabled{cursor:wait;opacity:.58}.status-toggle.is-pending .status-toggle-track{animation:switchPulse .8s ease-in-out infinite alternate}
 .status-toggle-label{font-size:var(--fs-meta);line-height:1}
 @keyframes switchPulse{to{opacity:.5}}
@@ -104,7 +104,7 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 .confirm-note{padding:10px 12px;border-radius:8px;background:#f4faf9;color:#6f8b86;font-size:var(--fs-minor);line-height:1.55}
 @media(max-width:800px){.app-shell{height:auto;min-height:100vh}.brand-mark{width:32px;height:32px}.main{padding:16px 12px 24px}.drawer{width:100%;max-width:100vw}}
 </style>
-<link rel="stylesheet" href="/ui/ui-common.css?v=20260824-3">
+<link rel="stylesheet" href="/ui/ui-common.css?v=20260908-4">
 </head>
 <body class="control-page">
 <div class="app-shell">
@@ -184,9 +184,9 @@ dialog::backdrop{background:rgba(18,48,56,.3)}
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="/ui/ui-common.js?v=20260824-1"></script>
-<script src="/ui/api.js?v=20260813-1"></script>
-<script src="/ui/ns.js?v=20260813-1"></script>
+<script src="/ui/ui-common.js?v=20260908-3"></script>
+<script src="/ui/api.js?v=20260908-3"></script>
+<script src="/ui/ns.js?v=20260908-3"></script>
 <script>
 (() => {
   "use strict";
