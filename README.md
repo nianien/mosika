@@ -1,8 +1,7 @@
 # Mosika
 
 <p align="center">
-  <strong>把业务规则画出来，就能编译、执行、追踪、回放</strong><br>
-  <sub>模型驱动的可视化规则流语言与执行内核 · JDK 21 · Rhino · ANTLR4</sub>
+  <sub>图即源代码 · 递归统一 串 / 并 / 分 / 循 · 定义与编排解耦 · 模板参数 · JS / Java UDF · 全链路可解释</sub>
 </p>
 
 <p align="center">
@@ -68,16 +67,6 @@ DSL 的原子项是规则 ID，用运算符递归组合成任意结构：
       <strong>有界循环</strong><br>
       <code>loop(3, condition, action)</code><br><br>
       <img src="./docs/images/loop.svg" alt="有界循环：命中条件则执行动作并进入下一轮，未命中或达上限时退出" width="100%">
-    </td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td colspan="2" align="center">
-      <strong>带参数规则</strong><br>
-      <code>threshold("""{"limit":100}""") || threshold("""{"limit":300}""")</code><br><br>
-      <sub>同一规则按节点绑定不同 JSON 参数，不必为阈值差异复制规则</sub>
     </td>
   </tr>
 </table>
