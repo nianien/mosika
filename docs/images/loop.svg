@@ -17,7 +17,7 @@
     <path class="edge" d="M 180 132 L 180 196"/>
     <text class="branch" x="300" y="34">下一轮 · 最多 3 轮</text>
     <text class="branch" x="300" y="92">命中</text>
-    <text class="branch" x="180" y="222">未命中 / 达上限</text>
+    <text class="branch" x="180" y="222">未命中则退出</text>
     <circle class="node" cx="180" cy="110" r="22"/>
     <circle class="node" cx="420" cy="110" r="22"/>
     <text class="label" x="180" y="110">c</text>
