@@ -59,24 +59,24 @@ DSL 的原子项是规则 ID，用运算符递归组合成任意结构：
     </td>
   </tr>
   <tr>
-    <td colspan="2" align="center">
+    <td width="50%" align="center">
       <strong>有序多分支</strong><br>
       <code>a?b:(c?d:e)</code><br><br>
-      <img src="./docs/images/multi-branch.svg" alt="有序多分支：命中首个条件后停止，并支持默认分支" width="56%">
+      <img src="./docs/images/multi-branch.svg" alt="有序多分支：命中首个条件后停止，并支持默认分支" width="100%">
+    </td>
+    <td width="50%" align="center">
+      <strong>有界循环</strong><br>
+      <code>loop(3, condition, action)</code><br><br>
+      <img src="./docs/images/loop.svg" alt="有界循环：命中条件则执行动作并进入下一轮，未命中或达上限时退出" width="100%">
     </td>
   </tr>
 </table>
 
 <table>
   <tr>
-    <td width="50%" align="center">
-      <strong>有界循环</strong><br>
-      <code>loop(3, shouldRetry, rebuild-&gt;check)</code><br><br>
-      <sub>条件命中就执行循环体，最多 3 轮；循环体是普通子树，可任意嵌套</sub>
-    </td>
-    <td width="50%" align="center">
+    <td colspan="2" align="center">
       <strong>带参数规则</strong><br>
-      <code>threshold("""{"limit":100}""")</code><br><br>
+      <code>threshold("""{"limit":100}""") || threshold("""{"limit":300}""")</code><br><br>
       <sub>同一规则按节点绑定不同 JSON 参数，不必为阈值差异复制规则</sub>
     </td>
   </tr>
