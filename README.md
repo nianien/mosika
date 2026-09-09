@@ -1,4 +1,4 @@
-# Mosika
+<h1 align="center">Mosika</h1>
 
 <p align="center">
   <sub>图即源代码 · 递归统一 串 / 并 / 分 / 循 · 定义与编排解耦 · 模板参数 · JS / Java UDF · 全链路可解释</sub>
