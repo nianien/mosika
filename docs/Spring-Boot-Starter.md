@@ -62,7 +62,7 @@ NormalizeAccountUdf normalizeAccountUdf(AccountService accountService) {
 }
 ```
 
-Starter 在 Spring 完成配置类解析后扫描 UDF。若同一类型已经通过 `@Bean`、`@Component` 等方式存在于容器中，Starter 直接使用已有 Bean，不再创建第二个实例；否则将扫描到的 `@Udf` 类型注册为 Spring Bean。两种方式都使用主容器完成依赖注入和 Bean 后置处理。
+Starter 在 Spring 完成配置类解析后扫描 UDF。若同一类型已经通过 `@Bean`、`@Component` 等方式存在于容器中，Starter 直接使用已有 Bean，不额外创建实例；否则将扫描到的 `@Udf` 类型注册为 Spring Bean。两种方式都使用主容器完成依赖注入和 Bean 后置处理。
 
 ## 3. 装配 RuleSuite
 
@@ -102,7 +102,7 @@ account.normalize(databaseFns.enrich($))
 
 ## 5. 实现与验证位置
 
-| 位置 | 当前职责 |
+| 位置 | 职责 |
 | --- | --- |
 | `mosika-udf` | 集中存放由 Starter 扫描注册的 Java UDF 实现 |
 | `MosikaUdfAutoConfiguration` | 导入扫描注册器并提供 `SpringUdfLoader` Bean |
