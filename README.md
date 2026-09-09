@@ -2,8 +2,7 @@
 
 <p align="center">
   <strong>把业务规则画出来，就能编译、执行、追踪、回放</strong><br>
-  <sub>模型驱动的可视化规则流语言与执行内核</sub><br>
-  <sub>JDK 21 · Rhino · ANTLR4</sub>
+  <sub>模型驱动的可视化规则流语言与执行内核 · JDK 21 · Rhino · ANTLR4</sub>
 </p>
 
 <p align="center">
@@ -64,6 +63,21 @@ DSL 的原子项是规则 ID，用运算符递归组合成任意结构：
       <strong>有序多分支</strong><br>
       <code>a?b:(c?d:e)</code><br><br>
       <img src="./docs/images/multi-branch.svg" alt="有序多分支：命中首个条件后停止，并支持默认分支" width="56%">
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>有界循环</strong><br>
+      <code>loop(3, shouldRetry, rebuild-&gt;check)</code><br><br>
+      <sub>条件命中就执行循环体，最多 3 轮；循环体是普通子树，可任意嵌套</sub>
+    </td>
+    <td width="50%" align="center">
+      <strong>带参数规则</strong><br>
+      <code>threshold("""{"limit":100}""")</code><br><br>
+      <sub>同一规则按节点绑定不同 JSON 参数，不必为阈值差异复制规则</sub>
     </td>
   </tr>
 </table>
