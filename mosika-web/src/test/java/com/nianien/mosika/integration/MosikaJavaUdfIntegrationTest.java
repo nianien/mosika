@@ -60,7 +60,7 @@ class MosikaJavaUdfIntegrationTest {
     }
 
     @Test
-    void mergesReadOnlyJavaUdfWithEditableDatabaseUdf() throws Exception {
+    void mergesReadOnlyBuiltinUdfWithEditableDatabaseUdf() throws Exception {
         mvc.perform(post("/api/udfs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -76,64 +76,38 @@ class MosikaJavaUdfIntegrationTest {
                 .andExpect(jsonPath("$.data.type").value("javascript"))
                 .andExpect(jsonPath("$.data.editable").value(true));
 
-        mvc.perform(get("/api/udfs")
-                        .param("namespace", "default")
-                        .param("status", "1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(5))
-                .andExpect(jsonPath("$.data.items[0].group").value("javaFns"))
-                .andExpect(jsonPath("$.data.items[0].name").value("add"))
-                .andExpect(jsonPath("$.data.items[0].type").value("java"))
-                .andExpect(jsonPath("$.data.items[0].editable").value(false))
-                .andExpect(jsonPath("$.data.items[0].implementationKind").value("function"))
-                .andExpect(jsonPath("$.data.items[0].id").doesNotExist())
-                .andExpect(jsonPath("$.data.items[0].methods[0].name").value("apply"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].parameterTypes[0]").value("Integer"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].parameterTypes[1]").value("Integer"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].parameterNames[0]").value("left"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].parameterNames[1]").value("right"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].returnType").value("Integer"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].description").value("返回两个整数之和"))
-                .andExpect(jsonPath("$.data.items[1].name").value("doubleValue"))
-                .andExpect(jsonPath("$.data.items[1].implementationKind").value("function"))
-                .andExpect(jsonPath("$.data.items[1].methods[0].parameterNames[0]").value("value"))
-                .andExpect(jsonPath("$.data.items[2].name").value("strings"))
-                .andExpect(jsonPath("$.data.items[2].implementationKind").value("bean"))
-                .andExpect(jsonPath("$.data.items[2].methods[0].name").value("contains"))
-                .andExpect(jsonPath("$.data.items[2].methods[0].parameterNames[0]").value("text"))
-                .andExpect(jsonPath("$.data.items[2].methods[0].parameterNames[1]").value("part"))
-                .andExpect(jsonPath("$.data.items[3].name").value("strings"))
-                .andExpect(jsonPath("$.data.items[3].implementationKind").value("bean"))
-                .andExpect(jsonPath("$.data.items[3].methods[0].name").value("join"))
-                .andExpect(jsonPath("$.data.items[3].methods[0].parameterNames[0]").value("separator"))
-                .andExpect(jsonPath("$.data.items[3].methods[0].parameterNames[1]").value("values"))
-                .andExpect(jsonPath("$.data.items[3].methods[0].varArgs").value(true))
-                .andExpect(jsonPath("$.data.items[4].group").value("jsFns"))
-                .andExpect(jsonPath("$.data.items[4].name").value("increment"))
-                .andExpect(jsonPath("$.data.items[4].type").value("javascript"))
-                .andExpect(jsonPath("$.data.items[4].editable").value(true))
-                .andExpect(jsonPath("$.data.items[4].implementationKind").doesNotExist())
-                .andExpect(jsonPath("$.data.items[4].methods").doesNotExist());
-
+        // 内置 sys.crypto.md5 是只读的 Java UDF，按方法关键字过滤到唯一条目
         mvc.perform(get("/api/udfs")
                         .param("namespace", "default")
                         .param("status", "1")
-                        .param("keyword", "join"))
+                        .param("keyword", "md5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.items[0].group").value("javaFns"))
-                .andExpect(jsonPath("$.data.items[0].name").value("strings"))
-                .andExpect(jsonPath("$.data.items[0].methods[0].name").value("join"));
+                .andExpect(jsonPath("$.data.items[0].group").value("sys"))
+                .andExpect(jsonPath("$.data.items[0].name").value("crypto"))
+                .andExpect(jsonPath("$.data.items[0].type").value("java"))
+                .andExpect(jsonPath("$.data.items[0].editable").value(false))
+                .andExpect(jsonPath("$.data.items[0].implementationKind").value("bean"))
+                .andExpect(jsonPath("$.data.items[0].id").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].methods[0].name").value("md5"))
+                .andExpect(jsonPath("$.data.items[0].methods[0].parameterNames[0]").value("text"))
+                .andExpect(jsonPath("$.data.items[0].methods[0].returnType").value("String"))
+                .andExpect(jsonPath("$.data.items[0].methods[0].description").value("MD5 十六进制摘要"));
 
+        // 可编辑的数据库 JavaScript UDF 与内置 Java UDF 并列呈现
         mvc.perform(get("/api/udfs")
                         .param("namespace", "default")
                         .param("status", "1")
-                        .param("pageNumber", "5")
-                        .param("pageSize", "1"))
+                        .param("keyword", "increment"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(5))
-                .andExpect(jsonPath("$.data.items[0].name").value("increment"));
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].group").value("jsFns"))
+                .andExpect(jsonPath("$.data.items[0].name").value("increment"))
+                .andExpect(jsonPath("$.data.items[0].type").value("javascript"))
+                .andExpect(jsonPath("$.data.items[0].editable").value(true))
+                .andExpect(jsonPath("$.data.items[0].methods").doesNotExist());
 
+        // 规则同时调用内置 Java UDF 与数据库 JavaScript UDF
         String createRuleResponse = mvc.perform(post("/api/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -141,7 +115,7 @@ class MosikaJavaUdfIntegrationTest {
                                   "namespace":"default",
                                   "name":"combined-udf",
                                   "description":"combined-udf",
-                                  "expression":"javaFns.strings.join('-', 'a', 'b', 'c') === 'a-b-c' ? javaFns.add(javaFns.doubleValue(jsFns.increment($.value)), 1) : 0",
+                                  "expression":"sys.crypto.sha256('abc').length === 64 ? jsFns.increment($.value) : 0",
                                   "kind":"action"
                                 }
                                 """))
@@ -154,22 +128,23 @@ class MosikaJavaUdfIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"target\":{\"value\":3}}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.result").value(9));
+                .andExpect(jsonPath("$.data.result").value(4));
 
+        // 保留分组 sys 拒绝创建同名 JavaScript UDF
         mvc.perform(post("/api/udfs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "namespace":"default",
-                                  "group":"javaFns",
-                                  "name":"doubleValue",
+                                  "group":"sys",
+                                  "name":"num",
                                   "description":"conflict",
                                   "source":"value => value"
                                 }
                                 """))
-                .andExpect(status().isConflict())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
-                        .value("udf is provided by Java and cannot be modified: javaFns.doubleValue"));
+                        .value("udf group 'sys' is reserved for built-in functions"));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM udf_definition", Integer.class));
     }
 
