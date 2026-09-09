@@ -10,8 +10,8 @@
   <a href="#为什么是-mosika">技术价值</a> ·
   <a href="#规则流是什么样的">核心能力</a> ·
   <a href="#模板参数化规则">模板参数</a> ·
-  <a href="./docs/规则编辑器.md">参考 Web UI</a> ·
-  <a href="./docs/核心设计.md">内核设计</a> ·
+  <a href="./docs/规则编排交互设计.md">编排交互</a> ·
+  <a href="./docs/规则模型核心设计.md">内核设计</a> ·
   <a href="./CHANGELOG.md">更新日志</a> ·
   <a href="./docs/README.md">完整文档</a> ·
   <a href="./mosika-web/src/main/resources/static/ui/index.html">参考 UI 源码</a>
@@ -148,7 +148,7 @@ threshold("""{"limit":100}""") || threshold("""{"limit":300}""")
 
 ANTLR4 只负责识别三引号参数块的安全边界，`ExprNode` 在构造时通过 `JsonUtils` 把参数解析为 `Map<String,Object>`，并用规范化 JSON 生成稳定的 `expr()`；JavaScript 源码不做字符串替换。`NodeBuilder` 不缓存原子节点或参数变体，单次顶层执行由 `RuleVisitor` 直接按 `ExprNode.expr()` 复用叶子结果：对象字段在所有嵌套层级递归排序，数组元素顺序保留。相同参数组合只真正求值一次，不同参数组合分别求值；每次出现仍保留各自的执行节点、结果和动态描述。未传参数的规则保持原有语义，并收到空的 `$args` 对象。
 
-完整语法、执行缓存和当前边界见[模板参数化规则](./docs/模板参数化规则.md)。
+完整语法、执行缓存和使用边界见[规则模型核心设计](./docs/规则模型核心设计.md#7-模板参数化)。
 
 ## 完整 UI 树
 
@@ -221,13 +221,11 @@ UDF 是进程内可执行代码，不是面向不受信任用户的普通配置�
 ./scripts/mosika.sh stop
 ```
 
-环境变量、运行目录和分模块验证命令见[开发与运行](./docs/开发与运行.md)。
+环境变量、运行目录和分模块验证命令见[运维与开发](./docs/运维与开发.md)。
 
 ## 进一步阅读
 
 - [文档索引](./docs/README.md)：全部有效文档及其适用边界。
-- [Core 核心设计](./docs/核心设计.md)：内核设计、运行链路与核心不变量。
-- [Spring Boot Starter](./docs/Spring-Boot-Starter.md)：`@Udf` 自动扫描、`@UdfMethod` 方法暴露、Spring 装配以及 Web 合并语义。
-- [模板参数化规则](./docs/模板参数化规则.md)：参数语法、`$args` 绑定、缓存语义、执行详情和使用边界。
-- [UI 树与 Web 编辑器](./docs/规则编辑器.md)：UI AST、画布投影、编辑与持久化契约。
-- [开发与运行](./docs/开发与运行.md)：构建、测试、服务脚本和运行配置。
+- [规则模型核心设计](./docs/规则模型核心设计.md)：设计理念、DSL 语法、节点体系、引擎装配、求值缓存、UDF 内核能力与内置库、模板参数。
+- [规则编排交互设计](./docs/规则编排交互设计.md)：规则定义与编排解耦、递归树统一串/并/分支/循环、UI 单向编译为 DSL、在线测试与执行路径渲染、版本生命周期。
+- [运维与开发](./docs/运维与开发.md)：工程结构、构建测试、服务脚本、部署与 Java/JavaScript UDF 的定义、装配和使用。

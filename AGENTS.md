@@ -41,7 +41,9 @@ mvn -pl mosika-core test -Dtest=SomeTest#someMethod   # 单个测试方法
 
 | 模块 | 负责 | 不得包含 |
 | --- | --- | --- |
-| `mosika-core` | DSL、规则树、执行上下文、求值、UDF、命名原子/复合规则 | 页面、持久化、Flow 产品模型、业务场景映射 |
+| `mosika-core` | DSL、规则树、执行上下文、求值、UDF 抽象与引擎、命名原子/复合规则 | 页面、持久化、Flow 产品模型、业务场景映射 |
+| `mosika-udf` | 内置 Java UDF 实现（`udf/builtin/*`） | DSL/引擎内核、页面、Spring 装配 |
+| `mosika-spring-boot-starter` | `@Udf` 自动扫描与 Spring 装配（`SpringUdfLoader`/`UdfBeanDefinitionRegistrar`/`MosikaUdfAutoConfiguration`） | 规则语义、执行内核、业务持久化 |
 | `mosika-ui` | 可序列化 UI AST + 单向编译为 `RuleNode` | 页面布局、Web 依赖、从执行树反向恢复 UI 树 |
 | `mosika-web` | 可选参考控制面：REST、SQLite、规则管理 + 可视化编辑器 | 规则语义、执行内核、以库形式替换 Core/UI |
 
@@ -77,7 +79,7 @@ Rule = AtomicNode(expr, args?) | BooleanNode(negative)
 - `UINodeAdapter` 只提供 `toRule()` —— UI AST 到 `RuleNode` 的单向编译，丢弃 `name` 等编辑元数据，不能反向恢复 UI 树。
 - 改任一节点都要保持一致：`toRule()` 编译、`TreeNode.visit()` 的全部递归边、`NodeTypeResolver` 的 JSON 类型映射，以及“UI → JSON → UI → Rule”的结构/语义等价。
 
-完整节点字段、遍历、校验、单向编译映射与画布交互见 [`docs/规则编辑器.md`](docs/规则编辑器.md)。
+完整节点字段、遍历、校验、单向编译映射与画布交互见 [`docs/规则编排交互设计.md`](docs/规则编排交互设计.md)。
 
 ## Web 层（`mosika-web`）
 
