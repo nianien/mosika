@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 250" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" role="img" aria-labelledby="title desc">
     <title id="title">有界循环</title>
-    <desc id="desc">每轮判断条件 c，命中则执行动作 a 并进入下一轮，未命中或达到最大轮数时退出</desc>
+    <desc id="desc">每轮判断条件 c，命中则执行动作 a 并进入下一轮；条件未命中，或动作后轮数达到上限，都退出循环</desc>
     <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 Z" fill="#475569"/>
@@ -9,17 +9,22 @@
             .edge { fill: none; stroke: #475569; stroke-width: 4; stroke-linecap: round; marker-end: url(#arrow); }
             .node { fill: #f0fdfa; stroke: #14b8a6; stroke-width: 3; }
             .label { fill: #0f172a; font: 600 24px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; dominant-baseline: central; }
+            .exit { fill: #0f172a; font: 600 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; dominant-baseline: central; }
             .branch { fill: #0f766e; font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; paint-order: stroke; stroke: white; stroke-width: 7px; stroke-linejoin: round; text-anchor: middle; }
         </style>
     </defs>
-    <path class="edge" d="M 420 88 C 420 34, 180 34, 180 88"/>
-    <path class="edge" d="M 202 110 L 398 110"/>
-    <path class="edge" d="M 180 132 L 180 196"/>
-    <text class="branch" x="300" y="34">下一轮 · 最多 3 轮</text>
-    <text class="branch" x="300" y="92">命中</text>
-    <text class="branch" x="180" y="222">未命中则退出</text>
-    <circle class="node" cx="180" cy="110" r="22"/>
-    <circle class="node" cx="420" cy="110" r="22"/>
-    <text class="label" x="180" y="110">c</text>
-    <text class="label" x="420" y="110">a</text>
+    <path class="edge" d="M 430 98 C 430 42, 170 42, 170 98"/>
+    <path class="edge" d="M 192 120 L 408 120"/>
+    <path class="edge" d="M 170 142 C 170 205, 224 238, 270 246"/>
+    <path class="edge" d="M 430 142 C 430 205, 376 238, 330 246"/>
+    <text class="branch" x="300" y="42">下一轮 · 最多 3 轮</text>
+    <text class="branch" x="300" y="102">命中</text>
+    <text class="branch" x="150" y="205">未命中</text>
+    <text class="branch" x="450" y="205">达上限</text>
+    <circle class="node" cx="170" cy="120" r="22"/>
+    <circle class="node" cx="430" cy="120" r="22"/>
+    <rect class="node" x="248" y="248" width="104" height="42" rx="12"/>
+    <text class="label" x="170" y="120">c</text>
+    <text class="label" x="430" y="120">a</text>
+    <text class="exit" x="300" y="269">退出</text>
 </svg>
