@@ -55,7 +55,7 @@ DSL 的原子项是规则 ID，用运算符递归组合成任意结构：
     </td>
     <td width="50%" align="center">
       <strong>有界循环</strong><br>
-      <code>loop(3, condition, action)</code><br><br>
+      <code>loop(3, c, a)</code><br><br>
       <img src="./docs/images/loop.svg" alt="有界循环：命中条件则执行动作并进入下一轮，未命中或达上限时退出" width="100%">
     </td>
   </tr>
