@@ -65,17 +65,34 @@ class ContentGenerationDemoDataTest {
                                 + "JOIN rule_namespace n ON n.id=u.namespace_id WHERE n.code='default'",
                         Integer.class));
 
+        insertLegacyFlowRules();
         importDemoData();
 
-        assertEquals(58, count("atomic_rule"));
+        assertEquals(62, count("atomic_rule"));
         assertEquals(3, count("udf_definition"));
-        assertEquals(7, count("rule_flow"));
-        assertEquals(115, count("flow_atomic_ref"));
+        assertEquals(9, count("rule_flow"));
+        assertEquals(123, count("flow_atomic_ref"));
         assertEquals(12, count("flow_flow_ref"));
+        assertEquals(
+                2,
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM rule_flow WHERE rule_tree LIKE '%\"type\":\"LoopNode\"%'",
+                        Integer.class));
+        assertEquals(
+                "LogicNode",
+                readFlowTree(20101).path("next").path("branches").get(0).path("rule").path("type").asText());
+        assertEquals(
+                "MatchNode",
+                readFlowTree(20102).path("next").path("branches").get(0).path("rule").path("type").asText());
         assertEquals(
                 "content.generation.extractClaims($)",
                 jdbc.queryForObject("SELECT expression FROM atomic_rule WHERE id=10118", String.class));
-        assertEquals(7, flowVersionSum());
+        assertEquals(
+                0,
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM atomic_rule WHERE expression LIKE '%sys.flow.eval%'",
+                        Integer.class));
+        assertEquals(9, flowVersionSum());
         assertTrue(flowDepth(20002) >= 11);
         assertTrue(flowDepth(20003) >= 10);
         assertTrue(flowDepth(20004) >= 10);
@@ -118,13 +135,41 @@ class ContentGenerationDemoDataTest {
         target.put("contentType", "MARKETING");
         assertExecuted(suiteManager.evalFlow("f20004", target, Map.of()));
 
+        Map<String, Object> sourceRetryContext = new LinkedHashMap<>();
+        assertExecutedRule(suiteManager.evalFlow("f20101", target, sourceRetryContext), "r10128");
+        assertEquals(3, sourceRetryContext.get("sourceRetryCount"));
+
+        Map<String, Object> qualityRetryContext = new LinkedHashMap<>();
+        assertExecutedRule(suiteManager.evalFlow("f20102", target, qualityRetryContext), "r10128");
+        assertEquals(2, qualityRetryContext.get("qualityRetryCount"));
+
         importDemoData();
-        assertEquals(58, count("atomic_rule"));
+        assertEquals(62, count("atomic_rule"));
         assertEquals(3, count("udf_definition"));
-        assertEquals(7, count("rule_flow"));
-        assertEquals(115, count("flow_atomic_ref"));
+        assertEquals(9, count("rule_flow"));
+        assertEquals(123, count("flow_atomic_ref"));
         assertEquals(12, count("flow_flow_ref"));
-        assertEquals(7, flowVersionSum());
+        assertEquals(9, flowVersionSum());
+    }
+
+    private void insertLegacyFlowRules() {
+        jdbc.update("""
+                INSERT INTO atomic_rule
+                    (id, namespace_id, name, description, expression, kind, status, version)
+                VALUES
+                    (10112, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用深度文章生成流程', '', 'sys.flow.eval("20002",$,$$)', 'action', 1, 0),
+                    (10113, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用突发快讯生成流程', '', 'sys.flow.eval("20003",$,$$)', 'action', 1, 0),
+                    (10114, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用营销文案生成流程', '', 'sys.flow.eval("20004",$,$$)', 'action', 1, 0),
+                    (10115, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用发布前质量门禁', '', 'sys.flow.eval("20005",$,$$)', 'action', 1, 0),
+                    (10132, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用素材证据链构建流程', '', 'sys.flow.eval("20006",$,$$)', 'action', 1, 0),
+                    (10133, (SELECT id FROM rule_namespace WHERE code='default'),
+                     '调用多渠道适配流程', '', 'sys.flow.eval("20007",$,$$)', 'action', 1, 0)
+                """);
     }
 
     private void importDemoData() {
@@ -233,6 +278,8 @@ class ContentGenerationDemoDataTest {
         target.put("campaignActive", true);
         target.put("campaignBudgetRemaining", 10000);
         target.put("autoPublishEnabled", true);
+        target.put("requiredSourceRetries", 3);
+        target.put("targetQualityScore", 0.95);
         return target;
     }
 

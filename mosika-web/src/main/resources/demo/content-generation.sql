@@ -9,8 +9,9 @@
 -- brandToneReady / campaignActive / campaignBudgetRemaining
 -- regulatedTopic / exposureLevel / seoRequired / autoPublishEnabled
 -- requiresHumanReview / eventAgeMinutes
+-- requiredSourceRetries / targetQualityScore
 --
--- r10001~r10136 和 f20001~f20007 是本演示固定占用的派生 ID。
+-- r10001~r10136、r10201~r10204 和 f20001~f20007、f20101~f20102 是本演示固定占用的派生 ID
 -- 原子规则只在不存在时插入；规则流由本文件维护，重复导入时升级树结构并重建引用。
 
 BEGIN TRANSACTION;
@@ -66,14 +67,17 @@ VALUES
     (10025, (SELECT id FROM rule_namespace WHERE code='default'), '允许自动发布', '租户与渠道策略允许质量门禁自动发布', '$.autoPublishEnabled == true', 'condition', 1, 0),
     (10026, (SELECT id FROM rule_namespace WHERE code='default'), '目标渠道为微信', '目标发布渠道为微信公众号', '$.channel == "WECHAT"', 'condition', 1, 0),
     (10027, (SELECT id FROM rule_namespace WHERE code='default'), '目标渠道为客户端', '目标发布渠道为移动客户端', '$.channel == "APP"', 'condition', 1, 0),
-    (10028, (SELECT id FROM rule_namespace WHERE code='default'), '目标渠道为网站', '目标发布渠道为 Web 站点', '$.channel == "WEB"', 'condition', 1, 0);
+    (10028, (SELECT id FROM rule_namespace WHERE code='default'), '目标渠道为网站', '目标发布渠道为 Web 站点', '$.channel == "WEB"', 'condition', 1, 0),
+    (10201, (SELECT id FROM rule_namespace WHERE code='default'), '仍需补全素材', '素材补全次数尚未达到本次任务要求', '($$.get("sourceRetryCount") || 0) < $.requiredSourceRetries', 'condition', 1, 0),
+    (10203, (SELECT id FROM rule_namespace WHERE code='default'), '内容质量仍需优化', '当前内容质量仍低于目标质量', '$.qualityScore < $.targetQualityScore', 'condition', 1, 0);
 
 -- ============================================================
 -- 动作规则：真实生成流水线中的可替换执行能力
 -- ============================================================
 
-DELETE FROM flow_atomic_ref WHERE flow_id BETWEEN 20001 AND 20007;
-DELETE FROM flow_flow_ref WHERE flow_id BETWEEN 20001 AND 20007;
+DELETE FROM flow_atomic_ref WHERE flow_id BETWEEN 20001 AND 20007 OR flow_id IN (20101, 20102);
+DELETE FROM flow_flow_ref WHERE flow_id BETWEEN 20001 AND 20007 OR flow_id IN (20101, 20102);
+DELETE FROM atomic_rule WHERE id IN (10112, 10113, 10114, 10115, 10132, 10133);
 
 INSERT OR IGNORE INTO atomic_rule
     (id, namespace_id, name, description, expression, kind, status, version)
@@ -107,7 +111,9 @@ VALUES
     (10131, (SELECT id FROM rule_namespace WHERE code='default'), '提交高影响发布审核', '将高曝光内容提交给高级审核队列', '{stage:"HIGH_IMPACT_REVIEW",status:"review_required"}', 'action', 1, 0),
     (10134, (SELECT id FROM rule_namespace WHERE code='default'), '拒绝不支持的发布渠道', '渠道适配无法识别目标渠道时终止任务', '{stage:"CHANNEL_ADAPTATION",status:"rejected",reason:"unsupported_channel"}', 'action', 1, 0),
     (10135, (SELECT id FROM rule_namespace WHERE code='default'), '生成标题与摘要', '并行生成快讯标题、导语和一句话摘要', '{stage:"TITLE_AND_SUMMARY",status:"completed"}', 'action', 1, 0),
-    (10136, (SELECT id FROM rule_namespace WHERE code='default'), '召回品牌知识', '召回品牌术语、产品卖点、风格指南和禁用词', '{stage:"BRAND_KNOWLEDGE",status:"completed"}', 'action', 1, 0);
+    (10136, (SELECT id FROM rule_namespace WHERE code='default'), '召回品牌知识', '召回品牌术语、产品卖点、风格指南和禁用词', '{stage:"BRAND_KNOWLEDGE",status:"completed"}', 'action', 1, 0),
+    (10202, (SELECT id FROM rule_namespace WHERE code='default'), '执行素材补全重试', '记录一次素材补全重试并推进循环状态', '($$.put("sourceRetryCount", ($$.get("sourceRetryCount") || 0) + 1), {stage:"SOURCE_RETRY",status:"completed",attempt:$$.get("sourceRetryCount")})', 'action', 1, 0),
+    (10204, (SELECT id FROM rule_namespace WHERE code='default'), '执行内容质量优化', '记录一次内容质量优化并推进循环状态', '($$.put("qualityRetryCount", ($$.get("qualityRetryCount") || 0) + 1), {stage:"QUALITY_RETRY",status:"completed",attempt:$$.get("qualityRetryCount")})', 'action', 1, 0);
 
 -- 这三条用于演示“原子规则引用稳定 UDF”；重复导入时同步演示表达式。
 UPDATE atomic_rule SET expression='content.delivery.publish($)' WHERE id=10108;
@@ -202,6 +208,30 @@ ON CONFLICT(id) DO UPDATE SET
 WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
    OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
 
+-- 20101 素材补全重试：条件在目标次数后停止，随后继续记录审计
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
+VALUES
+    (20101, 20101, (SELECT id FROM rule_namespace WHERE code='default'), '素材补全重试', '重复补全素材直至达到任务要求，并在循环结束后记录生成审计',
+     '{"type":"TreeNode","name":"","next":{"type":"SerialNode","name":"","branches":[{"type":"LoopNode","name":"素材补全重试","max":5,"rule":{"type":"LogicNode","name":"素材补全重试条件","expr":"&&","negative":false,"rules":[{"type":"BooleanNode","name":"仍需补全素材","expr":"r10201","negative":false},{"type":"BooleanNode","name":"创作请求完整","expr":"r10001","negative":false}]},"next":{"type":"ActionNode","name":"","rule":{"type":"AtomicNode","name":"","expr":"r10202"}}},{"type":"ActionNode","name":"","rule":{"type":"AtomicNode","name":"","expr":"r10128"}}]}}',
+     1, 1)
+ON CONFLICT(id) DO UPDATE SET
+    name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
+WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
+   OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
+
+-- 20102 内容质量优化重试：条件持续命中时由最大次数停止，随后继续记录审计
+INSERT INTO rule_flow (id, flow_key, namespace_id, name, description, rule_tree, status, version)
+VALUES
+    (20102, 20102, (SELECT id FROM rule_namespace WHERE code='default'), '内容质量优化重试', '内容质量未达目标时最多优化两轮，并在循环结束后记录生成审计',
+     '{"type":"TreeNode","name":"","next":{"type":"SerialNode","name":"","branches":[{"type":"LoopNode","name":"内容质量优化重试","max":2,"rule":{"type":"MatchNode","name":"质量优化重试条件","expr":"some","negative":false,"minHits":2,"maxHits":2,"rules":[{"type":"BooleanNode","name":"内容质量仍需优化","expr":"r10203","negative":false},{"type":"BooleanNode","name":"生成配置就绪","expr":"r10016","negative":false}]},"next":{"type":"ActionNode","name":"","rule":{"type":"AtomicNode","name":"","expr":"r10204"}}},{"type":"ActionNode","name":"","rule":{"type":"AtomicNode","name":"","expr":"r10128"}}]}}',
+     1, 1)
+ON CONFLICT(id) DO UPDATE SET
+    name=excluded.name, description=excluded.description, rule_tree=excluded.rule_tree,
+    status=excluded.status, version=excluded.version, updated_at=datetime('now','localtime')
+WHERE rule_flow.name <> excluded.name OR rule_flow.description <> excluded.description
+   OR rule_flow.rule_tree <> excluded.rule_tree OR rule_flow.status <> excluded.status;
+
 -- ============================================================
 -- 派生引用：与 RuleFlowService 发布流程时生成的两类引用表保持一致
 -- ============================================================
@@ -245,7 +275,10 @@ INSERT OR IGNORE INTO flow_atomic_ref (flow_id, rule_id) VALUES
     (20006, 10003), (20006, 10129), (20006, 10109),
 
     (20007, 10026), (20007, 10125), (20007, 10128), (20007, 10027),
-    (20007, 10126), (20007, 10028), (20007, 10127), (20007, 10134);
+    (20007, 10126), (20007, 10028), (20007, 10127), (20007, 10134),
+
+    (20101, 10201), (20101, 10001), (20101, 10202), (20101, 10128),
+    (20102, 10203), (20102, 10016), (20102, 10204), (20102, 10128);
 
 INSERT OR IGNORE INTO flow_flow_ref (flow_id, referenced_flow_id) VALUES
     (20001, 20002), (20001, 20003), (20001, 20004),
